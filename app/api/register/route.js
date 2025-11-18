@@ -11,8 +11,17 @@ const BASE_URL = "https://rocky-be-production.up.railway.app";
  */
 export async function POST(req) {
   try {
-    const { firstName, lastName, email, password, phone, sessionId } =
-      await req.json();
+    const {
+      firstName,
+      lastName,
+      email,
+      password,
+      phone,
+      dateOfBirth,
+      gender,
+      province,
+      sessionId,
+    } = await req.json();
 
     // Validate required fields
     if (!firstName || !lastName) {
@@ -65,6 +74,36 @@ export async function POST(req) {
       );
     }
 
+    if (!dateOfBirth) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Date of birth is required",
+        },
+        { status: 400 }
+      );
+    }
+
+    if (!gender) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Gender is required",
+        },
+        { status: 400 }
+      );
+    }
+
+    if (!province) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Province is required",
+        },
+        { status: 400 }
+      );
+    }
+
     try {
       // Prepare request body for new API
       const requestBody = {
@@ -73,6 +112,9 @@ export async function POST(req) {
         email,
         password,
         phone,
+        dateOfBirth,
+        gender,
+        province,
       };
 
       // Include sessionId if provided (for guest cart merging)
