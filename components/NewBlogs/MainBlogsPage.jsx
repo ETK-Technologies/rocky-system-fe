@@ -1,7 +1,5 @@
 "use client";
 
-import { useEffect } from 'react';
-import { useBlogFilters } from './hooks/useBlogFilters';
 import { useBlogData } from './hooks/useBlogData';
 import BlogHeader from './components/BlogHeader';
 import CategoryFilters from './components/CategoryFilters';
@@ -17,22 +15,13 @@ export default function MainBlogsPage({
     initialTotalPages = 1
 }) {
     const {
-        currentPage,
-        loadNextPage
-    } = useBlogFilters();
-
-    const {
         blogs,
         totalPages,
+        currentPage,
         isLoading,
-        loadMoreBlogs
+        hasMorePages,
+        loadNextPage
     } = useBlogData(initialBlogs, initialTotalPages);
-
-    useEffect(() => {
-        if (currentPage > 1) {
-            loadMoreBlogs(currentPage);
-        }
-    }, [currentPage, loadMoreBlogs]);
 
     const handleLoadMore = () => {
         loadNextPage();
@@ -64,6 +53,7 @@ export default function MainBlogsPage({
                     blogs={blogs}
                     totalPages={totalPages}
                     currentPage={currentPage}
+                    hasMorePages={hasMorePages}
                     onLoadMore={handleLoadMore}
                     isLoading={isLoading}
                 />

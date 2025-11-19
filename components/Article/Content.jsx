@@ -27,10 +27,10 @@ const Content = ({ html, loding = false, AuthorContent = null }) => {
 
           <div className="flex justify-center content-center ">
             <Author
-              name={AuthorContent?.display_name}
-              avatarUrl={AuthorContent?.avatar_url}
+              name={AuthorContent?.display_name || (AuthorContent?.firstName && AuthorContent?.lastName ? `${AuthorContent.firstName} ${AuthorContent.lastName}` : AuthorContent?.name) || 'Unknown Author'}
+              avatarUrl={AuthorContent?.avatar_url || AuthorContent?.avatar}
               full_show={true}
-              desc={AuthorContent?.description}
+              desc={AuthorContent?.description || ''}
               avatarSize="h-[100px] w-[100px]"
             ></Author>
           </div>

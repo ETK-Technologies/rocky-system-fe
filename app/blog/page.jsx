@@ -7,11 +7,15 @@ import ErrorUI from "./ErrorUI";
 
 async function BlogsContent() {
   try {
+    // Fetch all posts (featured and regular) and categories
+    // We'll fetch all posts and let the component handle featured vs regular
     const [blogsData, categories] = await Promise.all([
-      blogService.getBlogs(1),
+      blogService.getBlogs(1, null, { limit: 20 }),
       blogService.getBlogCategories(),
     ]);
 
+    // The blogs are already sorted by publishedAt desc, so featured ones should be first
+    // We'll pass all blogs and let the component handle the display
     return (
       <MainBlogsPage
         initialBlogs={blogsData.blogs || []}

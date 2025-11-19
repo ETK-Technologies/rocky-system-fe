@@ -21,12 +21,28 @@ const Blog = ({ blog }) => {
     return "4 mins read"; // Default fallback
   };
 
-  // Get featured image URL
+  // Get featured image URL - handle both old and new formats
   const getFeaturedImageUrl = () => {
     if (imageError) {
       return defaultImage;
     }
 
+    // New format: featuredImageUrl
+    if (blog.featuredImageUrl) {
+      return blog.featuredImageUrl;
+    }
+
+    // New format: featuredImage object
+    if (blog.featuredImage) {
+      if (blog.featuredImage.cdnUrl) {
+        return blog.featuredImage.cdnUrl;
+      }
+      if (blog.featuredImage.storagePath) {
+        return blog.featuredImage.storagePath;
+      }
+    }
+
+    // Old format: _embedded
     if (
       blog._embedded &&
       blog._embedded["wp:featuredmedia"] &&
@@ -51,12 +67,75 @@ const Blog = ({ blog }) => {
     setImageError(true);
   };
 
-  // Get the category name
+  // Get the category name - handle both old and new formats
   const getCategory = () => {
+    // New format: category string
+    if (blog.category && typeof blog.category === 'string') {
+      return blog.category;
+    }
+
+    // New format: categories array
+    if (blog.categories && Array.isArray(blog.categories) && blog.categories.length > 0) {
+      const firstCategory = blog.categories[0];
+      // Handle nested structure: categories[0].category.name
+      if (firstCategory.category && firstCategory.category.name) {
+        return firstCategory.category.name;
+      }
+      // Direct category object
+      if (firstCategory.name) {
+        return firstCategory.name;
+      }
+    }
+
+    // Old format: class_list
     if (blog.class_list && blog.class_list[7]) {
       return blog.class_list[7].replace("category-", "").replace(/-/g, " ");
     }
+
     return "";
+  };
+
+  // Get date - handle both old and new formats
+  const getDate = () => {
+    // New format: publishedAt
+    if (blog.publishedAt) {
+      try {
+        return new Date(blog.publishedAt);
+      } catch (e) {
+        // Fall through to old format
+      }
+    }
+    // Old format: date
+    if (blog.date) {
+      try {
+        return new Date(blog.date);
+      } catch (e) {
+        return new Date();
+      }
+    }
+    return new Date();
+  };
+
+  // Get title - handle both old and new formats
+  const getTitle = () => {
+    if (typeof blog.title === 'string') {
+      return blog.title;
+    }
+    if (blog.title?.rendered) {
+      return blog.title.rendered;
+    }
+    return 'Untitled';
+  };
+
+  // Get content - handle both old and new formats
+  const getContent = () => {
+    if (typeof blog.content === 'string') {
+      return blog.content;
+    }
+    if (blog.content?.rendered) {
+      return blog.content.rendered;
+    }
+    return '';
   };
 
   return (
@@ -67,7 +146,7 @@ const Blog = ({ blog }) => {
       <div className="relative w-full h-60">
         <CustomImage
           src={getFeaturedImageUrl()}
-          alt={blog.title?.rendered || "Article thumbnail"}
+          alt={getTitle() || "Article thumbnail"}
           className="rounded-xl"
           fill
           sizes="(max-width: 768px) 100vw, 400px"
@@ -80,21 +159,23 @@ const Blog = ({ blog }) => {
       </div>
       <div className="py-4">
         <p className="text-gray-500 text-sm mb-2">
-          {new Date(blog.date).toLocaleDateString("en-US", {
+          {getDate().toLocaleDateString("en-US", {
             year: "numeric",
             month: "long",
             day: "numeric",
           })}{" "}
           • {getReadingTime()}
         </p>
-        <Link href={`/blog/` + blog.slug}>
+        <Link href={`/blog/` + (blog.slug || blog.id || '')}>
           <h2 className="text-lg font-semibold leading-snug mb-2">
-            {getText(blog.title.rendered)}
+            {getText(getTitle())}
           </h2>
         </Link>
         <p className="text-gray-600 text-sm">
-          {getText(blog.content.rendered).slice(0, 75) +
-            (getText(blog.content.rendered).length > 75 ? "..." : "")}
+          {(() => {
+            const contentText = getText(getContent());
+            return contentText.slice(0, 75) + (contentText.length > 75 ? "..." : "");
+          })()}
         </p>
       </div>
     </div>

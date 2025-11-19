@@ -21,8 +21,33 @@ const HtmlContent = ({ html, className, loading = false }) => {
   const processedHtml = useMemo(() => {
     if (!html) return "";
 
+    // Check if content is markdown and convert to HTML
+    let cleanedHtml = html;
+    const isMarkdown = html.trim().startsWith('#') || html.includes('\n##');
+    
+    if (isMarkdown) {
+      // Convert markdown to HTML
+      cleanedHtml = html
+        // Headers
+        .replace(/^### (.*$)/gim, '<h3>$1</h3>')
+        .replace(/^## (.*$)/gim, '<h2>$1</h2>')
+        .replace(/^# (.*$)/gim, '<h1>$1</h1>')
+        // Bold
+        .replace(/\*\*(.*?)\*\*/gim, '<strong>$1</strong>')
+        // Lists
+        .replace(/^\- (.*$)/gim, '<li>$1</li>')
+        // Paragraphs
+        .split('\n\n')
+        .map(para => {
+          if (para.trim().startsWith('<')) return para;
+          if (para.trim().startsWith('<li')) return `<ul>${para}</ul>`;
+          return `<p>${para.trim()}</p>`;
+        })
+        .join('\n');
+    }
+
     // Clean up Visual Composer shortcodes and other unwanted elements
-    let cleanedHtml = html
+    cleanedHtml = cleanedHtml
       // Remove Visual Composer shortcodes
       .replace(/\[vc_row[^\]]*\]/gi, "")
       .replace(/\[vc_column[^\]]*\]/gi, "")

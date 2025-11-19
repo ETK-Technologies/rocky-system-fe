@@ -6,6 +6,7 @@ export default function LatestArticles({
     blogs = [],
     totalPages = 1,
     currentPage = 1,
+    hasMorePages = false,
     onLoadMore,
     isLoading = false
 }) {
@@ -21,7 +22,6 @@ export default function LatestArticles({
 
     // Skip the first 4 blogs as they're in featured section
     const latestBlogs = validBlogs.slice(4);
-    const hasMorePages = currentPage < totalPages;
 
     if (latestBlogs.length === 0) {
         return null;
