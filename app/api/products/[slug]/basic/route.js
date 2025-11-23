@@ -1,4 +1,4 @@
-import { fetchProductBySlug } from "@/lib/woocommerce";
+import { fetchProductBySlugFromBackend } from "@/lib/api/productApi";
 import { logger } from "@/utils/devLogger";
 
 export async function GET(request, { params }) {
@@ -10,22 +10,28 @@ export async function GET(request, { params }) {
       return Response.json({ error: "No slug provided" }, { status: 400 });
     }
 
-    // Fetch product data
-    const productData = await fetchProductBySlug(slug);
+    // Fetch product data from new backend API
+    const apiProduct = await fetchProductBySlugFromBackend(slug, false);
 
-    if (!productData) {
+    if (!apiProduct) {
       return Response.json({ error: "Product not found" }, { status: 404 });
-    } // Extract only the basic product information needed for initial rendering
+    }
+
+    // Extract only the basic product information needed for initial rendering
     const basicProductInfo = {
-      id: productData.id,
-      name: productData.name,
-      price: productData.price,
+      id: apiProduct.id,
+      name: apiProduct.name,
+      price: apiProduct.salePrice || apiProduct.basePrice || "0",
       image:
-        productData.images && productData.images.length > 0
-          ? productData.images[0].src
+        apiProduct.images && apiProduct.images.length > 0
+          ? apiProduct.images[0].url || apiProduct.images[0].src
           : null,
-      shortDescription: productData.short_description,
-      categories: productData.categories || [], // Include categories data
+      shortDescription: apiProduct.shortDescription || "",
+      categories: (apiProduct.categories || []).map((cat) => ({
+        id: cat.category?.id || cat.categoryId,
+        name: cat.category?.name || "",
+        slug: cat.category?.slug || "",
+      })),
     };
 
     return Response.json(basicProductInfo);
