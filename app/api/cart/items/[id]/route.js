@@ -15,7 +15,7 @@ const BASE_URL = "https://rocky-be-production.up.railway.app";
  */
 export async function PATCH(req, { params }) {
     try {
-        const { id } = params;
+        const { id } = await params;
         const { quantity } = await req.json();
         const cookieStore = await cookies();
         const authToken = cookieStore.get("authToken");
@@ -186,7 +186,7 @@ export async function PATCH(req, { params }) {
  */
 export async function DELETE(req, { params }) {
     try {
-        const { id } = params;
+        const { id } = await params;
         const cookieStore = await cookies();
         const authToken = cookieStore.get("authToken");
 
@@ -206,11 +206,13 @@ export async function DELETE(req, { params }) {
         }
 
         // Validate: Either authToken or sessionId must be provided
+        // For guest users, sessionId should be provided in the query string
         if (!authToken && !sessionId) {
+            logger.warn("DELETE cart item: No authToken and no sessionId provided");
             return NextResponse.json(
                 {
                     success: false,
-                    error: "Either authentication token or sessionId is required",
+                    error: "Session required. Please refresh the page and try again.",
                 },
                 { status: 400 }
             );
@@ -292,6 +294,24 @@ export async function DELETE(req, { params }) {
                         total_price: "0.00",
                     },
                     { status: 400 }
+                );
+            }
+
+            if (error.response?.status === 401) {
+                logger.error("Backend API returned 401 for cart item deletion:", {
+                    itemId: id,
+                    hasAuth: !!authToken,
+                    hasSessionId: !!sessionId,
+                });
+                return NextResponse.json(
+                    {
+                        success: false,
+                        error: "Session expired or invalid. Please refresh the page and try again.",
+                        items: [],
+                        total_items: 0,
+                        total_price: "0.00",
+                    },
+                    { status: 401 }
                 );
             }
 
