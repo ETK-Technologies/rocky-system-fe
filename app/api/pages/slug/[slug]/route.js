@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
 import { logger } from "@/utils/devLogger";
 
-const BASE_URL = "https://rocky-be-production.up.railway.app";
-const APP_KEY = "app_04ecfac3213d7b179dc1e5ae9cb7a627";
-const APP_SECRET = "sk_2c867224696400bc2b377c3e77356a9e";
+const BASE_URL = process.env.ROCKY_BE_BASE_URL;
+const APP_KEY = process.env.NEXT_PUBLIC_APP_KEY;
+const APP_SECRET = process.env.NEXT_PUBLIC_APP_SECRET;
 
 /**
  * GET /api/pages/slug/[slug]
@@ -14,10 +14,7 @@ export async function GET(request, { params }) {
     const { slug } = await params;
 
     if (!slug) {
-      return NextResponse.json(
-        { error: "Slug is required" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "Slug is required" }, { status: 400 });
     }
 
     const response = await fetch(`${BASE_URL}/api/v1/pages/slug/${slug}`, {
@@ -58,4 +55,3 @@ export async function GET(request, { params }) {
     );
   }
 }
-

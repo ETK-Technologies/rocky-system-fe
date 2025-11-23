@@ -200,7 +200,10 @@ const RegisterContent = ({ setActiveTab, registerRef }) => {
             const today = new Date();
             let age = today.getFullYear() - birthDate.getFullYear();
             const monthDiff = today.getMonth() - birthDate.getMonth();
-            if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+            if (
+              monthDiff < 0 ||
+              (monthDiff === 0 && today.getDate() < birthDate.getDate())
+            ) {
               age--;
             }
             if (age < 18) {
@@ -320,7 +323,10 @@ const RegisterContent = ({ setActiveTab, registerRef }) => {
           const today = new Date();
           let age = today.getFullYear() - birthDate.getFullYear();
           const monthDiff = today.getMonth() - birthDate.getMonth();
-          if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+          if (
+            monthDiff < 0 ||
+            (monthDiff === 0 && today.getDate() < birthDate.getDate())
+          ) {
             age--;
           }
           if (age < 18) {
@@ -465,8 +471,8 @@ const RegisterContent = ({ setActiveTab, registerRef }) => {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "X-App-Key": "app_04ecfac3213d7b179dc1e5ae9cb7a627",
-          "X-App-Secret": "sk_2c867224696400bc2b377c3e77356a9e",
+          "X-App-Key": process.env.NEXT_PUBLIC_APP_KEY,
+          "X-App-Secret": process.env.NEXT_PUBLIC_APP_SECRET,
         },
         body: JSON.stringify(requestBody),
       });
@@ -563,7 +569,8 @@ const RegisterContent = ({ setActiveTab, registerRef }) => {
 
         // Handle specific error cases and map to field errors
         if (res.status === 409) {
-          errorMessage = "This email is already registered. Please login instead.";
+          errorMessage =
+            "This email is already registered. Please login instead.";
           setErrors((prev) => ({
             ...prev,
             email: "This email is already registered",
@@ -590,17 +597,27 @@ const RegisterContent = ({ setActiveTab, registerRef }) => {
                 ...prev,
                 phone: data.error,
               }));
-            } else if (errorLower.includes("first name") || errorLower.includes("firstName")) {
+            } else if (
+              errorLower.includes("first name") ||
+              errorLower.includes("firstName")
+            ) {
               setErrors((prev) => ({
                 ...prev,
                 firstName: data.error,
               }));
-            } else if (errorLower.includes("last name") || errorLower.includes("lastName")) {
+            } else if (
+              errorLower.includes("last name") ||
+              errorLower.includes("lastName")
+            ) {
               setErrors((prev) => ({
                 ...prev,
                 lastName: data.error,
               }));
-            } else if (errorLower.includes("date of birth") || errorLower.includes("dateofbirth") || errorLower.includes("dob")) {
+            } else if (
+              errorLower.includes("date of birth") ||
+              errorLower.includes("dateofbirth") ||
+              errorLower.includes("dob")
+            ) {
               setErrors((prev) => ({
                 ...prev,
                 dateOfBirth: data.error,
@@ -634,8 +651,9 @@ const RegisterContent = ({ setActiveTab, registerRef }) => {
   return (
     <div className="px-3 mx-auto pt-5 text-center">
       <h2
-        className={`text-[#251f20] ${isEdFlow ? "text-[24px]" : "text-[32px]"
-          } headers-font font-[450] leading-[140%] max-w-[520px] mx-auto`}
+        className={`text-[#251f20] ${
+          isEdFlow ? "text-[24px]" : "text-[32px]"
+        } headers-font font-[450] leading-[140%] max-w-[520px] mx-auto`}
       >
         {isEdFlow ? (
           <>
@@ -650,9 +668,7 @@ const RegisterContent = ({ setActiveTab, registerRef }) => {
         Already have an account?
         <Link
           href={(() => {
-            const currentParams = new URLSearchParams(
-              searchParams.toString()
-            );
+            const currentParams = new URLSearchParams(searchParams.toString());
             currentParams.set("viewshow", "login");
             return `/login-register?${currentParams.toString()}`;
           })()}
@@ -674,8 +690,9 @@ const RegisterContent = ({ setActiveTab, registerRef }) => {
                     type="text"
                     id="firstName"
                     name="firstName"
-                    className={`block w-[100%] rounded-[8px] h-[40px] text-md m-auto border px-4 focus:outline focus:outline-2 focus:outline-black focus:ring-0 focus:border-transparent ${errors.firstName ? "border-red-500" : "border-gray-500"
-                      }`}
+                    className={`block w-[100%] rounded-[8px] h-[40px] text-md m-auto border px-4 focus:outline focus:outline-2 focus:outline-black focus:ring-0 focus:border-transparent ${
+                      errors.firstName ? "border-red-500" : "border-gray-500"
+                    }`}
                     tabIndex="1"
                     placeholder="Your first name"
                     value={formData.firstName}
@@ -685,7 +702,9 @@ const RegisterContent = ({ setActiveTab, registerRef }) => {
                     required
                   />
                   {errors.firstName && (
-                    <span className="text-red-500 text-sm">{errors.firstName}</span>
+                    <span className="text-red-500 text-sm">
+                      {errors.firstName}
+                    </span>
                   )}
                 </div>
                 <div className="w-full flex flex-col items-start justify-center gap-2">
@@ -694,8 +713,9 @@ const RegisterContent = ({ setActiveTab, registerRef }) => {
                     type="text"
                     id="lastName"
                     name="lastName"
-                    className={`block w-[100%] rounded-[8px] h-[40px] text-md m-auto border px-4 focus:outline focus:outline-2 focus:outline-black focus:ring-0 focus:border-transparent ${errors.lastName ? "border-red-500" : "border-gray-500"
-                      }`}
+                    className={`block w-[100%] rounded-[8px] h-[40px] text-md m-auto border px-4 focus:outline focus:outline-2 focus:outline-black focus:ring-0 focus:border-transparent ${
+                      errors.lastName ? "border-red-500" : "border-gray-500"
+                    }`}
                     tabIndex="1"
                     placeholder="Your last name"
                     value={formData.lastName}
@@ -705,7 +725,9 @@ const RegisterContent = ({ setActiveTab, registerRef }) => {
                     required
                   />
                   {errors.lastName && (
-                    <span className="text-red-500 text-sm">{errors.lastName}</span>
+                    <span className="text-red-500 text-sm">
+                      {errors.lastName}
+                    </span>
                   )}
                 </div>
               </div>
@@ -715,8 +737,9 @@ const RegisterContent = ({ setActiveTab, registerRef }) => {
                   type="email"
                   id="email"
                   name="email"
-                  className={`block w-[100%] rounded-[8px] h-[40px] text-md m-auto border px-4 focus:outline focus:outline-2 focus:outline-black focus:ring-0 focus:border-transparent ${errors.email ? "border-red-500" : "border-gray-500"
-                    }`}
+                  className={`block w-[100%] rounded-[8px] h-[40px] text-md m-auto border px-4 focus:outline focus:outline-2 focus:outline-black focus:ring-0 focus:border-transparent ${
+                    errors.email ? "border-red-500" : "border-gray-500"
+                  }`}
                   tabIndex="1"
                   autoComplete="email"
                   placeholder="Enter your email address"
@@ -738,8 +761,9 @@ const RegisterContent = ({ setActiveTab, registerRef }) => {
                     id="password"
                     placeholder="Enter your password"
                     name="password"
-                    className={`block w-[100%] rounded-[8px] h-[40px] text-md m-auto border px-4 focus:outline focus:outline-2 focus:outline-black focus:ring-0 focus:border-transparent ${errors.password ? "border-red-500" : "border-gray-500"
-                      }`}
+                    className={`block w-[100%] rounded-[8px] h-[40px] text-md m-auto border px-4 focus:outline focus:outline-2 focus:outline-black focus:ring-0 focus:border-transparent ${
+                      errors.password ? "border-red-500" : "border-gray-500"
+                    }`}
                     tabIndex="4"
                     autoComplete="off"
                     value={formData.password}
@@ -764,7 +788,9 @@ const RegisterContent = ({ setActiveTab, registerRef }) => {
                   )}
                 </div>
                 {errors.password && (
-                  <span className="text-red-500 text-sm">{errors.password}</span>
+                  <span className="text-red-500 text-sm">
+                    {errors.password}
+                  </span>
                 )}
               </div>
               <div className="w-full flex flex-col items-start justify-center gap-2 password-field">
@@ -775,8 +801,11 @@ const RegisterContent = ({ setActiveTab, registerRef }) => {
                     id="confirmPassword"
                     placeholder="Confirm your password"
                     name="confirmPassword"
-                    className={`block w-[100%] rounded-[8px] h-[40px] text-md m-auto border px-4 focus:outline focus:outline-2 focus:outline-black focus:ring-0 focus:border-transparent ${errors.confirmPassword ? "border-red-500" : "border-gray-500"
-                      }`}
+                    className={`block w-[100%] rounded-[8px] h-[40px] text-md m-auto border px-4 focus:outline focus:outline-2 focus:outline-black focus:ring-0 focus:border-transparent ${
+                      errors.confirmPassword
+                        ? "border-red-500"
+                        : "border-gray-500"
+                    }`}
                     tabIndex="4"
                     autoComplete="off"
                     value={formData.confirmPassword}
@@ -839,8 +868,9 @@ const RegisterContent = ({ setActiveTab, registerRef }) => {
                   type="tel"
                   id="phone"
                   name="phone"
-                  className={`block w-[100%] rounded-[8px] h-[40px] text-md m-auto border px-4 focus:outline focus:outline-2 focus:outline-black focus:ring-0 focus:border-transparent ${errors.phone ? "border-red-500" : "border-gray-500"
-                    }`}
+                  className={`block w-[100%] rounded-[8px] h-[40px] text-md m-auto border px-4 focus:outline focus:outline-2 focus:outline-black focus:ring-0 focus:border-transparent ${
+                    errors.phone ? "border-red-500" : "border-gray-500"
+                  }`}
                   placeholder="(___) ___-____"
                   value={formData.phone}
                   onChange={handlePhoneChange}
@@ -865,8 +895,9 @@ const RegisterContent = ({ setActiveTab, registerRef }) => {
                       validateField("dateOfBirth", value);
                     }
                   }}
-                  className={`block w-[100%] rounded-[8px] h-[40px] text-md m-auto border px-4 focus:outline focus:outline-2 focus:outline-black focus:ring-0 focus:border-transparent ${errors.dateOfBirth ? "border-red-500" : "border-gray-500"
-                    }`}
+                  className={`block w-[100%] rounded-[8px] h-[40px] text-md m-auto border px-4 focus:outline focus:outline-2 focus:outline-black focus:ring-0 focus:border-transparent ${
+                    errors.dateOfBirth ? "border-red-500" : "border-gray-500"
+                  }`}
                   placeholder="mm/dd/yyyy"
                   minAge={18}
                   required
@@ -874,7 +905,9 @@ const RegisterContent = ({ setActiveTab, registerRef }) => {
                   id="dateOfBirth"
                 />
                 {errors.dateOfBirth && (
-                  <span className="text-red-500 text-sm">{errors.dateOfBirth}</span>
+                  <span className="text-red-500 text-sm">
+                    {errors.dateOfBirth}
+                  </span>
                 )}
               </div>
 
@@ -884,8 +917,11 @@ const RegisterContent = ({ setActiveTab, registerRef }) => {
                   <select
                     id="province"
                     name="province"
-                    className={`block w-[100%] rounded-[8px] h-[40px] text-md m-auto border px-4 focus:outline focus:outline-2 focus:outline-black focus:ring-0 focus:border-transparent appearance-none bg-white ${errors.province ? "border-red-500" : "border-gray-500"
-                      } ${loadingProvinces ? "opacity-50 cursor-not-allowed" : ""}`}
+                    className={`block w-[100%] rounded-[8px] h-[40px] text-md m-auto border px-4 focus:outline focus:outline-2 focus:outline-black focus:ring-0 focus:border-transparent appearance-none bg-white ${
+                      errors.province ? "border-red-500" : "border-gray-500"
+                    } ${
+                      loadingProvinces ? "opacity-50 cursor-not-allowed" : ""
+                    }`}
                     value={formData.province}
                     onChange={handleChange}
                     onBlur={(e) => validateField("province", e.target.value)}
@@ -924,7 +960,9 @@ const RegisterContent = ({ setActiveTab, registerRef }) => {
                   <span className="text-red-500 text-sm">{provincesError}</span>
                 )}
                 {errors.province && (
-                  <span className="text-red-500 text-sm">{errors.province}</span>
+                  <span className="text-red-500 text-sm">
+                    {errors.province}
+                  </span>
                 )}
               </div>
 
@@ -934,8 +972,9 @@ const RegisterContent = ({ setActiveTab, registerRef }) => {
                   <select
                     id="gender"
                     name="gender"
-                    className={`block w-[100%] rounded-[8px] h-[40px] text-md m-auto border px-4 focus:outline focus:outline-2 focus:outline-black focus:ring-0 focus:border-transparent appearance-none bg-white ${errors.gender ? "border-red-500" : "border-gray-500"
-                      }`}
+                    className={`block w-[100%] rounded-[8px] h-[40px] text-md m-auto border px-4 focus:outline focus:outline-2 focus:outline-black focus:ring-0 focus:border-transparent appearance-none bg-white ${
+                      errors.gender ? "border-red-500" : "border-gray-500"
+                    }`}
                     value={formData.gender}
                     onChange={handleChange}
                     onBlur={(e) => validateField("gender", e.target.value)}
