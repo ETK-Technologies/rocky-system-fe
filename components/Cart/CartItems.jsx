@@ -135,21 +135,23 @@ export default CartItems;
 const CartItem = ({ item, setCartItems, allItems }) => {
   const [loading, setLoading] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
-  
+
   // Support both new API structure and legacy structure
   const itemKey = item.id || item.key;
   const itemName = item.product?.name || item.name || "Product";
   const variantName = item.variant?.name || null;
   const quantity = item.quantity || 1;
-  
-  // New API: unitPrice and totalPrice are strings, legacy: prices in cents
+
+  // Handle prices - new API has unitPrice and totalPrice as numbers
   let itemPrice = 0;
   let itemTotalPrice = 0;
-  
+
   if (item.unitPrice !== undefined) {
-    // New API structure - prices are strings
-    itemPrice = parseFloat(item.unitPrice) || 0;
-    itemTotalPrice = item.totalPrice ? parseFloat(item.totalPrice) || 0 : itemPrice * quantity;
+    // New API structure - prices can be numbers or strings
+    itemPrice = typeof item.unitPrice === 'number' ? item.unitPrice : parseFloat(item.unitPrice) || 0;
+    itemTotalPrice = item.totalPrice
+      ? (typeof item.totalPrice === 'number' ? item.totalPrice : parseFloat(item.totalPrice) || 0)
+      : itemPrice * quantity;
   } else if (item.prices?.sale_price) {
     // Legacy structure
     itemPrice = item.prices.sale_price / 100;
@@ -159,26 +161,53 @@ const CartItem = ({ item, setCartItems, allItems }) => {
     itemPrice = item.prices.regular_price / 100;
     itemTotalPrice = item.totals?.line_subtotal ? item.totals.line_subtotal / 100 : itemPrice * quantity;
   }
-  
+
   const currencySymbol = item.prices?.currency_symbol || "$";
-  const subscription = item.extensions?.subscriptions;
-  const isSubscription = subscription && subscription.billing_interval;
+
+  // Check for subscription - new API has subscription data in variant
+  // If product type is VARIABLE_SUBSCRIPTION and has subscriptionInterval, treat as subscription
+  const productType = item.product?.type;
+  const hasSubscriptionInterval = item.variant?.subscriptionInterval;
+  const hasSubscriptionPeriod = item.variant?.subscriptionPeriod;
+  const variantSubscription = (productType === "VARIABLE_SUBSCRIPTION" && hasSubscriptionInterval) || (hasSubscriptionInterval && hasSubscriptionPeriod);
+  const legacySubscription = item.extensions?.subscriptions;
+  const isSubscription = variantSubscription || (legacySubscription && legacySubscription.billing_interval);
 
   // Special handling for Sublingual Semaglutide product (ID: 490537)
-  // This product should be treated as a monthly subscription even if WooCommerce metadata is missing
-  const isOralSemaglutide = item.id === 490537 || item.product_id === 490537;
+  const productId = item.productId || item.product?.id || item.product_id || item.id;
+  const isOralSemaglutide = productId === 490537 || item.id === 490537 || item.product_id === 490537;
   const isSubscriptionWithFallback = isSubscription || isOralSemaglutide;
 
   let supply = "";
-  if (
-    subscription &&
-    subscription.billing_interval &&
-    subscription.billing_period
-  ) {
-    const interval = subscription.billing_interval;
-    const period = subscription.billing_period;
+  if (variantSubscription) {
+    // New API structure - subscription data in variant
+    const interval = item.variant.subscriptionInterval;
+    const period = item.variant.subscriptionPeriod;
 
-    // Pluralize the period if interval > 1
+    // If period is null but we have interval and product is VARIABLE_SUBSCRIPTION, default to "weeks"
+    if (!period && productType === "VARIABLE_SUBSCRIPTION" && interval) {
+      const pluralPeriod = interval > 1 ? "weeks" : "week";
+      supply = `every ${interval} ${pluralPeriod}`;
+    } else if (period) {
+      // Convert period to readable format
+      let periodText = period;
+      if (period === "week") periodText = "week";
+      else if (period === "month") periodText = "month";
+      else if (period === "day") periodText = "day";
+      else if (period === "year") periodText = "year";
+
+      // Pluralize the period if interval > 1
+      const pluralPeriod = interval > 1 ? `${periodText}s` : periodText;
+      supply = `every ${interval} ${pluralPeriod}`;
+    }
+  } else if (
+    legacySubscription &&
+    legacySubscription.billing_interval &&
+    legacySubscription.billing_period
+  ) {
+    // Legacy structure
+    const interval = legacySubscription.billing_interval;
+    const period = legacySubscription.billing_period;
     const pluralPeriod = interval > 1 ? `${period}s` : period;
     supply = `every ${interval} ${pluralPeriod}`;
   } else if (isOralSemaglutide) {
@@ -214,9 +243,9 @@ const CartItem = ({ item, setCartItems, allItems }) => {
         price: itemPrice,
         attributes: item.variation?.length
           ? item.variation.map((v) => ({
-              name: v.attribute || v.name,
-              options: [v.value],
-            }))
+            name: v.attribute || v.name,
+            options: [v.value],
+          }))
           : variantName ? [{ name: "Variant", options: [variantName] }] : [],
       };
       if (delta > 0) {
@@ -231,18 +260,18 @@ const CartItem = ({ item, setCartItems, allItems }) => {
       // Use cart item ID (item.id) for the new API endpoint
       // Support both new API structure (item.id) and legacy (item.key)
       const cartItemId = item.id || itemKey;
-      
+
       if (!cartItemId) {
         logger.error("Cannot update quantity: cart item ID is missing");
         toast.error("Unable to update item quantity. Please refresh the page.");
         return;
       }
-      
+
       // Build URL with sessionId for guest users
       let url = `/api/cart/items/${cartItemId}`;
       const { isAuthenticated } = await import("@/lib/cart/cartService");
       const isAuth = isAuthenticated();
-      
+
       if (!isAuth) {
         // For guest users, get sessionId from localStorage
         try {
@@ -273,7 +302,7 @@ const CartItem = ({ item, setCartItems, allItems }) => {
 
       const data = await res.json();
       setCartItems(data);
-      
+
       // Trigger cart refresh event
       document.dispatchEvent(new CustomEvent("cart-updated"));
     } catch (error) {
@@ -300,9 +329,9 @@ const CartItem = ({ item, setCartItems, allItems }) => {
           price: itemPrice,
           attributes: item.variation?.length
             ? item.variation.map((v) => ({
-                name: v.attribute || v.name,
-                options: [v.value],
-              }))
+              name: v.attribute || v.name,
+              options: [v.value],
+            }))
             : variantName ? [{ name: "Variant", options: [variantName] }] : [],
         };
         analyticsService.trackRemoveFromCart(
@@ -316,18 +345,18 @@ const CartItem = ({ item, setCartItems, allItems }) => {
       // Use cart item ID (item.id) for the new API endpoint
       // Support both new API structure (item.id) and legacy (item.key)
       const cartItemId = item.id || itemKey;
-      
+
       if (!cartItemId) {
         logger.error("Cannot delete item: cart item ID is missing");
         toast.error("Unable to remove item. Please refresh the page.");
         return;
       }
-      
+
       // Build URL with sessionId for guest users
       let url = `/api/cart/items/${cartItemId}`;
       const { isAuthenticated } = await import("@/lib/cart/cartService");
       const isAuth = isAuthenticated();
-      
+
       if (!isAuth) {
         // For guest users, get sessionId from localStorage
         try {
@@ -364,7 +393,7 @@ const CartItem = ({ item, setCartItems, allItems }) => {
       }
 
       setCartItems(data);
-      
+
       // Trigger cart refresh event
       document.dispatchEvent(new CustomEvent("cart-updated"));
     } catch (error) {
@@ -378,44 +407,55 @@ const CartItem = ({ item, setCartItems, allItems }) => {
 
   return (
     <>
-      <div className="grid grid-cols-4 md:items-center justify-between border-b border-[#E2E2E1] py-4 md:py-[24px] md:pr-[16px] relative">
+      <div className="grid grid-cols-[auto_1fr_auto_auto] md:grid-cols-[auto_2fr_auto_auto] items-center border-b border-[#E2E2E1] py-4 md:py-[24px] md:pr-[16px] md:pl-8 relative gap-4">
         {loading && (
           <div className="absolute backdrop-blur-[2px] flex items-center justify-center left-0 right-0 top-0 bottom-0 z-50">
             <DotsLoader size={25} loading={loading} color={"#000000"} />
           </div>
         )}
-        <div className="flex items-center gap-[14px] col-span-3 md:col-span-2">
-          <div className="hidden md:flex">
-            {itemCanBeRemoved ? (
-              <>
-                <CiTrash
-                  size={20}
-                  className={`cursor-pointer ${
-                    deleteLoading ? "opacity-50" : ""
-                  }`}
-                  onClick={handleDeleteItem}
-                />
-                {deleteLoading && (
-                  <span className="w-3 h-3 border-t-2 border-r-2 border-black rounded-full animate-spin absolute ml-1 mt-[-12px]"></span>
-                )}
-              </>
-            ) : (
-              <div
-                className="w-[20px] h-[20px] flex items-center justify-center"
-                title="This item cannot be removed while Weight Loss products are in your cart"
-              >
-                <CiTrash
-                  size={20}
-                  className="text-gray-300 cursor-not-allowed"
-                />
-              </div>
-            )}
-          </div>
-          <div className="flex items-start gap-3">
-            <div className="relative min-w-[70px] min-h-[70px] object-cover rounded-[12px] bg-[#F3F3F3] overflow-hidden">
-              {item.variant?.imageUrl || item.images?.[0]?.thumbnail ? (
+
+        {/* Trash Icon - Far Left */}
+        <div className="hidden md:flex items-center">
+          {itemCanBeRemoved ? (
+            <>
+              <CiTrash
+                size={20}
+                className={`cursor-pointer ${deleteLoading ? "opacity-50" : ""}`}
+                onClick={handleDeleteItem}
+              />
+              {deleteLoading && (
+                <span className="w-3 h-3 border-t-2 border-r-2 border-black rounded-full animate-spin absolute ml-1 mt-[-12px]"></span>
+              )}
+            </>
+          ) : (
+            <div
+              className="w-[20px] h-[20px] flex items-center justify-center"
+              title="This item cannot be removed while Weight Loss products are in your cart"
+            >
+              <CiTrash
+                size={20}
+                className="text-gray-300 cursor-not-allowed"
+              />
+            </div>
+          )}
+        </div>
+
+        {/* PRODUCT Column - Image + Name + Price */}
+        <div className="flex items-center gap-3 col-span-2 md:col-span-1">
+          {/* Product Image */}
+          <div className="relative min-w-[60px] min-h-[60px] md:min-w-[70px] md:min-h-[70px] object-cover rounded-[12px] bg-[#F3F3F3] overflow-hidden flex-shrink-0">
+            {(() => {
+              // Priority: variant image > product featured image > product first image > legacy images
+              const imageUrl =
+                item.variant?.imageUrl ||
+                item.product?.images?.find(img => img.featured)?.url ||
+                item.product?.images?.[0]?.url ||
+                item.images?.[0]?.thumbnail ||
+                item.images?.[0]?.url;
+
+              return imageUrl ? (
                 <CustomImage
-                  src={item.variant?.imageUrl || item.images?.[0]?.thumbnail}
+                  src={imageUrl}
                   alt={itemName}
                   fill
                 />
@@ -423,73 +463,80 @@ const CartItem = ({ item, setCartItems, allItems }) => {
                 <div className="w-full h-full flex items-center justify-center text-gray-400 text-xs">
                   No Image
                 </div>
-              )}
-            </div>
-            <div>
-              <p className="text-[14px] font-[500] leading-[19.6px] mb-[2px]">
-                <span dangerouslySetInnerHTML={{ __html: itemName }}></span>{" "}
-                {!isSubscriptionWithFallback &&
-                  (variantName || (item.variation?.[0] && `(${item.variation[0]?.value})`))}
-              </p>
+              );
+            })()}
+          </div>
 
-              {itemName != "Body Optimization Program" && (
-                <>
-                  <p className="text-[12px] font-[400] text-[#212121] inline">
-                    {currencySymbol}
-                    {formatPrice(itemPrice)}{" "}
-                  </p>
-                  <p className="text-[12px] font-[400] text-[#212121] inline">
-                    / {isSubscriptionWithFallback && intervalText}
-                    {!isSubscriptionWithFallback &&
-                      (item.variation?.[1]?.value || variantName)}
+          {/* Product Name and Price/Subscription Info */}
+          <div className="flex-1 min-w-0">
+            <p className="text-[14px] md:text-[16px] font-[500] md:font-[600] leading-[19.6px] mb-[2px] text-[#251F20]">
+              <span dangerouslySetInnerHTML={{ __html: itemName }}></span>
+              {!isSubscriptionWithFallback && variantName && variantName !== itemName && (
+                <span className="text-[12px] font-[400] text-[#212121]">
+                  {" "}({variantName})
+                </span>
+              )}
+            </p>
+
+            {itemName != "Body Optimization Program" && (
+              <p className="text-[12px] font-[400] text-[#212121] opacity-85">
+                {currencySymbol}
+                {formatPrice(itemPrice)}
+                {isSubscriptionWithFallback && intervalText ? (
+                  <span> / {intervalText}</span>
+                ) : (
+                  <>
+                    {variantName && variantName !== itemName && (
+                      <span> / {variantName}</span>
+                    )}
+                    {!variantName && item.variation?.[0]?.value && (
+                      <span> / {item.variation[0]?.value}</span>
+                    )}
                     {itemName?.toLowerCase().includes("zonnic") &&
                       item.variation?.find(
                         (v) => v.attribute?.toLowerCase() === "flavors"
                       )?.value && (
-                        <>
+                        <span className="text-[12px] font-[400] text-[#212121]">
                           {" / "}
-                          <span className="text-[12px] font-[400] text-[#212121]">
-                            {
-                              item.variation.find(
-                                (v) => v.attribute?.toLowerCase() === "flavors"
-                              )?.value
-                            }
-                          </span>
-                        </>
+                          {
+                            item.variation.find(
+                              (v) => v.attribute?.toLowerCase() === "flavors"
+                            )?.value
+                          }
+                        </span>
                       )}
-                  </p>
-                </>
-              )}
-              {itemName === "Body Optimization Program" && (
-                <div className="flex flex-col">
-                  <p className="text-sm md:text-base font-[500] text-[#212121] underline text-nowrap">
-                    Monthly membership:
-                  </p>
-                  <p className="text-sm md:text-base text-[#212121]">
-                    Initial fee $99 | <br className="hidden md:block" /> Monthly
-                    fee $99
-                  </p>
-                  <p className="text-sm md:text-base font-[500] text-[#212121] mt-2 underline">
-                    Includes:
-                  </p>
-                  <ul className="text-sm md:text-base text-[#212121] list-none pl-5">
-                    <li className="text-nowrap">- Monthly prescription</li>
-                    <li className="text-nowrap">
-                      - Follow-ups with clinicians
-                    </li>
-                    <li className="text-nowrap">- Pharmacist counselling</li>
-                  </ul>
-                </div>
-              )}
-            </div>
+                  </>
+                )}
+              </p>
+            )}
+            {itemName === "Body Optimization Program" && (
+              <div className="flex flex-col">
+                <p className="text-sm md:text-base font-[500] text-[#212121] underline text-nowrap">
+                  Monthly membership:
+                </p>
+                <p className="text-sm md:text-base text-[#212121]">
+                  Initial fee $99 | <br className="hidden md:block" /> Monthly
+                  fee $99
+                </p>
+                <p className="text-sm md:text-base font-[500] text-[#212121] mt-2 underline">
+                  Includes:
+                </p>
+                <ul className="text-sm md:text-base text-[#212121] list-none pl-5">
+                  <li className="text-nowrap">- Monthly prescription</li>
+                  <li className="text-nowrap">
+                    - Follow-ups with clinicians
+                  </li>
+                  <li className="text-nowrap">- Pharmacist counselling</li>
+                </ul>
+              </div>
+            )}
           </div>
         </div>
 
-        <div className="hidden md:flex justify-self-end  items-center justify-between p-2 w-[104px] h-[40px] rounded-full border border-[#E2E2E1]">
+        {/* QUANTITY Column */}
+        <div className="hidden md:flex justify-self-end items-center justify-between p-2 w-[104px] h-[40px] rounded-full border border-[#E2E2E1] flex-shrink-0">
           <button
-            className={`quantity-minus w-[20px] h-[20px] ${
-              item.quantity === 1 && "cursor-not-allowed"
-            }`}
+            className={`quantity-minus w-[20px] h-[20px] flex items-center justify-center ${item.quantity === 1 ? "cursor-not-allowed opacity-50" : ""}`}
             disabled={item.quantity === 1 || loading}
             onClick={() => handleQuantityEdit(item.quantity - 1)}
           >
@@ -497,7 +544,7 @@ const CartItem = ({ item, setCartItems, allItems }) => {
           </button>
           <span className="quantity-value font-medium">{quantity}</span>
           <button
-            className="quantity-plus w-[20px] h-[20px] relative"
+            className="quantity-plus w-[20px] h-[20px] relative flex items-center justify-center"
             disabled={loading}
             onClick={() => handleQuantityEdit(item.quantity + 1)}
           >
@@ -505,7 +552,8 @@ const CartItem = ({ item, setCartItems, allItems }) => {
           </button>
         </div>
 
-        <div className="text-[14px] font-[500] leading-[19.6px] justify-self-end product-sub-total">
+        {/* TOTAL Column */}
+        <div className="text-[14px] md:text-[16px] font-[500] md:font-[600] leading-[19.6px] text-[#251F20] justify-self-end flex-shrink-0">
           <span className="woocommerce-Price-amount amount">
             <bdi>
               <span className="woocommerce-Price-currencySymbol">
@@ -516,12 +564,11 @@ const CartItem = ({ item, setCartItems, allItems }) => {
           </span>
         </div>
 
-        <div className="md:hidden flex items-center gap-2 mt-4">
-          <div className="min-w-[104px] justify-self-end flex items-center justify-between p-2 w-[104px] h-[40px] rounded-full border border-[#E2E2E1]">
+        {/* Mobile Layout */}
+        <div className="md:hidden flex items-center gap-2 mt-4 w-full">
+          <div className="flex items-center justify-between p-2 w-[104px] h-[40px] rounded-full border border-[#E2E2E1] flex-shrink-0">
             <button
-              className={`quantity-minus w-[20px] h-[20px] ${
-                item.quantity === 1 && "cursor-not-allowed"
-              }`}
+              className={`quantity-minus w-[20px] h-[20px] flex items-center justify-center ${item.quantity === 1 ? "cursor-not-allowed opacity-50" : ""}`}
               disabled={item.quantity === 1 || loading}
               onClick={() => handleQuantityEdit(item.quantity - 1)}
             >
@@ -529,21 +576,20 @@ const CartItem = ({ item, setCartItems, allItems }) => {
             </button>
             <span className="quantity-value font-medium">{quantity}</span>
             <button
-              className="quantity-plus w-[20px] h-[20px] relative"
+              className="quantity-plus w-[20px] h-[20px] relative flex items-center justify-center"
               disabled={loading}
               onClick={() => handleQuantityEdit(item.quantity + 1)}
             >
               +
             </button>
           </div>
-          <div className="">
+          <div className="flex-1"></div>
+          <div className="flex items-center">
             {itemCanBeRemoved ? (
               <>
                 <CiTrash
                   size={20}
-                  className={`cursor-pointer ${
-                    deleteLoading ? "opacity-50" : ""
-                  }`}
+                  className={`cursor-pointer ${deleteLoading ? "opacity-50" : ""}`}
                   onClick={handleDeleteItem}
                 />
                 {deleteLoading && (

@@ -1,7 +1,6 @@
 import { logger } from "@/utils/devLogger";
 import { fetchProductBySlugFromBackend } from "@/lib/api/productApi";
 import { transformBackendProductToWooCommerceFormat } from "@/lib/api/productAdapter";
-import { BACKEND_API_PRODUCTS } from "@/lib/constants/backendApiProducts";
 import {
   ProductFactory,
   CategoryHandlerFactory,
@@ -18,12 +17,7 @@ export async function GET(request, { params }) {
       return Response.json({ error: "No slug provided" }, { status: 400 });
     }
 
-    // Only fetch from new backend API for specified products
-    if (!BACKEND_API_PRODUCTS.includes(slug)) {
-      return Response.json({ error: "Product not found" }, { status: 404 });
-    }
-
-    // Fetch product data from new backend API
+    // Fetch product data from new backend API for all products dynamically
     const apiProduct = await fetchProductBySlugFromBackend(slug, false);
 
     if (!apiProduct) {
