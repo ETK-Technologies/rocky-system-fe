@@ -1,14 +1,14 @@
 import { NextResponse } from "next/server";
 import { logger } from "@/utils/devLogger";
 
-const BASE_URL = "https://rocky-be-production.up.railway.app";
+const BASE_URL = process.env.ROCKY_BE_BASE_URL;
 
 /**
  * GET /api/auth/google
  * Initiate Google OAuth login
  * 
  * CRITICAL: The backend MUST have this redirect URI configured in Google Cloud Console:
- * https://rocky-be-production.up.railway.app/api/v1/auth/google/callback
+ * ${ROCKY_BE_BASE_URL}/api/v1/auth/google/callback
  * 
  * The backend must use this EXACT redirect_uri when calling Google OAuth.
  * We pass the frontend callback URL in the state parameter for the backend to use after OAuth completes.
@@ -55,7 +55,7 @@ export async function GET(req) {
         logger.log("===============================");
 
         // Redirect to backend - backend will handle Google OAuth
-        // Backend MUST use redirect_uri: https://rocky-be-production.up.railway.app/api/v1/auth/google/callback
+        // Backend MUST use redirect_uri: ${ROCKY_BE_BASE_URL}/api/v1/auth/google/callback
         return NextResponse.redirect(finalUrl);
     } catch (error) {
         logger.error("Error initiating Google OAuth:", error);
