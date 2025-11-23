@@ -3,7 +3,7 @@ import axios from "axios";
 import { logger } from "@/utils/devLogger";
 import { cookies } from "next/headers";
 
-const BASE_URL = "https://rocky-be-production.up.railway.app";
+const BASE_URL = process.env.ROCKY_BE_BASE_URL;
 
 /**
  * DELETE /api/cart/empty
@@ -44,8 +44,8 @@ export async function DELETE(req) {
       const headers = {
         "Content-Type": "application/json",
         accept: "application/json",
-        "X-App-Key": "app_04ecfac3213d7b179dc1e5ae9cb7a627",
-        "X-App-Secret": "sk_2c867224696400bc2b377c3e77356a9e",
+        "X-App-Key": process.env.NEXT_PUBLIC_APP_KEY,
+        "X-App-Secret": process.env.NEXT_PUBLIC_APP_SECRET,
       };
 
       // Add Authorization header ONLY if user is authenticated
