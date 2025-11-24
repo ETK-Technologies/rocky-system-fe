@@ -128,8 +128,8 @@ export async function POST(req) {
       const { searchParams } = new URL(req.url);
       const sessionId = searchParams.get("sessionId");
       
-      const BASE_URL = process.env.BASE_URL || "https://rocky-be-production.up.railway.app";
-      let validateUrl = `${BASE_URL}/api/v1/cart/validate`;
+      const ROCKY_BE_BASE_URL = process.env.ROCKY_BE_BASE_URL || "https://rocky-be-production.up.railway.app";
+      let validateUrl = `${ROCKY_BE_BASE_URL}/api/v1/cart/validate`;
       const useSessionId = !encodedCredentials && sessionId;
       
       if (useSessionId) {

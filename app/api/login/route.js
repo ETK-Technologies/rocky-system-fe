@@ -3,7 +3,7 @@ import axios from "axios";
 import { cookies } from "next/headers";
 import { logger } from "@/utils/devLogger";
 
-const BASE_URL = "https://rocky-be-production.up.railway.app";
+const BASE_URL = process.env.ROCKY_BE_BASE_URL || "https://rocky-be-production.up.railway.app";
 
 /**
  * POST /api/login

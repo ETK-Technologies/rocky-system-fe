@@ -3,7 +3,7 @@ import axios from "axios";
 import { logger } from "@/utils/devLogger";
 import { cookies } from "next/headers";
 
-const BASE_URL = "https://rocky-be-production.up.railway.app";
+const BASE_URL = process.env.ROCKY_BE_BASE_URL || "https://rocky-be-production.up.railway.app";
 
 // Helper function to decode HTML entities in error messages
 const decodeHtmlEntities = (text) => {
