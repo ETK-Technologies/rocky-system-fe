@@ -1,7 +1,8 @@
 "use client";
 
-export default function PrivacyPolicyNav({ variant }) {
-  const Content = [
+export default function PrivacyPolicyNav({ variant, navigationItems = [] }) {
+  // Default content if no navigation items from API
+  const defaultContent = [
     "Interpretation and Definitions",
     "Types of Data Collected",
     "Use of Your Personal Data",
@@ -16,6 +17,11 @@ export default function PrivacyPolicyNav({ variant }) {
     "Usage, Performance and Miscellaneous",
     "Contact Us",
   ];
+
+  // Use API navigation items if available, otherwise use default
+  const Content = navigationItems.length > 0 
+    ? navigationItems.map(item => item.text)
+    : defaultContent;
 
   if (variant === "mobile") {
     return (

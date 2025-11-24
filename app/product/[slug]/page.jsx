@@ -3,7 +3,6 @@ import ProductClientWrapper from "@/components/Product/ProductClientWrapper";
 import { logger } from "@/utils/devLogger";
 import { fetchProductBySlugFromBackend } from "@/lib/api/productApi";
 import { transformBackendProductToWooCommerceFormat } from "@/lib/api/productAdapter";
-import { BACKEND_API_PRODUCTS } from "@/lib/constants/backendApiProducts";
 import {
   ProductFactory,
   CategoryHandlerFactory,
@@ -26,27 +25,19 @@ export async function generateMetadata({ params }) {
       };
     }
 
-    // Only fetch from new API for specified products
-    if (BACKEND_API_PRODUCTS.includes(slug)) {
-      const apiProduct = await fetchProductBySlugFromBackend(slug, false);
+    // Fetch product data from backend API for all products
+    const apiProduct = await fetchProductBySlugFromBackend(slug, false);
 
-      if (!apiProduct) {
-        return {
-          title: "Product Not Found",
-          description: "The product you are looking for does not exist.",
-        };
-      }
-
+    if (!apiProduct) {
       return {
-        title: apiProduct.name,
-        description: apiProduct.shortDescription || apiProduct.description || "",
+        title: "Product Not Found",
+        description: "The product you are looking for does not exist.",
       };
     }
 
-    // For other products, return generic metadata
     return {
-      title: "Product",
-      description: "Product page",
+      title: apiProduct.name,
+      description: apiProduct.shortDescription || apiProduct.description || "",
     };
   } catch (error) {
     logger.error("Error generating metadata", error);
@@ -69,14 +60,8 @@ export default async function ProductPage({ params }) {
     return <ErrorPage />;
   }
 
-  // Only fetch from new backend API for specified products
-  if (!BACKEND_API_PRODUCTS.includes(slug)) {
-    // For other products, show error or handle differently
-    return <ErrorPage />;
-  }
-
   try {
-    // Fetch product data from new backend API
+    // Fetch product data from new backend API for all products dynamically
     const apiProduct = await fetchProductBySlugFromBackend(slug, false);
 
     if (!apiProduct) {

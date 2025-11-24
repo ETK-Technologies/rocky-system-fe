@@ -980,8 +980,15 @@ const CheckoutPageContent = () => {
       // Validate cart before proceeding (stock availability, pricing, etc.)
       try {
         logger.log("Validating cart before checkout...");
-        const { getSessionId } = await import("@/services/sessionService");
-        const sessionId = getSessionId();
+        // Only get sessionId if user is NOT authenticated
+        const { isAuthenticated } = await import("@/lib/cart/cartService");
+        const isAuth = isAuthenticated();
+        
+        let sessionId = null;
+        if (!isAuth) {
+          const { getSessionId } = await import("@/services/sessionService");
+          sessionId = getSessionId();
+        }
         
         const cartValidation = await validateCart(sessionId);
         

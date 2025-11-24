@@ -95,9 +95,12 @@ export async function GET(request) {
     }
 
     // Fetch cart from new backend API
+    // IMPORTANT: Only pass sessionId if user is NOT authenticated
+    // If both authToken and sessionId are provided, prioritize authToken (authenticated user)
+    const useSessionId = !authToken && sessionId; // Only use sessionId if no authToken
     const cartData = await fetchCartFromBackend(
       authToken?.value || null,
-      sessionId || null
+      useSessionId ? sessionId : null
     );
 
     if (!cartData) {

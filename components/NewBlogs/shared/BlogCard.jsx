@@ -48,9 +48,15 @@ export default function BlogCard({
   const title = extractText(blog.title) || "Untitled";
   const excerpt = extractText(blog.excerpt) || "No excerpt available";
 
-  // Extract author - try multiple sources
+  // Extract author - prioritize new format, fallback to legacy
   let author = "Unknown Author";
-  if (blog.authors && blog.authors.length > 0) {
+  if (blog.authorName) {
+    author = blog.authorName;
+  } else if (blog.author) {
+    const firstName = blog.author.firstName || "";
+    const lastName = blog.author.lastName || "";
+    author = `${firstName} ${lastName}`.trim() || "Unknown Author";
+  } else if (blog.authors && blog.authors.length > 0) {
     author =
       blog.authors[0].display_name || blog.authors[0].name || "Unknown Author";
   } else if (
@@ -61,22 +67,36 @@ export default function BlogCard({
     author = blog._embedded.author[0].name || "Unknown Author";
   }
 
-  // Extract category - try multiple sources
+  // Extract category - prioritize new format, fallback to legacy
   let category = "Uncategorized";
-  if (
+  if (blog.category) {
+    category = blog.category;
+  } else if (blog.categories && Array.isArray(blog.categories) && blog.categories.length > 0) {
+    // New format: categories array already contains category objects directly
+    const firstCategory = blog.categories[0];
+    if (firstCategory.name) {
+      category = firstCategory.name;
+    }
+  } else if (
     blog._embedded &&
     blog._embedded["wp:term"] &&
     blog._embedded["wp:term"][0] &&
     blog._embedded["wp:term"][0].length > 0
   ) {
     category = blog._embedded["wp:term"][0][0].name || "Uncategorized";
-  } else if (blog.categories && Array.isArray(blog.categories)) {
-    category = "Category " + blog.categories[0];
   }
 
-  // Extract tags
+  // Extract tags - prioritize new format, fallback to legacy
   let tags = [];
-  if (
+  if (blog.tags && Array.isArray(blog.tags)) {
+    tags = blog.tags
+      .map((tag) => {
+        // Tags array already contains tag objects directly after transformation
+        if (tag.name) return tag.name;
+        return null;
+      })
+      .filter(Boolean);
+  } else if (
     blog._embedded &&
     blog._embedded["wp:term"] &&
     blog._embedded["wp:term"][2]
@@ -84,9 +104,13 @@ export default function BlogCard({
     tags = extractTags(blog._embedded["wp:term"][2]);
   }
 
-  // Extract featured image
+  // Extract featured image - prioritize new format, fallback to legacy
   let featuredImage = null;
-  if (
+  if (blog.featuredImageUrl) {
+    featuredImage = blog.featuredImageUrl;
+  } else if (blog.featuredImage) {
+    featuredImage = blog.featuredImage.cdnUrl || blog.featuredImage.storagePath || null;
+  } else if (
     blog._embedded &&
     blog._embedded["wp:featuredmedia"] &&
     blog._embedded["wp:featuredmedia"].length > 0

@@ -128,7 +128,7 @@ export async function POST(req) {
       const { searchParams } = new URL(req.url);
       const sessionId = searchParams.get("sessionId");
       
-      const BASE_URL = process.env.BASE_URL || "https://rocky-be-production.up.railway.app";
+      const BASE_URL = process.env.ROCKY_BE_BASE_URL;
       let validateUrl = `${BASE_URL}/api/v1/cart/validate`;
       const useSessionId = !encodedCredentials && sessionId;
       
@@ -139,8 +139,8 @@ export async function POST(req) {
       const validateHeaders = {
         "Content-Type": "application/json",
         accept: "application/json",
-        "X-App-Key": "app_04ecfac3213d7b179dc1e5ae9cb7a627",
-        "X-App-Secret": "sk_2c867224696400bc2b377c3e77356a9e",
+        "X-App-Key": process.env.NEXT_PUBLIC_APP_KEY,
+        "X-App-Secret": process.env.NEXT_PUBLIC_APP_SECRET,
       };
 
       if (encodedCredentials) {

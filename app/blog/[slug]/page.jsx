@@ -37,46 +37,15 @@ export default function BlogSlugPage({ params }) {
       // Check if slug is available
       if (!slug || !slug.slug) {
         logger.error("No slug available:", slug);
-        throw new Error("No slug provided");
-      }
-
-      // Use the individual blog API route
-      var url = `/api/blogs/${slug.slug}`;
-      logger.log("Fetching blog from URL:", url);
-      logger.log("Slug object:", slug);
-      logger.log("Slug slug property:", slug.slug);
-
-      const res = await fetch(url);
-      logger.log("Response status:", res.status);
-      logger.log("Response ok:", res.ok);
-
-      // If the blog is not found (404), show 404 page
-      if (res.status === 404) {
-        logger.log("Blog not found, showing 404 page");
         setShowNotFound(true);
         return;
       }
 
-      if (!res.ok) {
-        throw new Error(`API call failed with status ${res.status}`);
-      }
-
-      const data = await res.json();
-      logger.log("Response data:", data);
-
-      // Check if the response contains an error indicating blog not found
-      if (data.error) {
-        if (data.error === "Blog post not found" || res.status === 404) {
-          logger.log("Blog not found via error response, showing 404 page");
-          setShowNotFound(true);
-          return;
-        }
-        throw new Error(data.error);
-      }
-
-      // Individual blog API route returns a single blog object, not an array
-      const blog = data;
-      logger.log("Blog object:", blog);
+      // Use the blogService to fetch by slug (which handles ID or slug)
+      const { blogService } = await import("@/components/NewBlogs/services/blogService");
+      const blog = await blogService.getBlogBySlug(slug.slug);
+      
+      logger.log("Fetched blog:", blog);
 
       if (!blog) {
         logger.log("No blog data received, showing 404 page");
@@ -94,11 +63,21 @@ export default function BlogSlugPage({ params }) {
 
       setBlog(blog);
 
-      if (blog.authors && blog.authors.length > 0) {
+      // Extract author
+      if (blog.author) {
+        setAuthorContent(blog.author);
+      } else if (blog.authors && blog.authors.length > 0) {
         setAuthorContent(blog.authors[0]);
+      } else if (blog._embedded && blog._embedded.author && blog._embedded.author.length > 0) {
+        setAuthorContent(blog._embedded.author[0]);
       }
 
-      if (
+      // Extract featured image
+      if (blog.featuredImageUrl) {
+        setFeaturedImage(blog.featuredImageUrl);
+      } else if (blog.featuredImage) {
+        setFeaturedImage(blog.featuredImage.cdnUrl || blog.featuredImage.storagePath || FeaturedImage);
+      } else if (
         blog._embedded &&
         blog._embedded["wp:featuredmedia"] &&
         blog._embedded["wp:featuredmedia"][0] &&
@@ -107,22 +86,25 @@ export default function BlogSlugPage({ params }) {
         setFeaturedImage(blog._embedded["wp:featuredmedia"][0].source_url);
       }
 
-      // Get the category name
-      if (blog.class_list && blog.class_list[7]) {
+      // Get the category name - prioritize new format
+      if (blog.category) {
+        setCategory(blog.category);
+      } else if (blog.categories && Array.isArray(blog.categories) && blog.categories.length > 0) {
+        const firstCategory = blog.categories[0];
+        // Handle nested structure: categories[0].category.name
+        if (firstCategory.category && firstCategory.category.name) {
+          setCategory(firstCategory.category.name);
+        } else if (firstCategory.name) {
+          setCategory(firstCategory.name);
+        }
+      } else if (blog.class_list && blog.class_list[7]) {
         const categoryName = blog.class_list[7]
           .replace("category-", "")
           .replace(/-/g, " ");
         logger.log("Category name extracted:", categoryName);
         setCategory(categoryName);
-      } else {
-        logger.log("No class_list[7] found, trying categories array");
-        // Try to get category from categories array
-        if (blog.categories && blog.categories.length > 0) {
-          logger.log("Found categories array:", blog.categories);
-          setCategory(blog.categories[0]);
-        } else {
-          logger.log("No categories found in blog data");
-        }
+      } else if (blog._embedded && blog._embedded["wp:term"] && blog._embedded["wp:term"][0] && blog._embedded["wp:term"][0].length > 0) {
+        setCategory(blog._embedded["wp:term"][0][0].name || "");
       }
 
       if (blog.yoast_head_json?.twitter_misc?.["Est. reading time"]) {
@@ -130,10 +112,21 @@ export default function BlogSlugPage({ params }) {
           blog.yoast_head_json.twitter_misc["Est. reading time"] + " read"
         );
       }
+
+      // Use relatedArticles from API response if available
+      if (blog.relatedArticles && Array.isArray(blog.relatedArticles) && blog.relatedArticles.length > 0) {
+        setRelatedBlogs(blog.relatedArticles);
+        setRelatedBlogsLoading(false);
+      }
     } catch (error) {
-      logger.error("Error fetching blogs:", error);
+      logger.error("Error fetching blog:", error);
       logger.error("Error details:", error.message);
       logger.error("Error stack:", error.stack);
+      
+      // If it's a "not found" error, show 404 page
+      if (error.message.includes("not found") || error.message.includes("Not found")) {
+        setShowNotFound(true);
+      }
     } finally {
       setBlogLoading(false);
     }
@@ -144,24 +137,14 @@ export default function BlogSlugPage({ params }) {
       setRelatedBlogsLoading(true);
       logger.log("Fetching recent articles as fallback");
 
-      var url = `/api/blogs?per_page=3`;
-      logger.log("Recent articles URL:", url);
+      const { blogService } = await import("@/components/NewBlogs/services/blogService");
+      const blogsData = await blogService.getBlogs(1, null, { limit: 4 });
+      
+      logger.log("Recent articles data:", blogsData);
 
-      const res = await fetch(url);
-      logger.log("Recent articles response status:", res.status);
-
-      if (!res.ok) {
-        throw new Error(
-          `Recent articles API call failed with status ${res.status}`
-        );
-      }
-
-      const data = await res.json();
-      logger.log("Recent articles data:", data);
-
-      if (Array.isArray(data)) {
+      if (blogsData.blogs && Array.isArray(blogsData.blogs)) {
         // Filter out the current blog from recent articles
-        const filteredData = data.filter((blog) => blog.id !== Blog?.id);
+        const filteredData = blogsData.blogs.filter((blog) => blog.id !== Blog?.id);
         logger.log("Filtered recent articles:", filteredData);
 
         // Take only the first 3 recent articles
@@ -169,7 +152,7 @@ export default function BlogSlugPage({ params }) {
         logger.log("Final recent articles (limited to 3):", finalData);
         setRelatedBlogs(finalData);
       } else {
-        logger.error("Recent articles data is not an array:", data);
+        logger.error("Recent articles data is not an array:", blogsData);
         setRelatedBlogs([]);
       }
     } catch (error) {
@@ -183,34 +166,17 @@ export default function BlogSlugPage({ params }) {
   const fetchRelated = async ({ category }) => {
     try {
       setRelatedBlogsLoading(true);
-      logger.log("Fetching related blogs for category:", category);
+      logger.log("Fetching related blogs for category ID:", category);
 
-      // Use the main blogs API route for related blogs by category
-      // Fetch more to account for filtering out the current blog
-      var url = `/api/blogs?categories=${category}&per_page=6`;
-      logger.log("Related blogs URL:", url);
+      // Use the blogService to fetch blogs by category
+      const { blogService } = await import("@/components/NewBlogs/services/blogService");
+      const blogsData = await blogService.getBlogs(1, category, { limit: 6 });
+      
+      logger.log("Related blogs data:", blogsData);
 
-      const res = await fetch(url);
-      logger.log("Related blogs response status:", res.status);
-
-      if (!res.ok) {
-        throw new Error(
-          `Related blogs API call failed with status ${res.status}`
-        );
-      }
-
-      const data = await res.json();
-      logger.log("Related blogs data:", data);
-      logger.log("Related blogs data type:", typeof data);
-      logger.log(
-        "Related blogs data length:",
-        Array.isArray(data) ? data.length : "not an array"
-      );
-
-      // Ensure data is an array
-      if (Array.isArray(data)) {
+      if (blogsData.blogs && Array.isArray(blogsData.blogs)) {
         // Filter out the current blog from related articles
-        const filteredData = data.filter((blog) => blog.id !== Blog?.id);
+        const filteredData = blogsData.blogs.filter((blog) => blog.id !== Blog?.id);
         logger.log("Filtered related blogs:", filteredData);
 
         // Take only the first 3 related articles
@@ -218,7 +184,7 @@ export default function BlogSlugPage({ params }) {
         logger.log("Final related blogs (limited to 3):", finalData);
         setRelatedBlogs(finalData);
       } else {
-        logger.error("Related blogs data is not an array:", data);
+        logger.error("Related blogs data is not an array:", blogsData);
         setRelatedBlogs([]);
       }
     } catch (error) {
@@ -233,25 +199,31 @@ export default function BlogSlugPage({ params }) {
     fetchBlog();
   }, []);
 
-  // Fetch related blogs when blog is loaded (same as original blog-old)
+  // Fetch related blogs when blog is loaded (only if relatedArticles not in response)
   useEffect(() => {
-    if (Blog && Blog.categories && Blog.categories.length > 0) {
-      logger.log(
-        "Blog loaded, fetching related articles for category:",
-        Blog.categories[0]
-      );
-      fetchRelated({ category: Blog.categories[0] });
-    } else if (Blog && Category) {
-      logger.log(
-        "Blog loaded, fetching related articles for category:",
-        Category
-      );
-      fetchRelated({ category: Category });
-    } else if (Blog) {
-      logger.log(
-        "Blog loaded but no categories found, fetching recent articles as fallback"
-      );
-      fetchRecentArticles();
+    if (Blog && (!Blog.relatedArticles || Blog.relatedArticles.length === 0)) {
+      // Try to get category ID from the blog
+      let categoryId = null;
+      
+      if (Blog.categories && Array.isArray(Blog.categories) && Blog.categories.length > 0) {
+        const firstCategory = Blog.categories[0];
+        // Handle nested structure
+        if (firstCategory.category && firstCategory.category.id) {
+          categoryId = firstCategory.category.id;
+        } else if (firstCategory.id) {
+          categoryId = firstCategory.id;
+        } else if (firstCategory.categoryId) {
+          categoryId = firstCategory.categoryId;
+        }
+        logger.log("Blog loaded, fetching related articles for category ID:", categoryId);
+      }
+      
+      if (categoryId) {
+        fetchRelated({ category: categoryId });
+      } else {
+        logger.log("Blog loaded but no category ID found, fetching recent articles as fallback");
+        fetchRecentArticles();
+      }
     }
   }, [Blog]);
 
@@ -276,7 +248,7 @@ export default function BlogSlugPage({ params }) {
             loading={BlogLoading}
             onClick={onClickCategoryBtn}
           ></CategoryBtn>
-          <TitleWrapper title={Blog?.title?.rendered}></TitleWrapper>
+          <TitleWrapper title={Blog?.title || Blog?.title?.rendered || "Untitled"}></TitleWrapper>
           {/* <Author
             name={AuthorContent?.display_name}
             readTime={EstReadTime}
@@ -288,11 +260,11 @@ export default function BlogSlugPage({ params }) {
         <ArticleImg
           src={FeaturedImage}
           loading={BlogLoading}
-          alt={Blog?.title.rendered}
+          alt={Blog?.title || Blog?.title?.rendered || "Blog post"}
         ></ArticleImg>
 
         <Content
-          html={Blog?.content?.rendered}
+          html={Blog?.content || Blog?.content?.rendered || ""}
           loading={BlogLoading}
           AuthorContent={AuthorContent}
         ></Content>

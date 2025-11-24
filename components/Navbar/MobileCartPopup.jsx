@@ -1,8 +1,8 @@
-import Image from "next/image";
 import Link from "next/link";
 import { IoClose } from "react-icons/io5";
 import { useState, useEffect } from "react";
 import { formatPrice } from "@/utils/priceFormatter";
+import CustomImage from "@/components/utils/CustomImage";
 
 export default function MobileCartPopup({
   open,
@@ -90,17 +90,66 @@ export default function MobileCartPopup({
 
               // New API has nested product and variant objects
               const itemName = item.product?.name || item.name || item.productName || "Product";
+              const variantName = item.variant?.name || null;
               const quantity = item.quantity || 1;
 
-              // New API structure: unitPrice and totalPrice are strings (e.g., "108", "12.5")
-              // Legacy structure: prices.sale_price/regular_price or price
+              // Check for subscription - new API has subscription data in variant
+              const productType = item.product?.type;
+              const hasSubscriptionInterval = item.variant?.subscriptionInterval;
+              const hasSubscriptionPeriod = item.variant?.subscriptionPeriod;
+              const variantSubscription = (productType === "VARIABLE_SUBSCRIPTION" && hasSubscriptionInterval) || (hasSubscriptionInterval && hasSubscriptionPeriod);
+              const legacySubscription = item.extensions?.subscriptions;
+              const isSubscription = variantSubscription || (legacySubscription && legacySubscription.billing_interval);
+
+              // Special handling for Sublingual Semaglutide product (ID: 490537)
+              const productId = item.productId || item.product?.id || item.product_id || item.id;
+              const isOralSemaglutide = productId === 490537 || item.id === 490537 || item.product_id === 490537;
+              const isSubscriptionWithFallback = isSubscription || isOralSemaglutide;
+
+              let supply = "";
+              if (variantSubscription) {
+                const interval = item.variant.subscriptionInterval;
+                const period = item.variant.subscriptionPeriod;
+
+                if (!period && productType === "VARIABLE_SUBSCRIPTION" && interval) {
+                  const pluralPeriod = interval > 1 ? "weeks" : "week";
+                  supply = `every ${interval} ${pluralPeriod}`;
+                } else if (period) {
+                  let periodText = period;
+                  if (period === "week") periodText = "week";
+                  else if (period === "month") periodText = "month";
+                  else if (period === "day") periodText = "day";
+                  else if (period === "year") periodText = "year";
+
+                  const pluralPeriod = interval > 1 ? `${periodText}s` : periodText;
+                  supply = `every ${interval} ${pluralPeriod}`;
+                }
+              } else if (
+                legacySubscription &&
+                legacySubscription.billing_interval &&
+                legacySubscription.billing_period
+              ) {
+                const interval = legacySubscription.billing_interval;
+                const period = legacySubscription.billing_period;
+                const pluralPeriod = interval > 1 ? `${period}s` : period;
+                supply = `every ${interval} ${pluralPeriod}`;
+              } else if (isOralSemaglutide) {
+                supply = "every 4 weeks";
+              }
+
+              const intervalText = isSubscriptionWithFallback ? `${supply}` : "";
+              const currencySymbol = item.prices?.currency_symbol || "$";
+
+              // Handle prices - new API has unitPrice and totalPrice as numbers
               let unitPrice = 0;
               let totalPrice = 0;
 
               if (item.unitPrice !== undefined) {
-                // New API structure - prices are strings, convert to number
-                unitPrice = parseFloat(item.unitPrice) || 0;
-                totalPrice = item.totalPrice ? parseFloat(item.totalPrice) || 0 : unitPrice * quantity;
+                // New API structure - prices can be numbers or strings
+                unitPrice = typeof item.unitPrice === 'number' ? item.unitPrice : parseFloat(item.unitPrice) || 0;
+                totalPrice = item.totalPrice
+                  ? (typeof item.totalPrice === 'number' ? item.totalPrice : parseFloat(item.totalPrice) || 0)
+                  : unitPrice * quantity;
               } else if (item.prices?.sale_price) {
                 // Legacy structure with sale_price (in cents)
                 unitPrice = item.prices.sale_price / 100;
@@ -115,40 +164,55 @@ export default function MobileCartPopup({
                 totalPrice = unitPrice * quantity;
               }
 
-              // Handle images - new API has variant.imageUrl, legacy has images array
-              const imageUrl = item.variant?.imageUrl ||
+              // Handle images - Priority: variant image > product featured image > product first image > legacy images
+              const imageUrl =
+                item.variant?.imageUrl ||
+                item.product?.images?.find(img => img.featured)?.url ||
+                item.product?.images?.[0]?.url ||
                 item.images?.[0]?.thumbnail ||
                 item.images?.[0]?.src ||
+                item.images?.[0]?.url ||
                 item.image ||
                 item.productImage ||
                 null;
 
               return (
                 <div key={itemKey} className="flex items-center gap-3 mb-4">
-                  <div className="min-w-[60px] min-h-[60px] w-[60px] h-[60px] bg-gray-100 rounded-md flex items-center justify-center">
+                  <div className="relative min-w-[60px] min-h-[60px] w-[60px] h-[60px] bg-gray-100 rounded-md overflow-hidden flex items-center justify-center">
                     {imageUrl ? (
-                      <Image
-                        width={60}
-                        height={60}
+                      <CustomImage
                         src={imageUrl}
                         alt={itemName}
-                        className="rounded-md"
+                        fill
+                        className="object-cover"
                       />
                     ) : (
-                      <div className="text-gray-400">No Image</div>
+                      <div className="text-gray-400 text-xs">No Image</div>
                     )}
                   </div>
                   <div className="flex-1">
-                    <div className="text-[#212121] text-sm">
+                    <div className="text-[#212121] text-sm font-medium mb-1">
                       <span
                         dangerouslySetInnerHTML={{ __html: itemName }}
                       ></span>
+                      {!isSubscriptionWithFallback && variantName && variantName !== itemName && (
+                        <span className="text-xs text-gray-600">
+                          {" "}({variantName})
+                        </span>
+                      )}
                     </div>
-                    <div className="text-[#212121] text-sm">
-                      {quantity} × ${formatPrice(unitPrice)}
+                    <div className="text-[#212121] text-xs opacity-85">
+                      {currencySymbol}
+                      {formatPrice(unitPrice)}
+                      {isSubscriptionWithFallback && intervalText && (
+                        <span> / {intervalText}</span>
+                      )}
+                      {!isSubscriptionWithFallback && variantName && variantName !== itemName && (
+                        <span> / {variantName}</span>
+                      )}
                     </div>
-                    <div className="text-[#212121] text-sm font-semibold">
-                      Total: ${formatPrice(totalPrice)}
+                    <div className="text-[#212121] text-sm font-semibold mt-1">
+                      Total: {currencySymbol}{formatPrice(totalPrice)}
                     </div>
                   </div>
                   <button
