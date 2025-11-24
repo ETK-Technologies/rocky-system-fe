@@ -8,21 +8,43 @@ import { analyticsService } from "@/utils/analytics/analyticsService";
 import { formatPrice } from "@/utils/priceFormatter";
 import { validateCart } from "@/lib/api/cartValidation";
 import { toast } from "react-toastify";
+import { isUserAuthenticated } from "@/utils/crossSellCheckout";
 
 const CartCalculations = ({ cartItems, setCartItems }) => {
   const router = useRouter();
   const [isValidating, setIsValidating] = useState(false);
 
   // Support both new API structure and legacy structure
-  const currencySymbol = cartItems.totals?.currency_symbol ||
-    cartItems.currency ||
-    "$";
+  const currencySymbol =
+    cartItems.totals?.currency_symbol || cartItems.currency || "$";
 
   const handleProceedToCheckout = async (e) => {
     e.preventDefault();
 
+    // Check if user is authenticated - guests need to login before checkout
+    const authenticated = isUserAuthenticated();
+    if (!authenticated) {
+      logger.log("Guest user attempting checkout, redirecting to login");
+      const origin =
+        typeof window !== "undefined" ? window.location.origin : "";
+      const redirectTo = encodeURIComponent(`${origin}/checkout`);
+      // Get sessionId to pass to login for cart merging
+      const { getSessionId } = await import("@/services/sessionService");
+      const sessionId = getSessionId();
+      let loginUrl = `${origin}/login-register?redirect_to=${redirectTo}&viewshow=login`;
+      if (sessionId) {
+        loginUrl += `&sessionId=${encodeURIComponent(sessionId)}`;
+      }
+      window.location.href = loginUrl;
+      return;
+    }
+
     // Check if cart has items
-    if (!cartItems || !Array.isArray(cartItems.items) || cartItems.items.length === 0) {
+    if (
+      !cartItems ||
+      !Array.isArray(cartItems.items) ||
+      cartItems.items.length === 0
+    ) {
       toast.error("Your cart is empty");
       return;
     }
@@ -40,7 +62,8 @@ const CartCalculations = ({ cartItems, setCartItems }) => {
         logger.error("Cart validation failed:", cartValidation);
 
         // Show detailed error message
-        const errorMessage = cartValidation.error ||
+        const errorMessage =
+          cartValidation.error ||
           cartValidation.message ||
           "Cart validation failed. Please check your cart and try again.";
         toast.error(errorMessage);
@@ -68,9 +91,10 @@ const CartCalculations = ({ cartItems, setCartItems }) => {
         const itemsForAnalytics = cartItems.items.map((it) => {
           // Support both new API structure and legacy structure
           const itemName = it.product?.name || it.name || "Product";
-          const itemPrice = it.unitPrice !== undefined
-            ? parseFloat(it.unitPrice) || 0
-            : (it.prices?.sale_price || it.prices?.regular_price || 0) / 100;
+          const itemPrice =
+            it.unitPrice !== undefined
+              ? parseFloat(it.unitPrice) || 0
+              : (it.prices?.sale_price || it.prices?.regular_price || 0) / 100;
 
           return {
             product: {
@@ -80,10 +104,12 @@ const CartCalculations = ({ cartItems, setCartItems }) => {
               price: itemPrice,
               attributes: it.variation?.length
                 ? it.variation.map((v) => ({
-                  name: v.attribute || v.name,
-                  options: [v.value],
-                }))
-                : it.variant?.name ? [{ name: "Variant", options: [it.variant.name] }] : [],
+                    name: v.attribute || v.name,
+                    options: [v.value],
+                  }))
+                : it.variant?.name
+                ? [{ name: "Variant", options: [it.variant.name] }]
+                : [],
             },
             quantity: it.quantity || 1,
           };

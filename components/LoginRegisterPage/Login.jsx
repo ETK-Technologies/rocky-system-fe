@@ -495,8 +495,20 @@ const LoginContent = ({ setActiveTab, loginRef }) => {
     setSubmitting(true);
 
     try {
-      // Get sessionId from localStorage for guest cart merging
-      const sessionId = getSessionId();
+      // Get sessionId from localStorage or URL params for guest cart merging
+      let sessionId = getSessionId();
+      
+      // Fallback: Check URL params for sessionId (in case it was passed from redirect)
+      if (!sessionId && typeof window !== "undefined") {
+        const urlParams = new URLSearchParams(window.location.search);
+        const urlSessionId = urlParams.get("sessionId");
+        if (urlSessionId) {
+          sessionId = urlSessionId;
+          // Store it in localStorage for future use
+          const { setSessionId } = await import("@/services/sessionService");
+          setSessionId(sessionId);
+        }
+      }
 
       // Prepare request body
       const requestBody = {
@@ -580,6 +592,18 @@ const LoginContent = ({ setActiveTab, loginRef }) => {
           document.getElementById("cart-refresher")?.click();
           const cartUpdatedEvent = new CustomEvent("cart-updated");
           document.dispatchEvent(cartUpdatedEvent);
+        }
+
+        // Clear sessionId after successful login and cart merge
+        // SessionId is no longer needed since user is authenticated
+        if (sessionId) {
+          try {
+            const { clearSessionId } = await import("@/services/sessionService");
+            clearSessionId();
+            logger.log("SessionId cleared after successful login");
+          } catch (error) {
+            logger.warn("Could not clear sessionId after login:", error);
+          }
         }
 
         // Small delay to ensure cart operations have time to complete

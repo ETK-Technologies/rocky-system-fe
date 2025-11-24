@@ -986,11 +986,21 @@ const CheckoutPageContent = () => {
         
         let sessionId = null;
         if (!isAuth) {
+        const { isAuthenticated } = await import("@/lib/cart/cartService");
+        const authenticated = isAuthenticated();
+        
+        // Only get sessionId if user is NOT authenticated
+        if (!authenticated) {
           const { getSessionId } = await import("@/services/sessionService");
           sessionId = getSessionId();
+        } else {
+          // Clear sessionId for authenticated users - don't send it
+          sessionId = null;
         }
-        
-        const cartValidation = await validateCart(sessionId);
+      }
+      
+      // validateCart will check authentication and ignore sessionId if authenticated
+      const cartValidation = await validateCart(sessionId);
         
         if (!cartValidation.success || !cartValidation.valid) {
           logger.error("Cart validation failed:", cartValidation);

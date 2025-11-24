@@ -20,10 +20,26 @@ const CartPopup = ({ isOpen, onClose, productType, onContinueShopping }) => {
   const handleProceedToCheckout = async (e, checkoutUrl) => {
     e.preventDefault();
 
+    // Check if user is authenticated - guests need to login before checkout
+    const authenticated = isUserAuthenticated();
+    if (!authenticated) {
+      logger.log("Guest user attempting checkout, redirecting to login");
+      const origin = typeof window !== "undefined" ? window.location.origin : "";
+      const redirectTo = encodeURIComponent(`${origin}${checkoutUrl}`);
+      // Get sessionId to pass to login for cart merging
+      const { getSessionId } = await import("@/services/sessionService");
+      const sessionId = getSessionId();
+      let loginUrl = `${origin}/login-register?redirect_to=${redirectTo}&viewshow=login`;
+      if (sessionId) {
+        loginUrl += `&sessionId=${encodeURIComponent(sessionId)}`;
+      }
+      window.location.href = loginUrl;
+      return;
+    }
+
     // If user is not authenticated and this is merch, redirect to login-register with redirect_to
     if (productType === "merch") {
       try {
-        const authenticated = isUserAuthenticated();
         if (!authenticated) {
           const origin = typeof window !== "undefined" ? window.location.origin : "";
           const redirectTo = encodeURIComponent(`${origin}${checkoutUrl}`);
@@ -116,17 +132,24 @@ const CartPopup = ({ isOpen, onClose, productType, onContinueShopping }) => {
   const fetchCartItems = useCallback(async () => {
     setIsLoading(true);
     try {
-      // Get sessionId for guest users
+      // Check if user is authenticated - authenticated users should NOT send sessionId
+      const { isAuthenticated } = await import("@/lib/cart/cartService");
+      const authenticated = isAuthenticated();
+      
       let url = "/api/cart";
-      try {
-        const { getSessionId } = await import("@/services/sessionService");
-        const sessionId = getSessionId();
-        if (sessionId) {
-          url = `/api/cart?sessionId=${sessionId}`;
+      
+      // Only add sessionId for guest users (not authenticated)
+      if (!authenticated) {
+        try {
+          const { getSessionId } = await import("@/services/sessionService");
+          const sessionId = getSessionId();
+          if (sessionId) {
+            url = `/api/cart?sessionId=${sessionId}`;
+          }
+        } catch (error) {
+          // If sessionService fails, continue without sessionId
+          logger.warn("Could not get sessionId for cart fetch:", error);
         }
-      } catch (error) {
-        // If sessionService fails, continue without sessionId
-        logger.warn("Could not get sessionId for cart fetch:", error);
       }
 
       const res = await fetch(url, {

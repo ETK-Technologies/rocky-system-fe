@@ -18,17 +18,24 @@ export const fetchCart = async () => {
     // Refresh nonce before cart operation (for old WooCommerce compatibility)
     await refreshCartNonceClient();
 
-    // Get sessionId for guest users
+    // Check if user is authenticated - authenticated users should NOT send sessionId
+    const { isAuthenticated } = await import("@/lib/cart/cartService");
+    const authenticated = isAuthenticated();
+    
     let url = "/api/cart";
-    try {
-      const { getSessionId } = await import("@/services/sessionService");
-      const sessionId = getSessionId();
-      if (sessionId) {
-        url = `/api/cart?sessionId=${sessionId}`;
+    
+    // Only add sessionId for guest users (not authenticated)
+    if (!authenticated) {
+      try {
+        const { getSessionId } = await import("@/services/sessionService");
+        const sessionId = getSessionId();
+        if (sessionId) {
+          url = `/api/cart?sessionId=${sessionId}`;
+        }
+      } catch (error) {
+        // If sessionService fails, continue without sessionId
+        logger.log("Could not get sessionId, fetching cart without it");
       }
-    } catch (error) {
-      // If sessionService fails, continue without sessionId
-      logger.log("Could not get sessionId, fetching cart without it");
     }
 
     const response = await fetch(url, {

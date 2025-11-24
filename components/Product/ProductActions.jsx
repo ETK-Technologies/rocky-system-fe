@@ -138,7 +138,23 @@ const ProductActions = ({
       setShowCartPopup(true);
     } catch (error) {
       logger.error("Error adding to cart:", error);
-      alert("Error adding to cart: " + error.message);
+      
+      // Provide user-friendly error messages
+      let errorMessage = "Error adding to cart. Please try again.";
+      
+      if (error.message) {
+        // Check for specific error types
+        if (error.message.includes("Authentication required") || 
+            error.message.includes("AUTH_OR_SESSION_REQUIRED") ||
+            error.message.includes("Session ID is required")) {
+          // This shouldn't happen with our fixes, but if it does, provide helpful message
+          errorMessage = "Unable to add to cart. Please refresh the page and try again.";
+        } else {
+          errorMessage = `Error adding to cart: ${error.message}`;
+        }
+      }
+      
+      alert(errorMessage);
     } finally {
       setIsLoading(false);
     }

@@ -523,6 +523,20 @@ const RegisterContent = ({ setActiveTab, registerRef }) => {
           document.dispatchEvent(cartUpdatedEvent);
         }
 
+        // Clear sessionId after successful registration and cart merge
+        // SessionId is no longer needed since user is authenticated
+        if (sessionId) {
+          try {
+            const { clearSessionId } = await import(
+              "@/services/sessionService"
+            );
+            clearSessionId();
+            logger.log("SessionId cleared after successful registration");
+          } catch (error) {
+            logger.warn("Could not clear sessionId after registration:", error);
+          }
+        }
+
         // Small delay to ensure everything is processed
         if (redirectTo && redirectTo.includes("/checkout")) {
           await new Promise((resolve) => setTimeout(resolve, 500));
