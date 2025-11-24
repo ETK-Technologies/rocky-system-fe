@@ -3,7 +3,7 @@ import axios from "axios";
 import { cookies } from "next/headers";
 import { logger } from "@/utils/devLogger";
 
-const BASE_URL = process.env.ROCKY_BE_BASE_URL || "https://rocky-be-production.up.railway.app";
+const BASE_URL = process.env.ROCKY_BE_BASE_URL;
 
 /**
  * PATCH /api/cart/items/[id]
@@ -15,7 +15,7 @@ const BASE_URL = process.env.ROCKY_BE_BASE_URL || "https://rocky-be-production.u
  */
 export async function PATCH(req, { params }) {
     try {
-        const { id } = params;
+        const { id } = await params;
         const { quantity } = await req.json();
         const cookieStore = await cookies();
         const authToken = cookieStore.get("authToken");
@@ -70,8 +70,8 @@ export async function PATCH(req, { params }) {
             const headers = {
                 "Content-Type": "application/json",
                 accept: "application/json",
-                "X-App-Key": "app_04ecfac3213d7b179dc1e5ae9cb7a627",
-                "X-App-Secret": "sk_2c867224696400bc2b377c3e77356a9e",
+                "X-App-Key": process.env.NEXT_PUBLIC_APP_KEY,
+                "X-App-Secret": process.env.NEXT_PUBLIC_APP_SECRET,
             };
 
             // Add Authorization header ONLY if user is authenticated
@@ -105,8 +105,8 @@ export async function PATCH(req, { params }) {
             }
             const cartHeaders = {
                 accept: "application/json",
-                "X-App-Key": "app_04ecfac3213d7b179dc1e5ae9cb7a627",
-                "X-App-Secret": "sk_2c867224696400bc2b377c3e77356a9e",
+                "X-App-Key": process.env.NEXT_PUBLIC_APP_KEY,
+                "X-App-Secret": process.env.NEXT_PUBLIC_APP_SECRET,
             };
 
             if (authToken) {
@@ -186,7 +186,7 @@ export async function PATCH(req, { params }) {
  */
 export async function DELETE(req, { params }) {
     try {
-        const { id } = params;
+        const { id } = await params;
         const cookieStore = await cookies();
         const authToken = cookieStore.get("authToken");
 
@@ -206,11 +206,13 @@ export async function DELETE(req, { params }) {
         }
 
         // Validate: Either authToken or sessionId must be provided
+        // For guest users, sessionId should be provided in the query string
         if (!authToken && !sessionId) {
+            logger.warn("DELETE cart item: No authToken and no sessionId provided");
             return NextResponse.json(
                 {
                     success: false,
-                    error: "Either authentication token or sessionId is required",
+                    error: "Session required. Please refresh the page and try again.",
                 },
                 { status: 400 }
             );
@@ -230,8 +232,8 @@ export async function DELETE(req, { params }) {
             const headers = {
                 "Content-Type": "application/json",
                 accept: "application/json",
-                "X-App-Key": "app_04ecfac3213d7b179dc1e5ae9cb7a627",
-                "X-App-Secret": "sk_2c867224696400bc2b377c3e77356a9e",
+                "X-App-Key": process.env.NEXT_PUBLIC_APP_KEY,
+                "X-App-Secret": process.env.NEXT_PUBLIC_APP_SECRET,
             };
 
             // Add Authorization header ONLY if user is authenticated
@@ -263,8 +265,8 @@ export async function DELETE(req, { params }) {
             logger.log("Cart item removed successfully, fetching updated cart");
             const cartHeaders = {
                 accept: "application/json",
-                "X-App-Key": "app_04ecfac3213d7b179dc1e5ae9cb7a627",
-                "X-App-Secret": "sk_2c867224696400bc2b377c3e77356a9e",
+                "X-App-Key": process.env.NEXT_PUBLIC_APP_KEY,
+                "X-App-Secret": process.env.NEXT_PUBLIC_APP_SECRET,
             };
 
             if (authToken) {
@@ -292,6 +294,24 @@ export async function DELETE(req, { params }) {
                         total_price: "0.00",
                     },
                     { status: 400 }
+                );
+            }
+
+            if (error.response?.status === 401) {
+                logger.error("Backend API returned 401 for cart item deletion:", {
+                    itemId: id,
+                    hasAuth: !!authToken,
+                    hasSessionId: !!sessionId,
+                });
+                return NextResponse.json(
+                    {
+                        success: false,
+                        error: "Session expired or invalid. Please refresh the page and try again.",
+                        items: [],
+                        total_items: 0,
+                        total_price: "0.00",
+                    },
+                    { status: 401 }
                 );
             }
 
