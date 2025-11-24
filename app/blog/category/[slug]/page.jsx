@@ -16,7 +16,7 @@ export async function generateStaticParams() {
 
 export default async function CategoryBlogsPage({ params }) {
   try {
-    const { slug } = params;
+    const { slug } = await params;
 
     // Fetch category details and blogs for this category
     const [categories, blogsData] = await Promise.all([

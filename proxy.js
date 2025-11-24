@@ -1,10 +1,9 @@
 import { NextResponse } from "next/server";
 import { logger } from "@/utils/devLogger";
-import { layoutExemptRoutes } from "./utils/layoutConfig";
 
-export function middleware(req) {
+export function proxy(req) {
   try {
-    // Skip middleware for static files and API routes
+    // Skip proxy for static files and API routes
     const { pathname } = req.nextUrl;
     if (
       pathname.startsWith("/_next/") ||
@@ -153,7 +152,7 @@ export function middleware(req) {
     });
   } catch (error) {
     // Log the error for debugging
-    logger.error("Middleware error:", error);
+    logger.error("Proxy error:", error);
 
     // Return a safe fallback response
     return NextResponse.next();
@@ -248,3 +247,4 @@ export const config = {
     "/((?!api|_next/static|_next/image|favicon.ico).*)",
   ],
 };
+

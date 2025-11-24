@@ -6,7 +6,7 @@ const API_BASE_URL = process.env.ROCKY_BE_BASE_URL;
 
 export async function GET(request, { params }) {
   try {
-    const { id } = params;
+    const { id } = await params;
 
     if (!id) {
       return NextResponse.json(

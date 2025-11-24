@@ -3,7 +3,7 @@ import { logger } from "@/utils/devLogger";
 
 export async function GET(req, { params }) {
   try {
-    const { slug } = params;
+    const { slug } = await params;
     logger.log("API: Fetching blog with slug:", slug);
     logger.log("API: BASE_URL:", process.env.BASE_URL);
     logger.log("API: ADMIN_TOKEN exists:", !!process.env.ADMIN_TOKEN);

@@ -68,7 +68,7 @@ function formatVariationAttributes(variationData) {
 }
 
 export async function GET(request, { params }) {
-  const { id: orderId } = params;
+  const { id: orderId } = await params;
 
   if (!orderId) {
     return NextResponse.json(
