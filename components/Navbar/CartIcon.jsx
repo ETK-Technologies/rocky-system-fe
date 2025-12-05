@@ -376,19 +376,56 @@ const CartItem = ({ item, refreshCart, isLocalCart, allItems }) => {
   const quantity = item.quantity;
   const currencySymbol = item.prices?.currency_symbol || "$"; // Default to $
 
-  // For local cart items, these might not exist
+  // Parse variant name to extract tabs frequency and subscription type
+  // Format: "Tabs frequency: 3 Tabs | Subscription Type: Monthly Supply"
+  const variantName = item.variant?.name || null;
+  let tabsFrequency = "";
+  let subscriptionType = "";
+  
+  if (variantName) {
+    const parts = variantName.split("|");
+    
+    // Extract tabs frequency
+    const tabsPart = parts.find(p => p.includes("Tabs frequency:"));
+    if (tabsPart) {
+      const match = tabsPart.match(/:\s*(.+)/);
+      if (match) {
+        tabsFrequency = match[1].trim().toLowerCase();
+      }
+    }
+    
+    // Extract subscription type
+    const subscriptionPart = parts.find(p => p.includes("Subscription Type:"));
+    if (subscriptionPart) {
+      const match = subscriptionPart.match(/:\s*(.+)/);
+      if (match) {
+        subscriptionType = match[1].trim().toLowerCase();
+      }
+    }
+  }
+
+  // Check if this is a subscription product
+  const productType = item.product?.type;
+  const hasSubscriptionInterval = item.variant?.subscriptionInterval;
+  const hasSubscriptionPeriod = item.variant?.subscriptionPeriod;
+  const variantSubscription = (productType === "VARIABLE_SUBSCRIPTION" && hasSubscriptionInterval) || (hasSubscriptionInterval && hasSubscriptionPeriod);
   const subscription = !isLocalCart ? item.extensions?.subscriptions : null;
-  const isSubscription = subscription && subscription.billing_period;
+  const isSubscription = variantSubscription || (subscription && subscription.billing_period);
 
-  let supply = "";
-  if (subscription && subscription.billing_interval === 1) {
-    supply = "Monthly Supply";
-  }
-  if (subscription && subscription.billing_interval === 3) {
-    supply = "Quarterly Supply";
+  // Build the display text
+  let frequencyText = "";
+  if (tabsFrequency && subscriptionType) {
+    // Format: "3 tabs monthly supply"
+    frequencyText = `${tabsFrequency} ${subscriptionType}`;
+  } else if (isSubscription) {
+    // Fallback to legacy format
+    frequencyText = "subscription";
+  } else {
+    // One time purchase
+    frequencyText = "one time purchase";
   }
 
-  const intervalText = isSubscription ? `${supply}` : "";
+  const isOneTimePurchase = !isSubscription && !tabsFrequency;
 
   // Check if this item can be removed (for UI purposes)
   const itemCanBeRemoved = canRemoveItem(allItems || [], item.key);
@@ -471,19 +508,14 @@ const CartItem = ({ item, refreshCart, isLocalCart, allItems }) => {
       <div className="text-sm font-semibold flex-grow">
         <h5 className="text-wrap max-w-[150px]">
           <span dangerouslySetInnerHTML={{ __html: item.name }}></span>{" "}
-          {!isSubscription &&
+          {isOneTimePurchase &&
             !isLocalCart &&
             item.variation &&
             item.variation[0] &&
             `(${item.variation[0]?.value})`}
         </h5>
         <p className="text-[12px] font-normal">
-          {isSubscription && intervalText}
-          {!isSubscription &&
-            !isLocalCart &&
-            item.variation &&
-            item.variation[1] &&
-            item.variation[1]?.value}
+          {frequencyText}
         </p>
         <p className="mt-1 text-xs">
           {quantity} × {currencySymbol}

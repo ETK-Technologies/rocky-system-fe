@@ -460,6 +460,55 @@ const PaymentModal = ({
                 if (displayPrice != null && quantity > 1)
                   displayPrice = displayPrice / quantity;
 
+                // Parse variant name to extract tabs frequency and subscription type
+                // Format: "Tabs frequency: 3 Tabs | Subscription Type: Monthly Supply"
+                const variantName = item.variant?.name || null;
+                let tabsFrequency = "";
+                let subscriptionType = "";
+                
+                if (variantName) {
+                  const parts = variantName.split("|");
+                  
+                  // Extract tabs frequency
+                  const tabsPart = parts.find(p => p.includes("Tabs frequency:"));
+                  if (tabsPart) {
+                    const match = tabsPart.match(/:\s*(.+)/);
+                    if (match) {
+                      tabsFrequency = match[1].trim().toLowerCase();
+                    }
+                  }
+                  
+                  // Extract subscription type
+                  const subscriptionPart = parts.find(p => p.includes("Subscription Type:"));
+                  if (subscriptionPart) {
+                    const match = subscriptionPart.match(/:\s*(.+)/);
+                    if (match) {
+                      subscriptionType = match[1].trim().toLowerCase();
+                    }
+                  }
+                }
+
+                // Check if this is a subscription product
+                const productType = item.product?.type;
+                const hasSubscriptionInterval = item.variant?.subscriptionInterval;
+                const hasSubscriptionPeriod = item.variant?.subscriptionPeriod;
+                const variantSubscription = (productType === "VARIABLE_SUBSCRIPTION" && hasSubscriptionInterval) || (hasSubscriptionInterval && hasSubscriptionPeriod);
+                const subscription = item.extensions?.subscriptions;
+                const isSubscription = variantSubscription || (subscription && subscription.billing_interval);
+
+                // Build the display text
+                let frequencyText = "";
+                if (tabsFrequency && subscriptionType) {
+                  // Format: "3 tabs monthly supply"
+                  frequencyText = `${tabsFrequency} ${subscriptionType}`;
+                } else if (isSubscription) {
+                  // Fallback to legacy format
+                  frequencyText = "subscription";
+                } else {
+                  // One time purchase
+                  frequencyText = "one time purchase";
+                }
+
                 return (
                   <div
                     key={idx}
@@ -484,6 +533,9 @@ const PaymentModal = ({
                       {displayPrice != null ? (
                         <p className="text-[14px] font-medium">
                           {formatPrice(displayPrice)}
+                          {frequencyText && (
+                            <span className="text-[12px] font-normal"> / {frequencyText}</span>
+                          )}
                         </p>
                       ) : null}
                     </div>

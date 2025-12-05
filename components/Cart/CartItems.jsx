@@ -164,8 +164,34 @@ const CartItem = ({ item, setCartItems, allItems }) => {
 
   const currencySymbol = item.prices?.currency_symbol || "$";
 
-  // Check for subscription - new API has subscription data in variant
-  // If product type is VARIABLE_SUBSCRIPTION and has subscriptionInterval, treat as subscription
+  // Parse variant name to extract tabs frequency and subscription type
+  // Format: "Tabs frequency: 3 Tabs | Subscription Type: Monthly Supply"
+  let tabsFrequency = "";
+  let subscriptionType = "";
+  
+  if (variantName) {
+    const parts = variantName.split("|");
+    
+    // Extract tabs frequency
+    const tabsPart = parts.find(p => p.includes("Tabs frequency:"));
+    if (tabsPart) {
+      const match = tabsPart.match(/:\s*(.+)/);
+      if (match) {
+        tabsFrequency = match[1].trim().toLowerCase();
+      }
+    }
+    
+    // Extract subscription type
+    const subscriptionPart = parts.find(p => p.includes("Subscription Type:"));
+    if (subscriptionPart) {
+      const match = subscriptionPart.match(/:\s*(.+)/);
+      if (match) {
+        subscriptionType = match[1].trim().toLowerCase();
+      }
+    }
+  }
+
+  // Check if this is a subscription product
   const productType = item.product?.type;
   const hasSubscriptionInterval = item.variant?.subscriptionInterval;
   const hasSubscriptionPeriod = item.variant?.subscriptionPeriod;
@@ -173,49 +199,20 @@ const CartItem = ({ item, setCartItems, allItems }) => {
   const legacySubscription = item.extensions?.subscriptions;
   const isSubscription = variantSubscription || (legacySubscription && legacySubscription.billing_interval);
 
-  // Special handling for Sublingual Semaglutide product (ID: 490537)
-  const productId = item.productId || item.product?.id || item.product_id || item.id;
-  const isOralSemaglutide = productId === 490537 || item.id === 490537 || item.product_id === 490537;
-  const isSubscriptionWithFallback = isSubscription || isOralSemaglutide;
-
-  let supply = "";
-  if (variantSubscription) {
-    // New API structure - subscription data in variant
-    const interval = item.variant.subscriptionInterval;
-    const period = item.variant.subscriptionPeriod;
-
-    // If period is null but we have interval and product is VARIABLE_SUBSCRIPTION, default to "weeks"
-    if (!period && productType === "VARIABLE_SUBSCRIPTION" && interval) {
-      const pluralPeriod = interval > 1 ? "weeks" : "week";
-      supply = `every ${interval} ${pluralPeriod}`;
-    } else if (period) {
-      // Convert period to readable format
-      let periodText = period;
-      if (period === "week") periodText = "week";
-      else if (period === "month") periodText = "month";
-      else if (period === "day") periodText = "day";
-      else if (period === "year") periodText = "year";
-
-      // Pluralize the period if interval > 1
-      const pluralPeriod = interval > 1 ? `${periodText}s` : periodText;
-      supply = `every ${interval} ${pluralPeriod}`;
-    }
-  } else if (
-    legacySubscription &&
-    legacySubscription.billing_interval &&
-    legacySubscription.billing_period
-  ) {
-    // Legacy structure
-    const interval = legacySubscription.billing_interval;
-    const period = legacySubscription.billing_period;
-    const pluralPeriod = interval > 1 ? `${period}s` : period;
-    supply = `every ${interval} ${pluralPeriod}`;
-  } else if (isOralSemaglutide) {
-    // Default to monthly for Sublingual Semaglutide if no subscription data
-    supply = "every 4 weeks";
+  // Build the display text
+  let frequencyText = "";
+  if (tabsFrequency && subscriptionType) {
+    // Format: "3 tabs monthly supply"
+    frequencyText = `${tabsFrequency} ${subscriptionType}`;
+  } else if (isSubscription) {
+    // Fallback to legacy format
+    frequencyText = "subscription";
+  } else {
+    // One time purchase
+    frequencyText = "one time purchase";
   }
 
-  const intervalText = isSubscriptionWithFallback ? `${supply}` : "";
+  const isOneTimePurchase = !isSubscription && !tabsFrequency;
 
   // Check if this item can be removed (for UI purposes)
   const itemCanBeRemoved = canRemoveItem(allItems || [], itemKey);
@@ -471,7 +468,7 @@ const CartItem = ({ item, setCartItems, allItems }) => {
           <div className="flex-1 min-w-0">
             <p className="text-[14px] md:text-[16px] font-[500] md:font-[600] leading-[19.6px] mb-[2px] text-[#251F20]">
               <span dangerouslySetInnerHTML={{ __html: itemName }}></span>
-              {!isSubscriptionWithFallback && variantName && variantName !== itemName && (
+              {isOneTimePurchase && variantName && variantName !== itemName && (
                 <span className="text-[12px] font-[400] text-[#212121]">
                   {" "}({variantName})
                 </span>
@@ -482,31 +479,22 @@ const CartItem = ({ item, setCartItems, allItems }) => {
               <p className="text-[12px] font-[400] text-[#212121] opacity-85">
                 {currencySymbol}
                 {formatPrice(itemPrice)}
-                {isSubscriptionWithFallback && intervalText ? (
-                  <span> / {intervalText}</span>
-                ) : (
-                  <>
-                    {variantName && variantName !== itemName && (
-                      <span> / {variantName}</span>
-                    )}
-                    {!variantName && item.variation?.[0]?.value && (
-                      <span> / {item.variation[0]?.value}</span>
-                    )}
-                    {itemName?.toLowerCase().includes("zonnic") &&
-                      item.variation?.find(
-                        (v) => v.attribute?.toLowerCase() === "flavors"
-                      )?.value && (
-                        <span className="text-[12px] font-[400] text-[#212121]">
-                          {" / "}
-                          {
-                            item.variation.find(
-                              (v) => v.attribute?.toLowerCase() === "flavors"
-                            )?.value
-                          }
-                        </span>
-                      )}
-                  </>
+                {frequencyText && (
+                  <span> / {frequencyText}</span>
                 )}
+                {itemName?.toLowerCase().includes("zonnic") &&
+                  item.variation?.find(
+                    (v) => v.attribute?.toLowerCase() === "flavors"
+                  )?.value && (
+                    <span className="text-[12px] font-[400] text-[#212121]">
+                      {" / "}
+                      {
+                        item.variation.find(
+                          (v) => v.attribute?.toLowerCase() === "flavors"
+                        )?.value
+                      }
+                    </span>
+                  )}
               </p>
             )}
             {itemName === "Body Optimization Program" && (

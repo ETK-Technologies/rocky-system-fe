@@ -60,35 +60,6 @@ const CartItem = ({ item }) => {
   // Get currency symbol - new API has it at cart level, legacy has it in item.prices
   const currencySymbol = item.prices?.currency_symbol || "$"; // Default to $
 
-  // Handle subscription data - new API might not have extensions.subscriptions
-  const subscription = item.extensions?.subscriptions;
-  const isSubscription = subscription && subscription.billing_interval;
-
-  // Special handling for Sublingual Semaglutide product (ID: 490537)
-  // This product should be treated as a monthly subscription even if WooCommerce metadata is missing
-  const productId = item.productId || item.product?.id || item.id;
-  const isOralSemaglutide = productId === 490537 || item.id === 490537 || item.product_id === 490537;
-  const isSubscriptionWithFallback = isSubscription || isOralSemaglutide;
-
-  let supply = "";
-  if (
-    subscription &&
-    subscription.billing_interval &&
-    subscription.billing_period
-  ) {
-    const interval = subscription.billing_interval;
-    const period = subscription.billing_period;
-
-    // Pluralize the period if interval > 1
-    const pluralPeriod = interval > 1 ? `${period}s` : period;
-    supply = `every ${interval} ${pluralPeriod}`;
-  } else if (isOralSemaglutide) {
-    // Default to monthly for Sublingual Semaglutide if no subscription data
-    supply = "every 4 weeks";
-  }
-
-  const intervalText = isSubscriptionWithFallback ? `${supply}` : "";
-
   // Handle item name - new API has nested product.name
   const itemName = item.product?.name || item.name || "Product";
 
@@ -102,6 +73,57 @@ const CartItem = ({ item }) => {
 
   // Handle variations - new API might not have variation array
   const variation = item.variation || [];
+
+  // Parse variant name to extract tabs frequency and subscription type
+  // Format: "Tabs frequency: 3 Tabs | Subscription Type: Monthly Supply"
+  const variantName = item.variant?.name || null;
+  let tabsFrequency = "";
+  let subscriptionType = "";
+  
+  if (variantName) {
+    const parts = variantName.split("|");
+    
+    // Extract tabs frequency
+    const tabsPart = parts.find(p => p.includes("Tabs frequency:"));
+    if (tabsPart) {
+      const match = tabsPart.match(/:\s*(.+)/);
+      if (match) {
+        tabsFrequency = match[1].trim().toLowerCase();
+      }
+    }
+    
+    // Extract subscription type
+    const subscriptionPart = parts.find(p => p.includes("Subscription Type:"));
+    if (subscriptionPart) {
+      const match = subscriptionPart.match(/:\s*(.+)/);
+      if (match) {
+        subscriptionType = match[1].trim().toLowerCase();
+      }
+    }
+  }
+
+  // Check if this is a subscription product
+  const productType = item.product?.type;
+  const hasSubscriptionInterval = item.variant?.subscriptionInterval;
+  const hasSubscriptionPeriod = item.variant?.subscriptionPeriod;
+  const variantSubscription = (productType === "VARIABLE_SUBSCRIPTION" && hasSubscriptionInterval) || (hasSubscriptionInterval && hasSubscriptionPeriod);
+  const subscription = item.extensions?.subscriptions;
+  const isSubscription = variantSubscription || (subscription && subscription.billing_interval);
+
+  // Build the display text
+  let frequencyText = "";
+  if (tabsFrequency && subscriptionType) {
+    // Format: "3 tabs monthly supply"
+    frequencyText = `${tabsFrequency} ${subscriptionType}`;
+  } else if (isSubscription) {
+    // Fallback to legacy format
+    frequencyText = "subscription";
+  } else {
+    // One time purchase
+    frequencyText = "one time purchase";
+  }
+
+  const isOneTimePurchase = !isSubscription && !tabsFrequency;
 
   return (
     <div className="flex gap-4 py-4 w-full">
@@ -121,7 +143,7 @@ const CartItem = ({ item }) => {
       <div className="text-[14px] font-semibold">
         <h5>
           <span dangerouslySetInnerHTML={{ __html: itemName }}></span>{" "}
-          {!isSubscriptionWithFallback &&
+          {isOneTimePurchase &&
             variation[0] &&
             `(${variation[0]?.value})`}
         </h5>
@@ -129,29 +151,24 @@ const CartItem = ({ item }) => {
         {itemName !== "Body Optimization Program" && (
           <p className="text-[12px]">
             {currencySymbol}
-            {formatPrice(itemPrice)} /{" "}
-            <span className="text-[12px] font-normal">
-              {isSubscriptionWithFallback && intervalText}
-              {!isSubscriptionWithFallback &&
-                variation[1] &&
-                variation[1]?.value}
-              {itemName?.toString().toLowerCase().includes("zonnic") &&
-                variation?.find(
-                  (v) => v.attribute?.toString().toLowerCase() === "flavors"
-                )?.value && (
-                  <>
-                    {" / "}
-                    <span className="text-[12px] font-normal">
-                      {
-                        variation.find(
-                          (v) =>
-                            v.attribute?.toString().toLowerCase() === "flavors"
-                        )?.value
-                      }
-                    </span>
-                  </>
-                )}
-            </span>
+            {formatPrice(itemPrice)}
+            {frequencyText && (
+              <span className="text-[12px] font-normal"> / {frequencyText}</span>
+            )}
+            {itemName?.toString().toLowerCase().includes("zonnic") &&
+              variation?.find(
+                (v) => v.attribute?.toString().toLowerCase() === "flavors"
+              )?.value && (
+                <span className="text-[12px] font-normal">
+                  {" / "}
+                  {
+                    variation.find(
+                      (v) =>
+                        v.attribute?.toString().toLowerCase() === "flavors"
+                    )?.value
+                  }
+                </span>
+              )}
           </p>
         )}
         {itemName === "Body Optimization Program" && (
@@ -173,7 +190,7 @@ const CartItem = ({ item }) => {
           </div>
         )}
         <p className="text-gray-500 mt-1 font-thin text-[12px]">
-          {isSubscriptionWithFallback && "Pause Or Cancel Anytime"}
+          {!isOneTimePurchase && "Pause Or Cancel Anytime"}
         </p>
       </div>
     </div>

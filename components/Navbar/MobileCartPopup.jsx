@@ -93,7 +93,34 @@ export default function MobileCartPopup({
               const variantName = item.variant?.name || null;
               const quantity = item.quantity || 1;
 
-              // Check for subscription - new API has subscription data in variant
+              // Parse variant name to extract tabs frequency and subscription type
+              // Format: "Tabs frequency: 3 Tabs | Subscription Type: Monthly Supply"
+              let tabsFrequency = "";
+              let subscriptionType = "";
+              
+              if (variantName) {
+                const parts = variantName.split("|");
+                
+                // Extract tabs frequency
+                const tabsPart = parts.find(p => p.includes("Tabs frequency:"));
+                if (tabsPart) {
+                  const match = tabsPart.match(/:\s*(.+)/);
+                  if (match) {
+                    tabsFrequency = match[1].trim().toLowerCase();
+                  }
+                }
+                
+                // Extract subscription type
+                const subscriptionPart = parts.find(p => p.includes("Subscription Type:"));
+                if (subscriptionPart) {
+                  const match = subscriptionPart.match(/:\s*(.+)/);
+                  if (match) {
+                    subscriptionType = match[1].trim().toLowerCase();
+                  }
+                }
+              }
+
+              // Check if this is a subscription product
               const productType = item.product?.type;
               const hasSubscriptionInterval = item.variant?.subscriptionInterval;
               const hasSubscriptionPeriod = item.variant?.subscriptionPeriod;
@@ -101,43 +128,20 @@ export default function MobileCartPopup({
               const legacySubscription = item.extensions?.subscriptions;
               const isSubscription = variantSubscription || (legacySubscription && legacySubscription.billing_interval);
 
-              // Special handling for Sublingual Semaglutide product (ID: 490537)
-              const productId = item.productId || item.product?.id || item.product_id || item.id;
-              const isOralSemaglutide = productId === 490537 || item.id === 490537 || item.product_id === 490537;
-              const isSubscriptionWithFallback = isSubscription || isOralSemaglutide;
-
-              let supply = "";
-              if (variantSubscription) {
-                const interval = item.variant.subscriptionInterval;
-                const period = item.variant.subscriptionPeriod;
-
-                if (!period && productType === "VARIABLE_SUBSCRIPTION" && interval) {
-                  const pluralPeriod = interval > 1 ? "weeks" : "week";
-                  supply = `every ${interval} ${pluralPeriod}`;
-                } else if (period) {
-                  let periodText = period;
-                  if (period === "week") periodText = "week";
-                  else if (period === "month") periodText = "month";
-                  else if (period === "day") periodText = "day";
-                  else if (period === "year") periodText = "year";
-
-                  const pluralPeriod = interval > 1 ? `${periodText}s` : periodText;
-                  supply = `every ${interval} ${pluralPeriod}`;
-                }
-              } else if (
-                legacySubscription &&
-                legacySubscription.billing_interval &&
-                legacySubscription.billing_period
-              ) {
-                const interval = legacySubscription.billing_interval;
-                const period = legacySubscription.billing_period;
-                const pluralPeriod = interval > 1 ? `${period}s` : period;
-                supply = `every ${interval} ${pluralPeriod}`;
-              } else if (isOralSemaglutide) {
-                supply = "every 4 weeks";
+              // Build the display text
+              let frequencyText = "";
+              if (tabsFrequency && subscriptionType) {
+                // Format: "3 tabs monthly supply"
+                frequencyText = `${tabsFrequency} ${subscriptionType}`;
+              } else if (isSubscription) {
+                // Fallback to legacy format
+                frequencyText = "subscription";
+              } else {
+                // One time purchase
+                frequencyText = "one time purchase";
               }
 
-              const intervalText = isSubscriptionWithFallback ? `${supply}` : "";
+              const isOneTimePurchase = !isSubscription && !tabsFrequency;
               const currencySymbol = item.prices?.currency_symbol || "$";
 
               // Handle prices - new API has unitPrice and totalPrice as numbers
@@ -195,7 +199,7 @@ export default function MobileCartPopup({
                       <span
                         dangerouslySetInnerHTML={{ __html: itemName }}
                       ></span>
-                      {!isSubscriptionWithFallback && variantName && variantName !== itemName && (
+                      {isOneTimePurchase && variantName && variantName !== itemName && (
                         <span className="text-xs text-gray-600">
                           {" "}({variantName})
                         </span>
@@ -204,11 +208,8 @@ export default function MobileCartPopup({
                     <div className="text-[#212121] text-xs opacity-85">
                       {currencySymbol}
                       {formatPrice(unitPrice)}
-                      {isSubscriptionWithFallback && intervalText && (
-                        <span> / {intervalText}</span>
-                      )}
-                      {!isSubscriptionWithFallback && variantName && variantName !== itemName && (
-                        <span> / {variantName}</span>
+                      {frequencyText && (
+                        <span> / {frequencyText}</span>
                       )}
                     </div>
                     <div className="text-[#212121] text-sm font-semibold mt-1">
