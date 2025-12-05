@@ -1,4 +1,28 @@
 import { NextResponse } from "next/server";
+import { logger } from "@/utils/devLogger";
+
+/**
+ * @deprecated This endpoint uses WordPress/WooCommerce APIs.
+ * Use /api/checkout-new instead, which uses the new backend API.
+ * 
+ * This endpoint is kept for backward compatibility but should not be used for new implementations.
+ */
+export async function POST(req) {
+  logger.warn("⚠️ DEPRECATED: /api/checkout endpoint called. Use /api/checkout-new instead.");
+  
+  return NextResponse.json(
+    {
+      success: false,
+      error: "This endpoint is deprecated. Please use /api/checkout-new instead.",
+      message: "The checkout endpoint has been migrated to use the new backend API. Please update your frontend code to use /api/checkout-new.",
+    },
+    { status: 410 } // 410 Gone - indicates the resource is no longer available
+  );
+}
+
+// OLD IMPLEMENTATION - KEPT FOR REFERENCE ONLY
+/*
+import { NextResponse } from "next/server";
 import axios from "axios";
 import { cookies } from "next/headers";
 import fs from "fs";
@@ -17,7 +41,7 @@ import {
 const BASE_URL = process.env.BASE_URL;
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "");
 
-export async function POST(req) {
+export async function POST_OLD(req) {
   try {
     const requestData = await req.json();
 

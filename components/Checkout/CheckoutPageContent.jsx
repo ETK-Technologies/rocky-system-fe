@@ -1364,334 +1364,44 @@ const CheckoutPageContent = () => {
         totalAmount: dataToSend.totalAmount,
       });
 
-      // For saved cards, we'll use a two-step approach but check for duplicate payments
+      // For saved cards, use the new checkout API with paymentMethodId
+      // Stripe handles saved cards automatically when paymentMethodId is provided
       if (selectedCard && cartItems.totals) {
         try {
           logger.log(`Processing checkout with saved card: ${selectedCard.id}`);
+          // The token field contains the Stripe payment method ID (pm_xxx)
+          const paymentMethodId = selectedCard.token;
+          logger.log("Saved card payment method ID:", paymentMethodId);
 
-          let orderId = savedOrderId;
-          let orderKey = savedOrderKey;
-
-          // Check if we should use direct payment (retry scenario)
-          if (shouldUseDirectPayment && savedOrderId) {
-            logger.log(
-              `Using direct payment for existing order: ${savedOrderId}`
-            );
-          } else {
-            // Step 1: Create order without payment processing
-            const checkoutResponse = await fetch("/api/create-pending-order", {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify(dataToSend),
-            });
-
-            const checkoutResult = await checkoutResponse.json();
-            logger.log("Order creation result:", checkoutResult);
-
-            // Check if order was created successfully
-            if (checkoutResult.success && checkoutResult.data?.id) {
-              orderId = checkoutResult.data.id;
-              orderKey = checkoutResult.data.order_key || "";
-              logger.log(
-                `Order created successfully with ID: ${orderId}, checking order amount...`
-              );
-
-              // Check if order is FREE (100% discount)
-              let orderAmountInCents = 0;
-              const orderTotal = checkoutResult.data.total;
-
-              if (typeof orderTotal === "string") {
-                const numericTotal = parseFloat(
-                  orderTotal.replace(/[^0-9.]/g, "")
-                );
-                orderAmountInCents = Math.round(numericTotal * 100);
-              } else if (typeof orderTotal === "number") {
-                orderAmountInCents = Math.round(orderTotal * 100);
-              }
-
-              // Handle FREE orders (100% discount, total is $0)
-              if (orderAmountInCents <= 0) {
-                logger.log(
-                  "✅ FREE ORDER detected (100% discount applied) - saved card flow"
-                );
-
-                // Update order status to processing (no payment needed)
-                const updateResponse = await fetch("/api/update-order-status", {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({
-                    orderId,
-                    status: "processing",
-                    paymentMethod: "free_order",
-                    errorMessage: "Free order - 100% discount applied",
-                  }),
-                });
-
-                const updateResult = await updateResponse.json();
-
-                if (!updateResult.success) {
-                  logger.warn(
-                    "Failed to update free order status, but continuing..."
-                  );
-                }
-
-                logger.log("✅ Free order completed successfully");
-                toast.success("Order placed successfully!");
-
-                // Empty cart
-                try {
-                  const { emptyCart } = await import("@/lib/cart/cartService");
-                  await emptyCart();
-                  logger.log("Cart emptied successfully");
-                } catch (error) {
-                  logger.error("Error emptying cart:", error);
-                }
-
-                // Redirect to success page
-                router.push(
-                  `/checkout/order-received/${orderId}?key=${orderKey}${buildFlowQueryString()}`
-                );
-                return;
-              }
-
-              logger.log(
-                "Order has payment amount, proceeding with saved card payment..."
-              );
-
-              // Before processing payment, check the order status to avoid duplicate payments
-              try {
-                const orderCheckResponse = await fetch(
-                  `/api/order/status?id=${orderId}`
-                );
-                const orderStatus = await orderCheckResponse.json();
-
-                if (
-                  isSuccessfulOrderStatus(orderStatus.status) ||
-                  orderStatus.success === false
-                ) {
-                  logger.log(
-                    "Order is already paid or being processed, skipping payment"
-                  );
-                  toast.success("Order is already being processed!");
-
-                  // Redirect to order received page
-                  router.push(
-                    `/checkout/order-received/${orderId}?key=${orderKey}${buildFlowQueryString()}`
-                  );
-                  return;
-                } else if (orderStatus.status === "failed") {
-                  logger.log("Order payment failed, allowing retry");
-                  // Continue with payment to retry
-                }
-              } catch (orderCheckError) {
-                logger.log("Error checking order status:", orderCheckError);
-                // Continue with payment if we can't check the status
-              }
-            } else if (checkoutResult.error) {
-              // Something else went wrong
-              toast.error(checkoutResult.error || "Failed to create order");
-              setSubmitting(false);
-              return;
-            }
+          if (!paymentMethodId) {
+            throw new Error("Saved card payment method ID not found");
           }
 
-          // Step 2: Process the payment with the saved card
-          const paymentResponse = await fetch(
-            "/api/pay-order-with-saved-card",
-            {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify({
-                order_id: orderId,
-                savedCardToken: selectedCard.token,
-                cardId: selectedCard.id,
-                cvv: "",
-                // Include billing address for address verification
-                billing_address: {
-                  first_name: formData.billing_address.first_name,
-                  last_name: formData.billing_address.last_name,
-                  address_1: formData.billing_address.address_1,
-                  address_2: formData.billing_address.address_2 || "",
-                  city: formData.billing_address.city,
-                  state: formData.billing_address.state,
-                  postcode: formData.billing_address.postcode,
-                  country: formData.billing_address.country || "US",
-                  email: formData.billing_address.email,
-                  phone: formData.billing_address.phone,
-                },
-              }),
-            }
-          );
-
-          // Use centralized payment response handler
-          const paymentResult = await handlePaymentResponse(
-            paymentResponse,
-            orderId,
-            orderKey
-          );
-          logger.log("Payment result:", paymentResult);
-
-          if (!paymentResult.success) {
-            // Store order details for retry mechanism
-            setSavedOrderId(orderId);
-            setSavedOrderKey(orderKey);
-            setShouldUseDirectPayment(true);
-
-            // Transform the error message if it's a WordPress critical error
-            const errorMessage =
-              paymentResult.message ||
-              "Payment failed. Please try another payment method.";
-
-            // Extract meaningful error message from complex objects
-            let errorString;
-            if (typeof errorMessage === "string") {
-              errorString = errorMessage;
-            } else if (errorMessage && typeof errorMessage === "object") {
-              // Try to extract meaningful message from object
-              errorString =
-                errorMessage.message ||
-                errorMessage.error?.message ||
-                errorMessage.toString();
-            } else {
-              errorString = String(errorMessage || "Unknown error occurred");
-            }
-
-            const userFriendlyMessage = isWordPressCriticalError(errorString)
-              ? transformPaymentError(errorString)
-              : errorString;
-
-            toast.error(userFriendlyMessage);
-            setSubmitting(false);
-            return;
-          }
-
-          // Successfully created order and processed payment
-          // Reset retry mechanism state on success
-          setShouldUseDirectPayment(false);
-          setSavedOrderId("");
-          setSavedOrderKey("");
-
-          toast.success("Order created and payment processed successfully!");
-
-          // Get the order ID and key from the payment result
-          const paymentOrderId = paymentResult.order_id;
-          const paymentOrderKey = paymentResult.order_key || "";
-
-          // Empty the cart after successful checkout
-          try {
-            logger.log("Emptying cart after successful checkout...");
-            const { emptyCart } = await import("@/lib/cart/cartService");
-            await emptyCart();
-            logger.log("Cart emptied successfully after checkout");
-          } catch (emptyError) {
-            logger.error("Error emptying cart after checkout:", emptyError);
-            // Don't block the redirect if cart emptying fails
-          }
-
-          // Debugging logs
-          logger.log(
-            `Redirecting to order received page: /checkout/order-received/${paymentOrderId}?key=${paymentOrderKey}`
-          );
-
-          // Redirect to order received page with the correct order details
-          router.push(
-            `/checkout/order-received/${paymentOrderId}?key=${paymentOrderKey}${buildFlowQueryString()}`
-          );
-          return;
-        } catch (error) {
-          logger.error("Error processing order with saved card:", error);
-          // Transform the error message if it's a WordPress critical error
-          const errorMessage =
-            error.message ||
-            "Unable to process payment with saved card. Please try another payment method.";
-
-          // Extract meaningful error message from complex objects
-          let errorString;
-          if (typeof errorMessage === "string") {
-            errorString = errorMessage;
-          } else if (errorMessage && typeof errorMessage === "object") {
-            // Try to extract meaningful message from object
-            errorString =
-              errorMessage.message ||
-              errorMessage.error?.message ||
-              errorMessage.toString();
-          } else {
-            errorString = String(errorMessage || "Unknown error occurred");
-          }
-
-          const userFriendlyMessage = isWordPressCriticalError(errorString)
-            ? transformPaymentError(errorString)
-            : errorString;
-
-          toast.error(userFriendlyMessage);
-          setSubmitting(false);
-          return;
-        }
-      }
-
-      // For NEW CARD payments with Stripe Elements (embedded in form)
-      if (!selectedCard && dataToSend.useStripe) {
-        try {
-          logger.log("Processing Stripe Elements payment...");
-
-          // Step 1: Create pending order first to check the amount
-          logger.log("Creating pending order...");
-          const orderResponse = await fetch("/api/create-pending-order", {
+          // Use the new checkout API with saved card payment method ID
+          const checkoutResponse = await fetch("/api/checkout-new", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(dataToSend),
+            body: JSON.stringify({
+              ...dataToSend,
+              // Pass the Stripe payment method ID for the saved card
+              paymentMethodId: paymentMethodId,
+            }),
           });
 
-          const orderResult = await orderResponse.json();
+          const checkoutResult = await checkoutResponse.json();
 
-          if (!orderResult.success) {
-            throw new Error(orderResult.error || "Failed to create order");
+          if (!checkoutResult.success) {
+            throw new Error(checkoutResult.error || "Failed to create order");
           }
 
-          const orderId = orderResult.data.id;
-          const orderKey = orderResult.data.order_key;
-          logger.log("✅ Pending order created:", orderId);
-
-          // Parse amount
-          let amountInCents = 0;
-          const orderTotal = orderResult.data.total;
-
-          if (typeof orderTotal === "string") {
-            const numericTotal = parseFloat(orderTotal.replace(/[^0-9.]/g, ""));
-            amountInCents = Math.round(numericTotal * 100);
-          } else if (typeof orderTotal === "number") {
-            amountInCents = Math.round(orderTotal * 100);
-          }
-
-          logger.log("Order amount in cents:", amountInCents);
+          const { order, payment } = checkoutResult;
+          const orderId = order.id;
+          const orderNumber = order.orderNumber;
+          logger.log("✅ Order created with saved card:", { orderId, orderNumber });
 
           // Handle FREE orders (100% discount, total is $0)
-          if (amountInCents <= 0) {
-            logger.log("✅ FREE ORDER detected (100% discount applied)");
-
-            // Update order status to processing (no payment needed)
-            const updateResponse = await fetch("/api/update-order-status", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                orderId,
-                status: "processing", // No payment needed, mark as processing
-                paymentMethod: "free_order",
-                errorMessage: "Free order - 100% discount applied",
-              }),
-            });
-
-            const updateResult = await updateResponse.json();
-
-            if (!updateResult.success) {
-              logger.warn(
-                "Failed to update free order status, but continuing..."
-              );
-            }
+          if (!payment || order.totalAmount === 0 || order.totalAmount === "0.00") {
+            logger.log("✅ FREE ORDER detected (100% discount applied) - saved card flow");
 
             logger.log("✅ Free order completed successfully");
             toast.success("Order placed successfully!");
@@ -1707,7 +1417,86 @@ const CheckoutPageContent = () => {
 
             // Redirect to success page
             router.push(
-              `/checkout/order-received/${orderId}?key=${orderKey}${buildFlowQueryString()}`
+              `/checkout/order-received/${orderId}?key=${orderNumber}${buildFlowQueryString()}`
+            );
+            return;
+          }
+
+          // For saved cards, the backend should have already processed the payment
+          // Check payment status
+          if (payment.status === 'succeeded' || payment.status === 'processing') {
+            toast.success("Payment successful!");
+            
+            // Empty cart
+            try {
+              const { emptyCart } = await import("@/lib/cart/cartService");
+              await emptyCart();
+              logger.log("Cart emptied successfully");
+            } catch (error) {
+              logger.error("Error emptying cart:", error);
+            }
+
+            // Redirect to success page
+            router.push(
+              `/checkout/order-received/${orderId}?key=${orderNumber}${buildFlowQueryString()}`
+            );
+            return;
+          } else {
+            // Payment might require confirmation or failed
+            logger.warn("Payment status:", payment.status);
+            throw new Error(`Payment status: ${payment.status}`);
+          }
+        } catch (error) {
+          logger.error("❌ Saved card payment error:", error);
+          toast.error(error.message || "Payment failed. Please try again.");
+          setSubmitting(false);
+          return;
+        }
+      }
+
+      // For NEW CARD payments with Stripe Elements (embedded in form)
+      if (!selectedCard && dataToSend.useStripe) {
+        try {
+          logger.log("Processing Stripe Elements payment with new backend API...");
+
+          // Step 1: Create order and get payment intent from new backend API
+          logger.log("Creating order via new checkout API...");
+          const checkoutResponse = await fetch("/api/checkout-new", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(dataToSend),
+          });
+
+          const checkoutResult = await checkoutResponse.json();
+
+          if (!checkoutResult.success) {
+            throw new Error(checkoutResult.error || "Failed to create order");
+          }
+
+          const { order, payment } = checkoutResult;
+          const orderId = order.id;
+          const orderNumber = order.orderNumber;
+          logger.log("✅ Order created:", { orderId, orderNumber });
+
+          // Handle FREE orders (100% discount, total is $0)
+          if (!payment || order.totalAmount === 0 || order.totalAmount === "0.00") {
+            logger.log("✅ FREE ORDER detected (100% discount applied)");
+
+            logger.log("✅ Free order completed successfully");
+            toast.success("Order placed successfully!");
+
+            // Empty cart
+            try {
+              const { emptyCart } = await import("@/lib/cart/cartService");
+              await emptyCart();
+              logger.log("Cart emptied successfully");
+            } catch (error) {
+              logger.error("Error emptying cart:", error);
+            }
+
+            // Redirect to success page (use orderNumber as key for new API)
+            router.push(
+              `/checkout/order-received/${orderId}?key=${orderNumber}${buildFlowQueryString()}`
             );
             return;
           }
@@ -1732,126 +1521,55 @@ const CheckoutPageContent = () => {
             throw new Error(submitError.message);
           }
 
-          // Step 3: Get the payment method from PaymentElement
-          logger.log("Getting payment method from PaymentElement...");
-          const { error: pmError, paymentMethod } =
-            await stripe.createPaymentMethod({
-              elements: stripeElements,
-              params: {
-                billing_details: {
-                  name: `${dataToSend.firstName} ${dataToSend.lastName}`,
-                  email: dataToSend.email,
-                  phone: dataToSend.phone,
-                  address: {
-                    line1: dataToSend.addressOne,
-                    line2: dataToSend.addressTwo || "",
-                    city: dataToSend.city,
-                    state: dataToSend.state,
-                    postal_code: dataToSend.postcode,
-                    country: dataToSend.country,
-                  },
-                },
-              },
-            });
-
-          if (pmError) {
-            throw new Error(pmError.message);
-          }
-
-          if (!paymentMethod) {
-            throw new Error("Failed to create payment method");
-          }
-
-          logger.log("✅ Payment method created:", paymentMethod.id);
-
-          // Step 4: Create PaymentIntent with manual capture using the payment method
-          logger.log("Creating PaymentIntent with manual capture...");
-          const intentResponse = await fetch("/api/create-payment-intent", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              orderId,
-              amount: amountInCents,
-              paymentMethodId: paymentMethod.id,
-              customerEmail: dataToSend.email,
-              customerName: `${dataToSend.firstName} ${dataToSend.lastName}`,
-            }),
+          // Step 3: Confirm payment with Stripe using the payment intent from backend
+          logger.log("Confirming payment with Stripe...");
+          const { error: confirmError, paymentIntent } = await stripe.confirmPayment({
+            elements: stripeElements,
+            clientSecret: payment.clientSecret,
+            confirmParams: {
+              return_url: `${window.location.origin}/checkout/order-received/${orderId}?key=${orderNumber}${buildFlowQueryString()}`,
+            },
+            redirect: 'if_required', // Only redirect if 3D Secure is required
           });
 
-          const intentResult = await intentResponse.json();
+          if (confirmError) {
+            throw new Error(confirmError.message);
+          }
 
-          if (!intentResult.success) {
-            throw new Error(
-              intentResult.error || "Failed to create payment intent"
+          if (!paymentIntent) {
+            throw new Error("Failed to confirm payment");
+          }
+
+          logger.log("✅ Payment confirmed:", {
+            paymentIntentId: paymentIntent.id,
+            status: paymentIntent.status,
+          });
+
+          // Check payment status
+          if (paymentIntent.status === 'succeeded' || paymentIntent.status === 'processing') {
+            toast.success("Payment successful!");
+            
+            // Empty cart
+            try {
+              const { emptyCart } = await import("@/lib/cart/cartService");
+              await emptyCart();
+              logger.log("Cart emptied successfully");
+            } catch (error) {
+              logger.error("Error emptying cart:", error);
+            }
+
+            // Redirect to success page
+            router.push(
+              `/checkout/order-received/${orderId}?key=${orderNumber}${buildFlowQueryString()}`
             );
+            return;
+          } else if (paymentIntent.status === 'requires_action') {
+            // 3D Secure required - Stripe will handle redirect
+            logger.log("3D Secure authentication required");
+            return;
+          } else {
+            throw new Error(`Payment status: ${paymentIntent.status}`);
           }
-
-          const paymentIntent = intentResult.paymentIntent;
-          logger.log(
-            "✅ PaymentIntent created and confirmed:",
-            paymentIntent.id
-          );
-
-          // Extract payment details for WooCommerce metadata
-          const paymentMethodId = paymentIntent?.payment_method;
-          const chargeId = paymentIntent?.latest_charge;
-          const currency = paymentIntent?.currency?.toUpperCase() || "USD";
-
-          // Try to get card details if available
-          const cardBrand = paymentIntent?.payment_method_details?.card?.brand;
-          const cardLast4 = paymentIntent?.payment_method_details?.card?.last4;
-
-          logger.log("Payment details for WooCommerce:", {
-            paymentIntentId: paymentIntent?.id,
-            chargeId,
-            paymentMethodId,
-            currency,
-            cardBrand,
-            cardLast4,
-          });
-
-          // Step 5: Update order status with full Stripe metadata
-          logger.log("Updating order status...");
-          const updateResponse = await fetch("/api/update-order-status", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              orderId,
-              status: "on-hold",
-              paymentIntentId:
-                paymentIntent?.id || intentResult.paymentIntentId,
-              chargeId: chargeId,
-              paymentMethodId: paymentMethodId, // Critical for WC to capture
-              paymentMethod: "stripe_cc",
-              currency: currency,
-              cardBrand: cardBrand,
-              cardLast4: cardLast4,
-            }),
-          });
-
-          const updateResult = await updateResponse.json();
-
-          if (!updateResult.success) {
-            throw new Error("Failed to update order status");
-          }
-
-          logger.log("✅ Order updated successfully");
-          toast.success("Payment successful!");
-
-          // Empty cart
-          try {
-            const { emptyCart } = await import("@/lib/cart/cartService");
-            await emptyCart();
-            logger.log("Cart emptied successfully");
-          } catch (error) {
-            logger.error("Error emptying cart:", error);
-          }
-
-          // Redirect to success page
-          router.push(
-            `/checkout/order-received/${orderId}?key=${orderKey}${buildFlowQueryString()}`
-          );
-          return;
         } catch (error) {
           logger.error("❌ Stripe payment error:", error);
           toast.error(error.message || "Payment failed. Please try again.");
@@ -1860,65 +1578,10 @@ const CheckoutPageContent = () => {
         }
       }
 
-      // Continue with WooCommerce Store API checkout (for Bambora or non-Stripe payments)
-      const res = await fetch("/api/checkout", {
-        method: "POST",
-        body: JSON.stringify(dataToSend),
-      });
-
-      // Use centralized payment response handler for regular checkout
-      // Note: For regular checkout, we don't have an orderId yet, so pass null
-      const data = await handlePaymentResponse(res, null);
-
-      if (data.error) {
-        // Extract meaningful error message from complex objects
-        let errorString;
-        if (typeof data.error === "string") {
-          errorString = data.error;
-        } else if (data.error && typeof data.error === "object") {
-          // Try to extract meaningful message from object
-          errorString =
-            data.error.message ||
-            data.error.error?.message ||
-            data.error.toString();
-        } else {
-          errorString = String(data.error || "Unknown error occurred");
-        }
-
-        // Transform the error message if it's a WordPress critical error
-        const userFriendlyMessage = isWordPressCriticalError(errorString)
-          ? transformPaymentError(errorString)
-          : errorString;
-
-        toast.error(userFriendlyMessage);
-        // Reload the page after showing error for new card payments
-        // setTimeout(() => {
-        //   window.location.reload();
-        // }, 2000); // Wait 2 seconds to show the error message
-        return;
-      }
-
-      if (data.success) {
-        toast.success("Order created successfully!");
-        const order_id = data.data.id || data.data.order_id;
-        const order_key = data.data.order_key || "";
-
-        // Empty the cart after successful checkout
-        try {
-          logger.log("Emptying cart after successful checkout...");
-          const { emptyCart } = await import("@/lib/cart/cartService");
-          await emptyCart();
-          logger.log("Cart emptied successfully after checkout");
-        } catch (emptyError) {
-          logger.error("Error emptying cart after checkout:", emptyError);
-          // Don't block the redirect if cart emptying fails
-        }
-
-        router.push(
-          `/checkout/order-received/${order_id}?key=${order_key}${buildFlowQueryString() ? buildFlowQueryString() : ""
-          }`
-        );
-      }
+      // All payment methods should be handled above
+      // If we reach here, it means no payment method was selected or processed
+      logger.error("No payment method processed");
+      toast.error("Please select a payment method and try again.");
     } catch (error) {
       logger.error("Checkout Error:", error);
 

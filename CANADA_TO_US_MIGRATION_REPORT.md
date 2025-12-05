@@ -84,7 +84,6 @@ These references to Health Canada need to be changed to FDA for US compliance:
 **Domain References:**
 
 - `vercel.json` - Lines 5-32: Redirects to myrocky.ca
-- `sentry.client.config.js` - Lines 40-41: myrocky.ca domains
 - `next.config.mjs` - Lines 36-61: CDN and media domains
 - `docs/google-signin-implementation.md` - Lines 77-78
 - Multiple component files referencing myrocky.ca

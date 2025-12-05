@@ -48,6 +48,7 @@ const RegisterContent = ({ setActiveTab, registerRef }) => {
     province: "",
   });
   const [loading, setLoading] = useState(false);
+  const [checkingEmail, setCheckingEmail] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [provinces, setProvinces] = useState([]);
@@ -360,13 +361,58 @@ const RegisterContent = ({ setActiveTab, registerRef }) => {
     return valid;
   };
 
-  const handleContinue = () => {
-    if (validateStep(1)) {
-      setCurrentStep(2);
-      // Fetch provinces if not already loaded
-      if (provinces.length === 0 && !loadingProvinces) {
-        fetchProvinces();
+  const checkEmailAvailability = async (email) => {
+    try {
+      setCheckingEmail(true);
+      const response = await fetch("/api/auth/check-email", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ email }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to verify email");
       }
+
+      return data;
+    } catch (error) {
+      logger.error("Error checking email availability:", error);
+      // If the check fails, we'll allow them to continue
+      // The final registration will catch duplicate emails
+      return { success: true, exists: false };
+    } finally {
+      setCheckingEmail(false);
+    }
+  };
+
+  const handleContinue = async () => {
+    if (!validateStep(1)) {
+      return;
+    }
+
+    // Check if email already exists before proceeding
+    const emailCheck = await checkEmailAvailability(formData.email);
+
+    if (emailCheck.exists) {
+      const errorMessage =
+        "This email is already registered. Please login instead.";
+      setErrors((prev) => ({
+        ...prev,
+        email: errorMessage,
+      }));
+      toast.error(errorMessage);
+      return;
+    }
+
+    // Email is available, proceed to step 2
+    setCurrentStep(2);
+    // Fetch provinces if not already loaded
+    if (provinces.length === 0 && !loadingProvinces) {
+      fetchProvinces();
     }
   };
 
@@ -852,11 +898,20 @@ const RegisterContent = ({ setActiveTab, registerRef }) => {
               <div className="w-full flex justify-center items-center my-5">
                 <button
                   type="submit"
-                  className="bg-black text-white py-[12.5px] w-full rounded-full flex justify-center items-center transition-opacity hover:opacity-90"
-                  disabled={loading}
+                  className="bg-black text-white py-[12.5px] w-full rounded-full flex justify-center items-center transition-opacity hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled={loading || checkingEmail}
                 >
-                  Continue
-                  {!loading && <MdArrowForward className="ml-2" size={20} />}
+                  {checkingEmail ? (
+                    <>
+                      Verifying email...
+                      <div className="ml-2 animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                    </>
+                  ) : (
+                    <>
+                      Continue
+                      <MdArrowForward className="ml-2" size={20} />
+                    </>
+                  )}
                 </button>
               </div>
             </div>
