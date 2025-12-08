@@ -8,6 +8,7 @@ import { addItemToCart } from "@/lib/cart/cartService";
 import { addRequiredConsultation } from "@/utils/requiredConsultation";
 import { analyticsService } from "@/utils/analytics/analyticsService";
 import { formatPrice } from "@/utils/priceFormatter";
+import { toast } from "react-toastify";
 
 const ProductActions = ({
   price = 90,
@@ -140,7 +141,7 @@ const ProductActions = ({
       logger.error("Error adding to cart:", error);
       
       // Provide user-friendly error messages
-      let errorMessage = "Error adding to cart. Please try again.";
+      let errorMessage = "Unable to add this item to your cart. Please try again.";
       
       if (error.message) {
         // Check for specific error types
@@ -149,12 +150,19 @@ const ProductActions = ({
             error.message.includes("Session ID is required")) {
           // This shouldn't happen with our fixes, but if it does, provide helpful message
           errorMessage = "Unable to add to cart. Please refresh the page and try again.";
+        } else if (error.message.includes("low in stock") || error.message.includes("out of stock") || error.message.includes("0 available")) {
+          // Stock-related errors - simple and clear
+          errorMessage = "This product is currently out of stock. Please try another option.";
+        } else if (error.message.includes("Cannot add to cart")) {
+          // Generic "cannot add" errors - keep it simple
+          errorMessage = "This item is currently unavailable. Please try another option.";
         } else {
-          errorMessage = `Error adding to cart: ${error.message}`;
+          // For other errors, show a generic friendly message
+          errorMessage = "Unable to add this item to your cart. Please try again.";
         }
       }
       
-      alert(errorMessage);
+      toast.error(errorMessage, { autoClose: 6000 });
     } finally {
       setIsLoading(false);
     }

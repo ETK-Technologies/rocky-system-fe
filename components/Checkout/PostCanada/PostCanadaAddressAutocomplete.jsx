@@ -159,7 +159,7 @@ const PostCanadaAddressAutocomplete = ({
           autoClose: 5000,
           hideProgressBar: false,
           closeOnClick: true,
-          pauseOnHover: false,
+          pauseOnHover: true,
           draggable: true,
         });
       } else if (data.address) {

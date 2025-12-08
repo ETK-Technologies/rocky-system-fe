@@ -338,22 +338,8 @@ export default function CheckoutPage() {
 
       logger.log("Customer Payload ->", customerPayload);
 
-      const upd = await fetch("/api/cart/update-customer", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(customerPayload),
-      });
-      const updJson = await upd.json();
-      if (updJson && updJson.error) {
-        const userFriendly = isWordPressCriticalError(updJson.error)
-          ? transformPaymentError(updJson.error)
-          : updJson.error;
-        toast.error("Failed to update customer details");
-        setLoading(false);
-        return;
-      }
+      // Note: /api/cart/update-customer has been removed
+      // Customer data is now updated via /api/update-customer-profile during checkout
     } catch (e) {
       logger.error("Error updating customer before checkout:", e);
       toast.error("Failed to update customer details. Please try again.");

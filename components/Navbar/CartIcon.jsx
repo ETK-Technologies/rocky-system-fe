@@ -13,13 +13,18 @@ import { IoIosCart } from "react-icons/io";
 import { formatPrice } from "@/utils/priceFormatter";
 
 const CartIcon = ({ handleToggle }) => {
-  const [cartItems, setCartItems] = useState([]);
+  const [cartItems, setCartItems] = useState({ items: [], totals: {} });
   const [isLocalCart, setIsLocalCart] = useState(false);
   const [isMobileCartOpen, setIsMobileCartOpen] = useState(false);
   const [isEmptyingCart, setIsEmptyingCart] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const getCartItems = useCallback(async () => {
+  const getCartItems = useCallback(async (silent = false) => {
     try {
+      if (!silent) {
+        setIsLoading(true);
+      }
+      
       // Check if user is authenticated - authenticated users should NOT send sessionId
       const { isAuthenticated } = await import("@/lib/cart/cartService");
       const authenticated = isAuthenticated();
@@ -61,6 +66,8 @@ const CartIcon = ({ handleToggle }) => {
       // Set empty cart on error
       setCartItems({ items: [], total_items: 0, total_price: "0.00" });
       setIsLocalCart(false);
+    } finally {
+      setIsLoading(false);
     }
   }, []);
 
@@ -255,9 +262,9 @@ const CartIcon = ({ handleToggle }) => {
           onClick={() => setIsMobileCartOpen(true)}
         >
           <IoIosCart size={24} />
-          {cartItems.items && (
+          {cartItems.items && cartItems.items.length > 0 && (
             <span className="absolute top-[-40%] right-[-40%] text-[10px] bg-[#A55255] flex items-center justify-center w-5 h-5 text-white rounded-full">
-              {cartItems.items?.length}
+              {cartItems.items.length}
             </span>
           )}
         </div>
@@ -412,11 +419,41 @@ const CartItem = ({ item, refreshCart, isLocalCart, allItems }) => {
   const subscription = !isLocalCart ? item.extensions?.subscriptions : null;
   const isSubscription = variantSubscription || (subscription && subscription.billing_period);
 
+  // Helper function to format subscription period
+  const formatSubscriptionPeriod = (period, interval) => {
+    if (!period) return "";
+    
+    const periodMap = {
+      "DAY": "daily",
+      "WEEK": "weekly",
+      "MONTH": "monthly",
+      "YEAR": "yearly"
+    };
+    
+    // Special case: 3 months = quarterly
+    if (period.toUpperCase() === "MONTH" && interval === 3) {
+      return "quarterly";
+    }
+    
+    const periodText = periodMap[period.toUpperCase()] || period.toLowerCase();
+    
+    if (interval && interval > 1) {
+      return `every ${interval} ${periodText.replace("ly", "")}s`;
+    }
+    
+    return periodText;
+  };
+
   // Build the display text
   let frequencyText = "";
   if (tabsFrequency && subscriptionType) {
     // Format: "3 tabs monthly supply"
     frequencyText = `${tabsFrequency} ${subscriptionType}`;
+  } else if (hasSubscriptionPeriod) {
+    // If variant.name doesn't exist or doesn't contain the expected pattern,
+    // construct from subscriptionPeriod and subscriptionInterval
+    const periodText = formatSubscriptionPeriod(hasSubscriptionPeriod, hasSubscriptionInterval);
+    frequencyText = periodText ? `${periodText} supply` : "subscription";
   } else if (isSubscription) {
     // Fallback to legacy format
     frequencyText = "subscription";

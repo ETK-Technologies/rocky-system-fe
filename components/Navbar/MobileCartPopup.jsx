@@ -128,11 +128,41 @@ export default function MobileCartPopup({
               const legacySubscription = item.extensions?.subscriptions;
               const isSubscription = variantSubscription || (legacySubscription && legacySubscription.billing_interval);
 
+              // Helper function to format subscription period
+              const formatSubscriptionPeriod = (period, interval) => {
+                if (!period) return "";
+                
+                const periodMap = {
+                  "DAY": "daily",
+                  "WEEK": "weekly",
+                  "MONTH": "monthly",
+                  "YEAR": "yearly"
+                };
+                
+                // Special case: 3 months = quarterly
+                if (period.toUpperCase() === "MONTH" && interval === 3) {
+                  return "quarterly";
+                }
+                
+                const periodText = periodMap[period.toUpperCase()] || period.toLowerCase();
+                
+                if (interval && interval > 1) {
+                  return `every ${interval} ${periodText.replace("ly", "")}s`;
+                }
+                
+                return periodText;
+              };
+
               // Build the display text
               let frequencyText = "";
               if (tabsFrequency && subscriptionType) {
                 // Format: "3 tabs monthly supply"
                 frequencyText = `${tabsFrequency} ${subscriptionType}`;
+              } else if (hasSubscriptionPeriod) {
+                // If variant.name doesn't exist or doesn't contain the expected pattern,
+                // construct from subscriptionPeriod and subscriptionInterval
+                const periodText = formatSubscriptionPeriod(hasSubscriptionPeriod, hasSubscriptionInterval);
+                frequencyText = periodText ? `${periodText} supply` : "subscription";
               } else if (isSubscription) {
                 // Fallback to legacy format
                 frequencyText = "subscription";

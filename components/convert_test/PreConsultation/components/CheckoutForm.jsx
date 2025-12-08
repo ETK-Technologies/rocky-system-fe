@@ -172,51 +172,9 @@ const CheckoutForm = ({
           country: formValues.country || "CA",
         };
 
-        const customerPayload = {
-          billing_address: billing,
-          shipping_address: shipping,
-        };
-
-        const nonce =
-          typeof window !== "undefined" && window.wpApiSettings?.nonce;
-
-        const upd = await fetch("/api/cart/update-customer", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            ...(nonce ? { "X-WP-Nonce": nonce } : {}),
-          },
-          credentials: "include",
-          body: JSON.stringify(customerPayload),
-        });
-
-        const updJson = await upd.json();
-        if (updJson && updJson.error) {
-          // Extract meaningful error message from complex objects
-          let errorString;
-          if (typeof updJson.error === "string") {
-            errorString = updJson.error;
-          } else if (updJson.error && typeof updJson.error === "object") {
-            // Try to extract meaningful message from object
-            errorString =
-              updJson.error.message ||
-              updJson.error.error?.message ||
-              updJson.error.toString();
-          } else {
-            errorString = String(updJson.error || "Unknown error occurred");
-          }
-
-          const userFriendly = isWordPressCriticalError(errorString)
-            ? transformPaymentError(errorString)
-            : errorString;
-          toast.error(
-            userFriendly || "Failed to update shipping based on province"
-          );
-          setIsUpdatingShipping(false);
-          return;
-        }
-
-        // Optionally refresh cart or update local UI from response if provided
+        // Note: /api/cart/update-customer has been removed
+        // Shipping rates are calculated via /api/shipping/calculate-by-cart
+        // Cart update is no longer needed as shipping is calculated separately
         // (left intentionally minimal to preserve existing design)
       } catch (e) {
         logger.error("Error updating customer on province change:", e);

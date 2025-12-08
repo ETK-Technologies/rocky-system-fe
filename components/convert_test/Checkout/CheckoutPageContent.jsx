@@ -370,29 +370,77 @@ const CheckoutPageContent = () => {
         }));
       }
 
-      // Log the customer data being sent
-      logger.log(
-        "Sending customer data to update-customer API:",
-        JSON.stringify(customerData, null, 2)
-      );
+      // Get the country and postal code from the appropriate address
+      const country = addressType === "billing" 
+        ? formData.billing_address.country || "CA"
+        : formData.shipping_address.country || "CA";
+      
+      const postalCode = addressType === "billing"
+        ? formData.billing_address.postcode
+        : formData.shipping_address.postcode;
 
-      // Call the update customer API
-      const response = await fetch("/api/cart/update-customer", {
+      logger.log("Calculating shipping for province change:", {
+        country,
+        state: newProvince,
+        postalCode,
+        addressType,
+      });
+
+      // Call the shipping calculation API
+      const response = await fetch("/api/shipping/calculate-by-cart", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(customerData),
+        body: JSON.stringify({
+          country,
+          state: newProvince,
+          postalCode: postalCode || "",
+        }),
       });
 
-      const updatedCart = await response.json();
+      const result = await response.json();
 
-      if (response.ok && !updatedCart.error) {
-        // Update cart state with new shipping rates
-        setCartItems(updatedCart);
+      if (response.ok && result.success) {
+        logger.log("Shipping options calculated:", result.shippingOptions);
+        
+        // Update cart state with new shipping options
+        // Transform shipping options to cart format
+        const shippingRates = result.shippingOptions.map((option) => ({
+          package_id: 0,
+          name: "Shipping",
+          destination: {
+            address_1: "",
+            address_2: "",
+            city: "",
+            state: newProvince,
+            postcode: postalCode || "",
+            country: country,
+          },
+          items: cartItems.items,
+          shipping_rates: [
+            {
+              rate_id: option.methodId,
+              name: option.title,
+              description: option.description || "",
+              delivery_time: "",
+              price: (option.cost * 100).toString(), // Convert to cents
+              taxes: "0",
+              instance_id: 0,
+              method_id: option.methodType || "flat_rate",
+              meta_data: [],
+              selected: true, // Select first option by default
+            },
+          ],
+        }));
+
+        setCartItems((prev) => ({
+          ...prev,
+          shipping_rates: shippingRates,
+        }));
       } else {
-        logger.error("Error updating shipping rates:", updatedCart.error);
-        toast.error("Failed to update shipping rates. Please try again.");
+        logger.error("Error calculating shipping rates:", result.error);
+        toast.error("Failed to calculate shipping rates. Please try again.");
       }
     } catch (error) {
       logger.error("Error updating shipping rates:", error);
@@ -982,97 +1030,72 @@ const CheckoutPageContent = () => {
             },
         };
 
-        const updateResponse = await fetch("/api/cart/update-customer", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(customerUpdateData),
+        // Include date_of_birth in the profile update
+        const profileData = {
+          ...customerUpdateData,
+          date_of_birth:
+            formData.billing_address.date_of_birth ||
+            formData.date_of_birth ||
+            "",
+        };
+
+        logger.log("Profile data with DOB:", {
+          date_of_birth: profileData.date_of_birth,
+          phone: profileData.billing_address?.phone,
         });
 
-        const updateResult = await updateResponse.json();
+        const profileUpdateResponse = await fetch(
+          "/api/update-customer-profile",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(profileData),
+          }
+        );
 
-        if (updateResponse.ok && !updateResult.error) {
-          logger.log("Customer cart data updated successfully before checkout");
+        const profileUpdateResult = await profileUpdateResponse.json();
 
-          // Also update the customer's permanent profile in WooCommerce
-          try {
-            logger.log("Updating customer profile permanently...");
+        logger.log("=== PROFILE UPDATE API RESPONSE ===", {
+          status: profileUpdateResponse.status,
+          ok: profileUpdateResponse.ok,
+          response: profileUpdateResult,
+        });
 
-            // Include date_of_birth in the profile update
-            const profileData = {
-              ...customerUpdateData,
-              date_of_birth:
-                formData.billing_address.date_of_birth ||
-                formData.date_of_birth ||
-                "",
-            };
+        if (profileUpdateResponse.ok && profileUpdateResult.success) {
+          logger.log("Customer profile updated permanently ✓");
+          logger.log("Updated customer data:", profileUpdateResult.data);
 
-            logger.log("Profile data with DOB:", {
-              date_of_birth: profileData.date_of_birth,
-              phone: profileData.billing_address?.phone,
-            });
-
-            const profileUpdateResponse = await fetch(
-              "/api/update-customer-profile",
-              {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                },
-                body: JSON.stringify(profileData),
-              }
+          // Check metadata update status
+          if (profileUpdateResult.metadata_update) {
+            logger.log(
+              "=== METADATA UPDATE STATUS ===",
+              profileUpdateResult.metadata_update
             );
 
-            const profileUpdateResult = await profileUpdateResponse.json();
-
-            logger.log("=== PROFILE UPDATE API RESPONSE ===", {
-              status: profileUpdateResponse.status,
-              ok: profileUpdateResponse.ok,
-              response: profileUpdateResult,
-            });
-
-            if (profileUpdateResponse.ok && profileUpdateResult.success) {
-              logger.log("Customer profile updated permanently ✓");
-              logger.log("Updated customer data:", profileUpdateResult.data);
-
-              // Check metadata update status
-              if (profileUpdateResult.metadata_update) {
+            if (profileUpdateResult.metadata_update.attempted) {
+              if (profileUpdateResult.metadata_update.success) {
                 logger.log(
-                  "=== METADATA UPDATE STATUS ===",
-                  profileUpdateResult.metadata_update
+                  "✓ User metadata (DOB, phone) updated successfully"
                 );
-
-                if (profileUpdateResult.metadata_update.attempted) {
-                  if (profileUpdateResult.metadata_update.success) {
-                    logger.log(
-                      "✓ User metadata (DOB, phone) updated successfully"
-                    );
-                  } else {
-                    logger.error(
-                      "✗ User metadata update FAILED:",
-                      profileUpdateResult.metadata_update.error
-                    );
-                  }
-                } else {
-                  logger.warn(
-                    "⚠ Metadata update was not attempted (no DOB or phone provided)"
-                  );
-                }
+              } else {
+                logger.error(
+                  "✗ User metadata update FAILED:",
+                  profileUpdateResult.metadata_update.error
+                );
               }
             } else {
               logger.warn(
-                "Failed to update customer profile:",
-                profileUpdateResult.error
+                "⚠ Metadata update was not attempted (no DOB or phone provided)"
               );
             }
-          } catch (profileError) {
-            logger.error("Error updating customer profile:", profileError);
-            // Continue with checkout even if profile update fails
           }
         } else {
-          logger.warn("Failed to update customer data:", updateResult.error);
-          // Continue with checkout even if update fails
+          logger.warn(
+            "Failed to update customer profile:",
+            profileUpdateResult.error
+          );
         }
       } catch (error) {
         logger.error("Error updating customer data before checkout:", error);

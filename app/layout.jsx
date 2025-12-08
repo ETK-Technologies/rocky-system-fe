@@ -152,7 +152,7 @@ export default function RootLayout({ children }) {
         <ToastContainer
           position="top-right"
           autoClose={5000}
-          pauseOnHover={false}
+          pauseOnHover={true}
           pauseOnFocusLoss={false}
           style={{ zIndex: 999999 }}
         />

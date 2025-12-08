@@ -62,11 +62,32 @@ const CartCalculations = ({ cartItems, setCartItems }) => {
         logger.error("Cart validation failed:", cartValidation);
 
         // Show detailed error message
-        const errorMessage =
+        let errorMessage =
           cartValidation.error ||
           cartValidation.message ||
           "Cart validation failed. Please check your cart and try again.";
-        toast.error(errorMessage);
+        
+        // If there are multiple errors, show them in a more readable format
+        if (cartValidation.errorList && cartValidation.errorList.length > 0) {
+          if (cartValidation.errorList.length === 1) {
+            // Single error - show it directly
+            toast.error(cartValidation.errorList[0], { autoClose: 7000 });
+          } else {
+            // Multiple errors - show a friendly summary
+            toast.error("Some items in your cart are currently unavailable. Please remove them to continue.", { autoClose: 5000 });
+            
+            // Show each specific error
+            cartValidation.errorList.forEach((err, idx) => {
+              setTimeout(() => toast.error(err, { autoClose: 6000 }), (idx + 1) * 200);
+            });
+            
+            // Log detailed errors for debugging
+            logger.warn("Cart validation errors:", cartValidation.errorList);
+          }
+        } else {
+          // No specific error list, show the general message
+          toast.error(errorMessage, { autoClose: 7000 });
+        }
 
         // If cart data is returned, update cart state (cart might have changed)
         if (cartValidation.cart && setCartItems) {

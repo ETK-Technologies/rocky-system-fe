@@ -263,7 +263,7 @@ const EDPreConsultationQuiz = () => {
       <div className="flex flex-col min-h-screen bg-white subheaders-font font-medium">
         <ToastContainer
           position="top-center"
-          pauseOnHover={false}
+          pauseOnHover={true}
           style={{ zIndex: 9999 }}
         />
         <QuestionnaireNavbar
@@ -545,7 +545,7 @@ const EDPreConsultationQuiz = () => {
     >
       <ToastContainer
         position="top-center"
-        pauseOnHover={false}
+        pauseOnHover={true}
         style={{ zIndex: 9999 }}
       />
 

@@ -78,17 +78,21 @@ STRIPE_PUBLISHABLE_KEY=pk_test_...
    ↓
 5. User provides shipping/billing address data (new or existing)
    ↓
-6. Create order from cart (POST /orders) with address data
+6. Calculate shipping (POST /shipping/calculate-by-cart) when province changes
    ↓
-7. Addresses created/updated automatically if provided
+7. User selects shipping method
    ↓
-8. Receive payment intent from Stripe
+8. Create order from cart (POST /orders) with address data
    ↓
-9. Confirm payment with Stripe Elements
+9. Addresses created/updated automatically if provided
    ↓
-10. Payment authorized (webhook updates order status)
+10. Receive payment intent from Stripe
    ↓
-11. Order moves to MEDICAL_REVIEW or PROCESSING
+11. Confirm payment with Stripe Elements
+   ↓
+12. Payment authorized (webhook updates order status)
+   ↓
+13. Order moves to MEDICAL_REVIEW or PROCESSING
 ```
 
 ### Detailed Steps
@@ -97,10 +101,11 @@ STRIPE_PUBLISHABLE_KEY=pk_test_...
 2. **Cart Validation**: Validate cart before checkout via `POST /cart/validate`
 3. **Fetch Addresses** (Optional): Retrieve user's existing addresses via `GET /users/addresses` to pre-fill forms
 4. **Address Collection**: User provides shipping and billing address data (can be new or existing)
-5. **Checkout Request**: Send checkout request with cart ID and address data (addresses created/updated automatically)
-6. **Payment Intent**: Receive Stripe payment intent client secret
-7. **Payment Confirmation**: Use Stripe Elements to confirm payment
-8. **Order Confirmation**: Display order confirmation page
+5. **Calculate Shipping** (Dynamic): When user changes province/state, call `POST /shipping/calculate-by-cart` to recalculate shipping options
+6. **Checkout Request**: Send checkout request with cart ID and address data (addresses created/updated automatically)
+7. **Payment Intent**: Receive Stripe payment intent client secret
+8. **Payment Confirmation**: Use Stripe Elements to confirm payment
+9. **Order Confirmation**: Display order confirmation page
 
 ---
 
@@ -202,7 +207,145 @@ When sending addresses with the checkout request, use the following fields:
 
 ## API Endpoints
 
-### 1. Validate Cart (Recommended)
+### 1. Calculate Shipping (Province Change)
+
+**Endpoint:** `POST /api/v1/shipping/calculate-by-cart`
+
+**Description:** Calculate shipping options when the user changes the province/state in the checkout form. This endpoint automatically fetches cart items and calculates shipping based on the provided address information.
+
+**When to Use:**
+
+- When user changes province/state in checkout form
+- When user changes country in checkout form
+- When user enters postal code
+- To show shipping options before final checkout
+
+**Request:**
+
+```http
+POST /api/v1/shipping/calculate-by-cart
+Authorization: Bearer <token>
+Content-Type: application/json
+X-App-Key: <app-key>
+
+{
+  "cartId": "cart_123",
+  "country": "CA",
+  "state": "ON",
+  "postalCode": "M5V 3A8"
+}
+```
+
+**Request Fields:**
+
+| Field        | Type   | Required | Description                       |
+| ------------ | ------ | -------- | --------------------------------- |
+| `cartId`     | string | Yes      | Cart ID                           |
+| `country`    | string | Yes      | Country code (ISO 3166-1 alpha-2) |
+| `state`      | string | No       | State/Province code               |
+| `postalCode` | string | No       | Postal/ZIP code                   |
+
+**Response:**
+
+```json
+[
+  {
+    "methodId": "method_123",
+    "methodType": "FLAT_RATE",
+    "title": "Standard Shipping",
+    "description": "5-7 business days",
+    "cost": 10.0
+  },
+  {
+    "methodId": "method_456",
+    "methodType": "FLAT_RATE",
+    "title": "Express Shipping",
+    "description": "2-3 business days",
+    "cost": 20.0
+  }
+]
+```
+
+**Response Fields:**
+
+| Field         | Type   | Description                                       |
+| ------------- | ------ | ------------------------------------------------- |
+| `methodId`    | string | Shipping method ID (use this when creating order) |
+| `methodType`  | string | Method type (FLAT_RATE, FREE_SHIPPING, etc.)      |
+| `title`       | string | Display name for shipping method                  |
+| `description` | string | Optional description                              |
+| `cost`        | number | Shipping cost in cart currency                    |
+
+**Example Usage (Province Change):**
+
+```javascript
+// When user changes province in checkout form
+async function onProvinceChange(cartId, country, state, postalCode) {
+  try {
+    const response = await fetch('/api/v1/shipping/calculate-by-cart', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'X-App-Key': appKey,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        cartId,
+        country,
+        state,
+        postalCode,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to calculate shipping');
+    }
+
+    const shippingOptions = await response.json();
+
+    // Update UI with shipping options
+    updateShippingOptions(shippingOptions);
+
+    // Update order total with selected shipping cost
+    const selectedShipping = shippingOptions[0]; // or let user select
+    updateOrderTotal(selectedShipping.cost);
+  } catch (error) {
+    console.error('Error calculating shipping:', error);
+    showError('Unable to calculate shipping. Please try again.');
+  }
+}
+```
+
+**Alternative Endpoint (Manual Cart Items):**
+
+If you prefer to manually provide cart items instead of using cartId, use:
+
+**Endpoint:** `POST /api/v1/shipping/calculate`
+
+**Request:**
+
+```http
+POST /api/v1/shipping/calculate
+Authorization: Bearer <token>
+Content-Type: application/json
+
+{
+  "country": "CA",
+  "state": "ON",
+  "postalCode": "M5V 3A8",
+  "cartItems": [
+    {
+      "productId": "prod_123",
+      "variantId": "var_123",
+      "quantity": 2
+    }
+  ],
+  "subtotal": 100.00,
+  "couponCode": "SAVE10"
+}
+```
+
+### 2. Validate Cart (Recommended)
 
 **Endpoint:** `POST /api/v1/cart/validate`
 
@@ -230,7 +373,7 @@ Content-Type: application/json
 }
 ```
 
-### 2. Create Order (Checkout)
+### 3. Create Order (Checkout)
 
 **Endpoint:** `POST /api/v1/orders`
 
@@ -342,7 +485,7 @@ Content-Type: application/json
 }
 ```
 
-### 3. Get Order Details
+### 4. Get Order Details
 
 **Endpoint:** `GET /api/v1/orders/:id`
 
@@ -370,7 +513,7 @@ Authorization: Bearer <token>
 }
 ```
 
-### 4. Get Order by Order Number
+### 5. Get Order by Order Number
 
 **Endpoint:** `GET /api/v1/orders/order-number/:orderNumber`
 
@@ -426,9 +569,9 @@ After creating the order, you'll receive:
 ### Step 2: Initialize Stripe Elements
 
 ```javascript
-import { loadStripe } from "@stripe/stripe-js";
+import { loadStripe } from '@stripe/stripe-js';
 
-const stripe = await loadStripe("pk_test_..."); // Your publishable key
+const stripe = await loadStripe('pk_test_...'); // Your publishable key
 const elements = stripe.elements({
   clientSecret: payment.clientSecret,
 });
@@ -437,8 +580,8 @@ const elements = stripe.elements({
 ### Step 3: Create Payment Element
 
 ```javascript
-const paymentElement = elements.create("payment");
-paymentElement.mount("#payment-element");
+const paymentElement = elements.create('payment');
+paymentElement.mount('#payment-element');
 ```
 
 ### Step 4: Confirm Payment
@@ -447,15 +590,15 @@ paymentElement.mount("#payment-element");
 const { error, paymentIntent } = await stripe.confirmPayment({
   elements,
   confirmParams: {
-    return_url: "https://your-store.com/checkout/success",
+    return_url: 'https://your-store.com/checkout/success',
   },
-  redirect: "if_required",
+  redirect: 'if_required',
 });
 
 if (error) {
   // Handle error
   console.error(error.message);
-} else if (paymentIntent.status === "succeeded") {
+} else if (paymentIntent.status === 'succeeded') {
   // Payment succeeded
   // Redirect to success page
 }
@@ -479,30 +622,30 @@ requires_action → Additional authentication required (3D Secure)
 
 ```javascript
 // 1. Get current cart
-const cartResponse = await fetch("/api/v1/cart", {
+const cartResponse = await fetch('/api/v1/cart', {
   headers: {
     Authorization: `Bearer ${token}`,
-    "X-App-Key": appKey,
+    'X-App-Key': appKey,
   },
 });
 const { cart } = await cartResponse.json();
 
 // 2. Validate cart
-await fetch("/api/v1/cart/validate", {
-  method: "POST",
+await fetch('/api/v1/cart/validate', {
+  method: 'POST',
   headers: {
     Authorization: `Bearer ${token}`,
-    "X-App-Key": appKey,
-    "Content-Type": "application/json",
+    'X-App-Key': appKey,
+    'Content-Type': 'application/json',
   },
   body: JSON.stringify({ cartId: cart.id }),
 });
 
 // 3. (Optional) Fetch user addresses to pre-fill form
-const addressesResponse = await fetch("/api/v1/users/addresses", {
+const addressesResponse = await fetch('/api/v1/users/addresses', {
   headers: {
     Authorization: `Bearer ${token}`,
-    "X-App-Key": appKey,
+    'X-App-Key': appKey,
   },
 });
 const addresses = await addressesResponse.json();
@@ -510,30 +653,65 @@ const addresses = await addressesResponse.json();
 // 4. User provides address data (from form or existing address selection)
 // Option A: Use existing address ID
 const selectedShippingAddressId = addresses.find(
-  (addr) => addr.type === "SHIPPING" && addr.isDefault
+  (addr) => addr.type === 'SHIPPING' && addr.isDefault,
 )?.id;
 
 // Option B: Send new address data (will be created automatically)
 const shippingAddressData = {
-  type: "SHIPPING",
-  firstName: "John",
-  lastName: "Doe",
-  addressLine1: "123 Main Street",
-  city: "Toronto",
-  state: "ON",
-  postalCode: "M5V 3A8",
-  country: "CA",
-  phone: "+1 416-555-0100",
+  type: 'SHIPPING',
+  firstName: 'John',
+  lastName: 'Doe',
+  addressLine1: '123 Main Street',
+  city: 'Toronto',
+  state: 'ON',
+  postalCode: 'M5V 3A8',
+  country: 'CA',
+  phone: '+1 416-555-0100',
   isDefault: true,
 };
 
-// 5. Create order with address data (addresses created/updated automatically)
-const checkoutResponse = await fetch("/api/v1/orders", {
-  method: "POST",
+// 5. Calculate shipping when province changes (call this whenever address changes)
+async function calculateShipping(cartId, country, state, postalCode) {
+  const shippingResponse = await fetch('/api/v1/shipping/calculate-by-cart', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'X-App-Key': appKey,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      cartId,
+      country,
+      state,
+      postalCode,
+    }),
+  });
+
+  if (!shippingResponse.ok) {
+    throw new Error('Failed to calculate shipping');
+  }
+
+  return await shippingResponse.json();
+}
+
+// When user changes province in form
+const shippingOptions = await calculateShipping(
+  cart.id,
+  shippingAddressData.country,
+  shippingAddressData.state,
+  shippingAddressData.postalCode,
+);
+
+// User selects shipping method
+const selectedShippingMethodId = shippingOptions[0]?.methodId;
+
+// 6. Create order with address data (addresses created/updated automatically)
+const checkoutResponse = await fetch('/api/v1/orders', {
+  method: 'POST',
   headers: {
     Authorization: `Bearer ${token}`,
-    "X-App-Key": appKey,
-    "Content-Type": "application/json",
+    'X-App-Key': appKey,
+    'Content-Type': 'application/json',
   },
   body: JSON.stringify({
     cartId: cart.id,
@@ -542,14 +720,14 @@ const checkoutResponse = await fetch("/api/v1/orders", {
     // Option B: Send address objects (recommended - addresses saved automatically)
     shippingAddress: shippingAddressData,
     billingAddress: {
-      type: "BILLING",
-      firstName: "John",
-      lastName: "Doe",
-      addressLine1: "456 Oak Avenue",
-      city: "Toronto",
-      state: "ON",
-      postalCode: "M5V 3A9",
-      country: "CA",
+      type: 'BILLING',
+      firstName: 'John',
+      lastName: 'Doe',
+      addressLine1: '456 Oak Avenue',
+      city: 'Toronto',
+      state: 'ON',
+      postalCode: 'M5V 3A9',
+      country: 'CA',
       isDefault: true,
     },
     paymentMethodId: selectedPaymentMethodId,
@@ -558,7 +736,7 @@ const checkoutResponse = await fetch("/api/v1/orders", {
 
 const { order, payment } = await checkoutResponse.json();
 
-// 6. Confirm payment with Stripe
+// 7. Confirm payment with Stripe
 // ... (Stripe Elements integration)
 ```
 
@@ -566,26 +744,26 @@ const { order, payment } = await checkoutResponse.json();
 
 ```javascript
 // 1. Apply coupon to cart
-await fetch("/api/v1/cart/coupon", {
-  method: "POST",
+await fetch('/api/v1/cart/coupon', {
+  method: 'POST',
   headers: {
     Authorization: `Bearer ${token}`,
-    "X-App-Key": appKey,
-    "Content-Type": "application/json",
+    'X-App-Key': appKey,
+    'Content-Type': 'application/json',
   },
   body: JSON.stringify({
     cartId: cart.id,
-    couponCode: "SAVE10",
+    couponCode: 'SAVE10',
   }),
 });
 
 // 2. Proceed with checkout (coupon already applied)
-const checkoutResponse = await fetch("/api/v1/orders", {
-  method: "POST",
+const checkoutResponse = await fetch('/api/v1/orders', {
+  method: 'POST',
   headers: {
     Authorization: `Bearer ${token}`,
-    "X-App-Key": appKey,
-    "Content-Type": "application/json",
+    'X-App-Key': appKey,
+    'Content-Type': 'application/json',
   },
   body: JSON.stringify({
     cartId: cart.id,
@@ -725,7 +903,6 @@ Decline: 4000 0000 0000 0002
 ### Test Scenarios
 
 1. **Successful Checkout**
-
    - Login as authenticated user
    - Add items to cart
    - Proceed to checkout
@@ -733,14 +910,12 @@ Decline: 4000 0000 0000 0002
    - Verify order creation
 
 2. **Cart Validation**
-
    - Add items to cart
    - Change product price in admin
    - Attempt checkout
    - Verify validation error
 
 3. **Payment Failure**
-
    - Login as authenticated user
    - Attempt checkout
    - Use declined card
@@ -769,7 +944,9 @@ Decline: 4000 0000 0000 0002
 2. **Provide clear error messages**
 3. **Allow cart editing** before checkout
 4. **Require authentication** before checkout (redirect to login if needed)
-5. **Send confirmation emails** (handled by backend)
+5. **Recalculate shipping** when province/state changes (use `POST /shipping/calculate-by-cart`)
+6. **Update order total** dynamically as shipping options change
+7. **Send confirmation emails** (handled by backend)
 
 ### Performance
 
@@ -855,9 +1032,27 @@ Decline: 4000 0000 0000 0002
 - Check payment method is supported
 - Ensure 3D Secure is handled if required
 
+#### Shipping Not Calculated on Province Change
+
+**Problem:** Shipping options don't update when province changes
+
+**Solution:**
+
+- Call `POST /shipping/calculate-by-cart` when province/state field changes
+- Ensure cartId is valid and cart belongs to the user
+- Verify country code is in ISO 3166-1 alpha-2 format (e.g., 'CA', 'US')
+- Check that shipping zones are configured for the selected province
+
 ---
 
 ## Changelog
+
+### Version 1.2
+
+- Added shipping calculation endpoint (`POST /shipping/calculate-by-cart`)
+- Added support for dynamic shipping recalculation when province changes
+- Updated checkout flow to include shipping calculation step
+- Added example code for province change handling
 
 ### Version 1.1
 

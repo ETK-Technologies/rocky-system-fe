@@ -283,93 +283,91 @@ const CheckoutPageContent = () => {
       }
     }
 
-    // Update shipping rates when province changes
+    // Update shipping rates when province changes using the new backend API
     try {
       setIsUpdatingShipping(true);
 
-      // Prepare address data based on whether we should clear fields
-      let addressData;
+      // Get the country and postal code from the appropriate address
+      const country = addressType === "billing" 
+        ? formData.billing_address.country || "CA"
+        : formData.shipping_address.country || "CA";
+      
+      const postalCode = addressType === "billing"
+        ? formData.billing_address.postcode
+        : formData.shipping_address.postcode;
 
-      if (shouldClearFields) {
-        // Create a basic address with province and country to trigger shipping calculation
-        addressData = {
-          first_name:
-            formData.shipping_address.first_name ||
-            formData.billing_address.first_name ||
-            "",
-          last_name:
-            formData.shipping_address.last_name ||
-            formData.billing_address.last_name ||
-            "",
-          company: "",
-          address_1: "",
-          address_2: "",
-          city: "",
-          state: newProvince,
-          postcode: "",
-          country: "US",
-        };
-      } else {
-        // Keep existing address data when province changes due to address selection
-        addressData = {
-          first_name:
-            formData.shipping_address.first_name ||
-            formData.billing_address.first_name ||
-            "",
-          last_name:
-            formData.shipping_address.last_name ||
-            formData.billing_address.last_name ||
-            "",
-          company: formData.shipping_address.company || "",
-          address_1: formData.shipping_address.address_1 || "",
-          address_2: formData.shipping_address.address_2 || "",
-          city: formData.shipping_address.city || "",
-          state: newProvince,
-          postcode: formData.shipping_address.postcode || "",
-          country: "US",
-        };
-      }
+      logger.log("Calculating shipping for province change:", {
+        country,
+        state: newProvince,
+        postalCode,
+        addressType,
+      });
 
-      // Prepare customer data for API call
-      const customerData = {
-        billing_address: {
-          first_name: formData.billing_address.first_name || "",
-          last_name: formData.billing_address.last_name || "",
-          company: formData.billing_address.company || "",
-          address_1:
-            addressType === "billing" && shouldClearFields
-              ? ""
-              : formData.billing_address.address_1 || "",
-          address_2:
-            addressType === "billing" && shouldClearFields
-              ? ""
-              : formData.billing_address.address_2 || "",
-          city:
-            addressType === "billing" && shouldClearFields
-              ? ""
-              : formData.billing_address.city || "",
-          state:
-            addressType === "billing"
-              ? newProvince
-              : formData.billing_address.state || newProvince,
-          postcode:
-            addressType === "billing" && shouldClearFields
-              ? ""
-              : formData.billing_address.postcode || "",
-          country: "US",
-          email: formData.billing_address.email || "",
-          phone: formData.billing_address.phone || "",
+      // Call the new shipping calculation API
+      const response = await fetch("/api/shipping/calculate-by-cart", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
         },
-        shipping_address: addressData,
-      };
+        body: JSON.stringify({
+          country,
+          state: newProvince,
+          postalCode: postalCode || "",
+        }),
+      });
+
+      const result = await response.json();
+
+      if (response.ok && result.success) {
+        logger.log("Shipping options calculated:", result.shippingOptions);
+        
+        // Update cart state with new shipping options
+        // The backend returns shipping options in the format:
+        // [{ methodId, methodType, title, description, cost }]
+        
+        // Transform to cart format if needed
+        const shippingRates = result.shippingOptions.map((option) => ({
+          package_id: 0,
+          name: "Shipping",
+          destination: {
+            address_1: "",
+            address_2: "",
+            city: "",
+            state: newProvince,
+            postcode: postalCode || "",
+            country: country,
+          },
+          items: cartItems.items,
+          shipping_rates: [
+            {
+              rate_id: option.methodId,
+              name: option.title,
+              description: option.description || "",
+              delivery_time: "",
+              price: (option.cost * 100).toString(), // Convert to cents
+              taxes: "0",
+              instance_id: 0,
+              method_id: option.methodType || "flat_rate",
+              meta_data: [],
+              selected: true, // Select first option by default
+            },
+          ],
+        }));
+
+        setCartItems((prev) => ({
+          ...prev,
+          shipping_rates: shippingRates,
+        }));
+
+        logger.log("Cart updated with new shipping rates");
+      } else {
+        logger.error("Error calculating shipping:", result.error);
+        toast.error(result.error || "Failed to calculate shipping. Please try again.");
+      }
 
       // Also update form data to sync UI only if we should clear fields
       if (shouldClearFields) {
-        logger.log("🚨 CLEARING FIELDS - This might be causing address truncation!");
-        logger.log("shouldClearFields:", shouldClearFields);
-        logger.log("addressType:", addressType);
-        logger.log("Current billing address_1 before clearing:", formData.billing_address?.address_1);
-        logger.log("🚨 WARNING: This will clear the address fields!");
+        logger.log("Clearing address fields due to province change");
 
         // IMPORTANT: Only clear fields if we're not in the middle of an address autocomplete selection
         // Check if the current address looks like it was just populated (has meaningful data)
@@ -383,74 +381,45 @@ const CheckoutPageContent = () => {
           return; // Don't clear fields if we have recent address data
         }
 
-        setFormData((prev) => {
-          const updatedData = {
-            ...prev,
-            billing_address: {
-              ...prev.billing_address,
-              ...(addressType === "billing"
-                ? {
-                  address_1: "",
-                  address_2: "",
-                  city: "",
-                  postcode: "",
-                  country: "US",
-                }
-                : {}),
-              state:
-                addressType === "billing"
-                  ? newProvince
-                  : prev.billing_address.state || newProvince,
-            },
-            shipping_address: addressData,
-          };
-
-          logger.log("FormData after clearing fields:", {
-            billing_address_1: updatedData.billing_address.address_1,
-            shipping_address_1: updatedData.shipping_address.address_1,
-          });
-
-          return updatedData;
-        });
-      }
-
-      // Log the customer data being sent
-      logger.log(
-        "Sending customer data to update-customer API:",
-        JSON.stringify(customerData, null, 2)
-      );
-
-      // Specifically log the address_1 field to debug truncation
-      logger.log("=== ADDRESS DEBUG ===");
-      logger.log("Billing address_1 being sent:", `"${customerData.billing_address.address_1}"`);
-      logger.log("Billing address_1 length:", customerData.billing_address.address_1?.length || 0);
-      logger.log("Shipping address_1 being sent:", `"${customerData.shipping_address.address_1}"`);
-      logger.log("Shipping address_1 length:", customerData.shipping_address.address_1?.length || 0);
-      logger.log("FormData billing address_1:", `"${formData.billing_address.address_1}"`);
-      logger.log("FormData shipping address_1:", `"${formData.shipping_address.address_1}"`);
-      logger.log("=== END ADDRESS DEBUG ===");
-
-      // Call the update customer API
-      const response = await fetch("/api/cart/update-customer", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(customerData),
-      });
-
-      const updatedCart = await response.json();
-
-      if (response.ok && !updatedCart.error) {
-        // Update cart state with new shipping rates
-        setCartItems(updatedCart);
-      } else {
-        logger.error("Error updating shipping rates:", updatedCart.error);
-        toast.error("Failed to update shipping rates. Please try again.");
+        setFormData((prev) => ({
+          ...prev,
+          billing_address: {
+            ...prev.billing_address,
+            ...(addressType === "billing"
+              ? {
+                address_1: "",
+                address_2: "",
+                city: "",
+                postcode: "",
+              }
+              : {}),
+            state:
+              addressType === "billing"
+                ? newProvince
+                : prev.billing_address.state || newProvince,
+            country: country,
+          },
+          shipping_address: {
+            ...prev.shipping_address,
+            ...(addressType === "shipping"
+              ? {
+                address_1: "",
+                address_2: "",
+                city: "",
+                postcode: "",
+              }
+              : {}),
+            state:
+              addressType === "shipping"
+                ? newProvince
+                : prev.shipping_address.state || newProvince,
+            country: country,
+          },
+        }));
       }
     } catch (error) {
-      logger.error("Error updating shipping rates:", error);
-      toast.error("Failed to update shipping rates. Please try again.");
+      logger.error("Error calculating shipping:", error);
+      toast.error("Failed to calculate shipping. Please try again.");
     } finally {
       setIsUpdatingShipping(false);
     }
@@ -1006,10 +975,31 @@ const CheckoutPageContent = () => {
           logger.error("Cart validation failed:", cartValidation);
           
           // Show detailed error message
-          const errorMessage = cartValidation.error || 
+          let errorMessage = cartValidation.error || 
                               cartValidation.message || 
                               "Cart validation failed. Please check your cart and try again.";
-          toast.error(errorMessage);
+          
+          // If there are multiple errors, show them in a more readable format
+          if (cartValidation.errorList && cartValidation.errorList.length > 0) {
+            if (cartValidation.errorList.length === 1) {
+              // Single error - show it directly
+              toast.error(cartValidation.errorList[0], { autoClose: 7000 });
+            } else {
+              // Multiple errors - show a friendly summary
+              toast.error("Some items in your cart are currently unavailable. Please remove them to continue.", { autoClose: 5000 });
+              
+              // Show each specific error
+              cartValidation.errorList.forEach((err, idx) => {
+                setTimeout(() => toast.error(err, { autoClose: 6000 }), (idx + 1) * 200);
+              });
+              
+              // Log detailed errors for debugging
+              logger.warn("Cart validation errors:", cartValidation.errorList);
+            }
+          } else {
+            // No specific error list, show the general message
+            toast.error(errorMessage, { autoClose: 7000 });
+          }
           
           // If cart data is returned, update cart state (cart might have changed)
           if (cartValidation.cart && setCartItems) {
@@ -1105,9 +1095,9 @@ const CheckoutPageContent = () => {
         }
       }
 
-      // Update customer data on server before checkout to ensure latest info is saved
+      // Update customer's permanent profile in WooCommerce
       try {
-        logger.log("Updating customer data before checkout...");
+        logger.log("Updating customer profile before checkout...");
         const useShippingAddress =
           formData.shipping_address.ship_to_different_address;
 
@@ -1152,101 +1142,76 @@ const CheckoutPageContent = () => {
             },
         };
 
-        const updateResponse = await fetch("/api/cart/update-customer", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(customerUpdateData),
+        // Include date_of_birth in the profile update
+        const profileData = {
+          ...customerUpdateData,
+          date_of_birth:
+            formData.billing_address.date_of_birth ||
+            formData.date_of_birth ||
+            "",
+        };
+
+        logger.log("Profile data with DOB:", {
+          date_of_birth: profileData.date_of_birth,
+          phone: profileData.billing_address?.phone,
         });
 
-        const updateResult = await updateResponse.json();
+        const profileUpdateResponse = await fetch(
+          "/api/update-customer-profile",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(profileData),
+          }
+        );
 
-        if (updateResponse.ok && !updateResult.error) {
-          logger.log("Customer cart data updated successfully before checkout");
+        const profileUpdateResult = await profileUpdateResponse.json();
 
-          // Also update the customer's permanent profile in WooCommerce
-          try {
-            logger.log("Updating customer profile permanently...");
+        logger.log("=== PROFILE UPDATE API RESPONSE ===", {
+          status: profileUpdateResponse.status,
+          ok: profileUpdateResponse.ok,
+          response: profileUpdateResult,
+        });
 
-            // Include date_of_birth in the profile update
-            const profileData = {
-              ...customerUpdateData,
-              date_of_birth:
-                formData.billing_address.date_of_birth ||
-                formData.date_of_birth ||
-                "",
-            };
+        if (profileUpdateResponse.ok && profileUpdateResult.success) {
+          logger.log("Customer profile updated permanently ✓");
+          logger.log("Updated customer data:", profileUpdateResult.data);
 
-            logger.log("Profile data with DOB:", {
-              date_of_birth: profileData.date_of_birth,
-              phone: profileData.billing_address?.phone,
-            });
-
-            const profileUpdateResponse = await fetch(
-              "/api/update-customer-profile",
-              {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                },
-                body: JSON.stringify(profileData),
-              }
+          // Check metadata update status
+          if (profileUpdateResult.metadata_update) {
+            logger.log(
+              "=== METADATA UPDATE STATUS ===",
+              profileUpdateResult.metadata_update
             );
 
-            const profileUpdateResult = await profileUpdateResponse.json();
-
-            logger.log("=== PROFILE UPDATE API RESPONSE ===", {
-              status: profileUpdateResponse.status,
-              ok: profileUpdateResponse.ok,
-              response: profileUpdateResult,
-            });
-
-            if (profileUpdateResponse.ok && profileUpdateResult.success) {
-              logger.log("Customer profile updated permanently ✓");
-              logger.log("Updated customer data:", profileUpdateResult.data);
-
-              // Check metadata update status
-              if (profileUpdateResult.metadata_update) {
+            if (profileUpdateResult.metadata_update.attempted) {
+              if (profileUpdateResult.metadata_update.success) {
                 logger.log(
-                  "=== METADATA UPDATE STATUS ===",
-                  profileUpdateResult.metadata_update
+                  "✓ User metadata (DOB, phone) updated successfully"
                 );
-
-                if (profileUpdateResult.metadata_update.attempted) {
-                  if (profileUpdateResult.metadata_update.success) {
-                    logger.log(
-                      "✓ User metadata (DOB, phone) updated successfully"
-                    );
-                  } else {
-                    logger.error(
-                      "✗ User metadata update FAILED:",
-                      profileUpdateResult.metadata_update.error
-                    );
-                  }
-                } else {
-                  logger.warn(
-                    "⚠ Metadata update was not attempted (no DOB or phone provided)"
-                  );
-                }
+              } else {
+                logger.error(
+                  "✗ User metadata update FAILED:",
+                  profileUpdateResult.metadata_update.error
+                );
               }
             } else {
               logger.warn(
-                "Failed to update customer profile:",
-                profileUpdateResult.error
+                "⚠ Metadata update was not attempted (no DOB or phone provided)"
               );
             }
-          } catch (profileError) {
-            logger.error("Error updating customer profile:", profileError);
-            // Continue with checkout even if profile update fails
           }
         } else {
-          logger.warn("Failed to update customer data:", updateResult.error);
-          // Continue with checkout even if update fails
+          logger.warn(
+            "Failed to update customer profile:",
+            profileUpdateResult.error
+          );
         }
       } catch (error) {
-        logger.error("Error updating customer data before checkout:", error);
-        // Continue with checkout even if update fails
+        logger.error("Error updating customer profile before checkout:", error);
+        // Continue with checkout even if profile update fails
       }
 
       // Check if shipping address fields are empty, if so, use billing address
