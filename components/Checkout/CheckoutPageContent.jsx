@@ -1329,12 +1329,52 @@ const CheckoutPageContent = () => {
           });
 
           // Check payment status
-          if (
-            paymentIntent.status === "succeeded" ||
-            paymentIntent.status === "processing" ||
-            paymentIntent.status === "requires_capture"
-          ) {
+          // For manual capture, the expected status is 'requires_capture' (payment authorized but not captured yet)
+          if (paymentIntent.status === "requires_capture") {
+            // Payment authorized but not captured yet (this is expected for manual capture)
+            // The payment will be captured later when order status changes to PROCESSING
+            logger.log(
+              "Payment authorized successfully (awaiting manual capture)"
+            );
+            toast.success("Payment authorized successfully!");
+
+            // Empty cart
+            try {
+              const { emptyCart } = await import("@/lib/cart/cartService");
+              await emptyCart();
+              logger.log("Cart emptied successfully");
+            } catch (error) {
+              logger.error("Error emptying cart:", error);
+            }
+
+            // Redirect to success page
+            router.push(
+              `/checkout/order-received/${orderId}?key=${orderNumber}${buildFlowQueryString()}`
+            );
+            return;
+          } else if (paymentIntent.status === "succeeded") {
+            // Payment succeeded (if automatic capture was used)
+            logger.log("Payment succeeded");
             toast.success("Payment successful!");
+
+            // Empty cart
+            try {
+              const { emptyCart } = await import("@/lib/cart/cartService");
+              await emptyCart();
+              logger.log("Cart emptied successfully");
+            } catch (error) {
+              logger.error("Error emptying cart:", error);
+            }
+
+            // Redirect to success page
+            router.push(
+              `/checkout/order-received/${orderId}?key=${orderNumber}${buildFlowQueryString()}`
+            );
+            return;
+          } else if (paymentIntent.status === "processing") {
+            // Payment is being processed
+            logger.log("Payment is being processed");
+            toast.success("Payment is being processed!");
 
             // Empty cart
             try {
@@ -1355,7 +1395,9 @@ const CheckoutPageContent = () => {
             logger.log("3D Secure authentication required");
             return;
           } else {
-            throw new Error(`Payment status: ${paymentIntent.status}`);
+            throw new Error(
+              `Unexpected payment status: ${paymentIntent.status}`
+            );
           }
         } catch (error) {
           logger.error("❌ Stripe payment error:", error);
