@@ -1295,6 +1295,21 @@ const CheckoutPageContent = () => {
                 return_url: `${
                   window.location.origin
                 }/checkout/order-received/${orderId}?key=${orderNumber}${buildFlowQueryString()}`,
+                payment_method_data: {
+                  billing_details: {
+                    name: `${dataToSend.firstName} ${dataToSend.lastName}`,
+                    email: dataToSend.email,
+                    phone: dataToSend.phone,
+                    address: {
+                      line1: dataToSend.addressOne,
+                      line2: dataToSend.addressTwo || "",
+                      city: dataToSend.city,
+                      state: dataToSend.state,
+                      postal_code: dataToSend.postcode,
+                      country: (dataToSend.country || "CA").toUpperCase(),
+                    },
+                  },
+                },
               },
               redirect: "if_required", // Only redirect if 3D Secure is required
             });
