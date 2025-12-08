@@ -46,13 +46,18 @@ const stripePromise = loadStripe(
 );
 
 // Wrapper component to provide Stripe context
+// Using deferred mode - Elements shows immediately with placeholder amount
+// The actual amount will come from the PaymentIntent when confirming payment
+// Note: Backend creates PaymentIntent with manual capture, so we need to handle this
 const CheckoutPageWrapper = () => {
   return (
     <Elements
       stripe={stripePromise}
       options={{
-        mode: "payment", // Setup mode for Payment Element
-        amount: 1000, // Default amount, will be updated
+        mode: "payment", // Payment mode for Payment Element
+        amount: 100, // Placeholder amount (1.00 in smallest currency unit)
+        // This is required by Stripe but will be overridden by the actual
+        // PaymentIntent amount when we confirm payment
         currency: getCurrencyLowerCase(),
         appearance: {
           theme: "stripe",
@@ -60,6 +65,8 @@ const CheckoutPageWrapper = () => {
         paymentMethodCreation: "manual", // Required for createPaymentMethod with PaymentElement
         // Configure payment methods at the Elements level
         paymentMethodTypes: ["card", "link"], // Allow card and link payments
+        // Note: capture_method is set on the PaymentIntent, not Elements
+        // We'll need to ensure the PaymentIntent matches Elements expectations
       }}
     >
       <CheckoutPageContent />
@@ -1213,14 +1220,71 @@ const CheckoutPageContent = () => {
         }
       }
 
-      // For NEW CARD payments with Stripe Elements (embedded in form)
+      // For NEW CARD payments with Stripe Elements (deferred mode)
       if (!selectedCard && dataToSend.useStripe) {
         try {
-          logger.log(
-            "Processing Stripe Elements payment with new backend API..."
-          );
+          logger.log("Processing Stripe Elements payment in deferred mode...");
 
-          // Step 1: Create order and get payment intent from new backend API
+          // Validate Stripe Elements is ready
+          if (!stripeElements) {
+            throw new Error("Stripe payment form not ready. Please try again.");
+          }
+
+          // Validate Stripe instance is available
+          if (!stripe) {
+            throw new Error(
+              "Stripe is not loaded. Please refresh and try again."
+            );
+          }
+
+          // Step 1: Submit Payment Element to collect payment method
+          // This happens BEFORE creating the order (deferred mode)
+          logger.log("Collecting payment method from Payment Element...");
+          const { error: submitError } = await stripeElements.submit();
+
+          if (submitError) {
+            throw new Error(submitError.message);
+          }
+
+          // Step 2: Extract payment method from PaymentElement
+          // We need the payment method ID to use with confirmCardPayment
+          logger.log("Retrieving payment method from PaymentElement...");
+          const paymentElement = stripeElements.getElement("payment");
+
+          if (!paymentElement) {
+            throw new Error("PaymentElement not found");
+          }
+
+          // Create payment method from the PaymentElement
+          const { error: pmError, paymentMethod } =
+            await stripe.createPaymentMethod({
+              elements: stripeElements,
+              params: {
+                billing_details: {
+                  name: `${dataToSend.firstName} ${dataToSend.lastName}`,
+                  email: dataToSend.email,
+                  phone: dataToSend.phone,
+                  address: {
+                    line1: dataToSend.addressOne,
+                    line2: dataToSend.addressTwo || "",
+                    city: dataToSend.city,
+                    state: dataToSend.state,
+                    postal_code: dataToSend.postcode,
+                    country: (dataToSend.country || "CA").toUpperCase(),
+                  },
+                },
+              },
+            });
+
+          if (pmError || !paymentMethod) {
+            throw new Error(
+              pmError?.message || "Failed to create payment method"
+            );
+          }
+
+          logger.log("Payment method created:", paymentMethod.id);
+
+          // Step 3: Create order and get PaymentIntent from new backend API
           logger.log("Creating order via new checkout API...");
           const checkoutResponse = await fetch("/api/checkout-new", {
             method: "POST",
@@ -1266,53 +1330,15 @@ const CheckoutPageContent = () => {
             return;
           }
 
-          // Validate Stripe Elements is ready (only for paid orders)
-          if (!stripeElements) {
-            throw new Error("Stripe payment form not ready. Please try again.");
-          }
+          // Step 4: Confirm payment using confirmCardPayment with payment method and clientSecret
+          // This works with manual capture PaymentIntents (unlike confirmPayment with Elements)
+          logger.log(
+            "Confirming payment with Stripe using confirmCardPayment..."
+          );
 
-          // Validate Stripe instance is available (only for paid orders)
-          if (!stripe) {
-            throw new Error(
-              "Stripe is not loaded. Please refresh and try again."
-            );
-          }
-
-          // Step 2: Submit Payment Element to collect payment method
-          logger.log("Submitting Payment Element...");
-          const { error: submitError } = await stripeElements.submit();
-
-          if (submitError) {
-            throw new Error(submitError.message);
-          }
-
-          // Step 3: Confirm payment with Stripe using the payment intent from backend
-          logger.log("Confirming payment with Stripe...");
           const { error: confirmError, paymentIntent } =
-            await stripe.confirmPayment({
-              elements: stripeElements,
-              clientSecret: payment.clientSecret,
-              confirmParams: {
-                return_url: `${
-                  window.location.origin
-                }/checkout/order-received/${orderId}?key=${orderNumber}${buildFlowQueryString()}`,
-                payment_method_data: {
-                  billing_details: {
-                    name: `${dataToSend.firstName} ${dataToSend.lastName}`,
-                    email: dataToSend.email,
-                    phone: dataToSend.phone,
-                    address: {
-                      line1: dataToSend.addressOne,
-                      line2: dataToSend.addressTwo || "",
-                      city: dataToSend.city,
-                      state: dataToSend.state,
-                      postal_code: dataToSend.postcode,
-                      country: (dataToSend.country || "CA").toUpperCase(),
-                    },
-                  },
-                },
-              },
-              redirect: "if_required", // Only redirect if 3D Secure is required
+            await stripe.confirmCardPayment(payment.clientSecret, {
+              payment_method: paymentMethod.id,
             });
 
           if (confirmError) {
