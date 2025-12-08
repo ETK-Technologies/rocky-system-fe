@@ -557,3 +557,4 @@ async function generateToken({ cvd, expiry_month, expiry_year, number }) {
 
   return res.data.token;
 }
+*/
