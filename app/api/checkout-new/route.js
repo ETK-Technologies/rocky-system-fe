@@ -56,20 +56,17 @@ export async function POST(req) {
     // Step 1: Get cart ID from the cart API
     // The cart API returns cart data, but we need to check if cart exists
     logger.log("Fetching cart to get cart ID...");
-    const cartResponse = await axios.get(
-      `${BASE_URL}/api/v1/cart`,
-      {
-        headers: {
-          Authorization: authToken.value,
-          accept: "application/json",
-          "X-App-Key": process.env.NEXT_PUBLIC_APP_KEY,
-          "X-App-Secret": process.env.NEXT_PUBLIC_APP_SECRET,
-        },
-      }
-    );
+    const cartResponse = await axios.get(`${BASE_URL}/api/v1/cart`, {
+      headers: {
+        Authorization: authToken.value,
+        accept: "application/json",
+        "X-App-Key": process.env.NEXT_PUBLIC_APP_KEY,
+        "X-App-Secret": process.env.NEXT_PUBLIC_APP_SECRET,
+      },
+    });
 
     const cart = cartResponse.data;
-    
+
     // Check if cart has items
     if (!cart || !cart.items || cart.items.length === 0) {
       return NextResponse.json(
@@ -81,7 +78,7 @@ export async function POST(req) {
     // The backend API may use cart ID or we can omit it and let backend use user's cart
     // According to the guide, we can send cartId or let backend use authenticated user's cart
     const cartId = cart.id || null;
-    
+
     logger.log("Cart retrieved:", {
       hasItems: cart.items?.length > 0,
       cartId: cartId || "will use authenticated user's cart",
@@ -125,9 +122,7 @@ export async function POST(req) {
       firstName: shipToAnotherAddress
         ? shippingFirstName || firstName
         : firstName,
-      lastName: shipToAnotherAddress
-        ? shippingLastName || lastName
-        : lastName,
+      lastName: shipToAnotherAddress ? shippingLastName || lastName : lastName,
       addressLine1: shipToAnotherAddress
         ? shippingAddressOne || addressOne
         : addressOne,
@@ -171,11 +166,6 @@ export async function POST(req) {
       checkoutRequestBody.cartId = cartId;
     }
 
-    // Add optional fields
-    if (customerNotes && customerNotes.trim()) {
-      checkoutRequestBody.customerNotes = customerNotes.trim();
-    }
-
     // Add payment method ID if provided (for saved cards)
     if (paymentMethodId) {
       checkoutRequestBody.paymentMethodId = paymentMethodId;
@@ -187,6 +177,14 @@ export async function POST(req) {
       { key: "_meta_mail_box", value: toMailBox ? "1" : "0" },
       { key: "_is_created_from_rocky_fe", value: "true" },
     ];
+
+    // Add customer notes to metadata if provided
+    if (customerNotes && customerNotes.trim()) {
+      checkoutRequestBody.metaData.push({
+        key: "customerNotes",
+        value: customerNotes.trim(),
+      });
+    }
 
     logger.log("Creating order with checkout request:", {
       cartId,
@@ -260,4 +258,3 @@ export async function POST(req) {
     );
   }
 }
-
