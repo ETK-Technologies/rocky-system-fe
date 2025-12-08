@@ -3,7 +3,7 @@ import axios from "axios";
 import { logger } from "@/utils/devLogger";
 import { cookies } from "next/headers";
 
-const BASE_URL = process.env.ROCKY_BE_BASE_URL;
+const BASE_URL = process.env.BASE_URL;
 
 /**
  * DELETE /api/cart/empty
@@ -14,7 +14,7 @@ export async function DELETE(req) {
   try {
     const cookieStore = await cookies();
     const authToken = cookieStore.get("authToken");
-    
+
     // Get sessionId from query parameters (for guest users)
     const { searchParams } = new URL(req.url);
     const sessionId = searchParams.get("sessionId");
@@ -35,7 +35,7 @@ export async function DELETE(req) {
       // If both authToken and sessionId are provided, prioritize authToken (authenticated user)
       let url = `${BASE_URL}/api/v1/cart`;
       const useSessionId = !authToken && sessionId; // Only use sessionId if no authToken
-      
+
       if (useSessionId) {
         url += `?sessionId=${encodeURIComponent(sessionId)}`;
       }
@@ -82,7 +82,9 @@ export async function DELETE(req) {
         return NextResponse.json(
           {
             success: false,
-            error: error.response.data?.message || "Either authentication token or sessionId is required",
+            error:
+              error.response.data?.message ||
+              "Either authentication token or sessionId is required",
           },
           { status: 400 }
         );

@@ -3,7 +3,7 @@ import axios from "axios";
 import { logger } from "@/utils/devLogger";
 import { cookies } from "next/headers";
 
-const BASE_URL = process.env.ROCKY_BE_BASE_URL;
+const BASE_URL = process.env.BASE_URL;
 
 // Helper function to decode HTML entities in error messages
 const decodeHtmlEntities = (text) => {
@@ -121,8 +121,8 @@ export async function POST(req) {
         typeof errorData === "object" && errorData?.message
           ? decodeHtmlEntities(errorData.message)
           : typeof errorData === "string"
-            ? decodeHtmlEntities(errorData)
-            : errorData;
+          ? decodeHtmlEntities(errorData)
+          : errorData;
 
       logger.error("Error applying coupon:", {
         couponCode,
@@ -269,8 +269,8 @@ export async function DELETE(req) {
         typeof errorData === "object" && errorData?.message
           ? decodeHtmlEntities(errorData.message)
           : typeof errorData === "string"
-            ? decodeHtmlEntities(errorData)
-            : errorData;
+          ? decodeHtmlEntities(errorData)
+          : errorData;
 
       logger.error("Error removing coupon:", {
         error: errorMessage,
@@ -283,7 +283,9 @@ export async function DELETE(req) {
         return NextResponse.json(
           {
             success: false,
-            error: error.response.data?.message || "Either authentication token or sessionId is required",
+            error:
+              error.response.data?.message ||
+              "Either authentication token or sessionId is required",
           },
           { status: 400 }
         );

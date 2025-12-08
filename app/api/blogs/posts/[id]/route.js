@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import axios from "axios";
 import { logger } from "@/utils/devLogger";
 
-const API_BASE_URL = process.env.ROCKY_BE_BASE_URL;
+const API_BASE_URL = process.env.BASE_URL;
 
 export async function GET(request, { params }) {
   try {
@@ -17,13 +17,16 @@ export async function GET(request, { params }) {
 
     logger.log("Fetching blog post with ID:", id);
 
-    const response = await axios.get(`${API_BASE_URL}/api/v1/blogs/posts/${id}`, {
-      headers: {
-        accept: "application/json",
-        "X-App-Key": process.env.NEXT_PUBLIC_APP_KEY,
-        "X-App-Secret": process.env.NEXT_PUBLIC_APP_SECRET,
-      },
-    });
+    const response = await axios.get(
+      `${API_BASE_URL}/api/v1/blogs/posts/${id}`,
+      {
+        headers: {
+          accept: "application/json",
+          "X-App-Key": process.env.NEXT_PUBLIC_APP_KEY,
+          "X-App-Secret": process.env.NEXT_PUBLIC_APP_SECRET,
+        },
+      }
+    );
 
     return NextResponse.json(response.data, {
       status: 200,
@@ -32,8 +35,11 @@ export async function GET(request, { params }) {
       },
     });
   } catch (error) {
-    logger.error("Error fetching blog post:", error.response?.data || error.message);
-    
+    logger.error(
+      "Error fetching blog post:",
+      error.response?.data || error.message
+    );
+
     if (error.response?.status === 404) {
       return NextResponse.json(
         { error: "Blog post not found" },
@@ -50,4 +56,3 @@ export async function GET(request, { params }) {
     );
   }
 }
-

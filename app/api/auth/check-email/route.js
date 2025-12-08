@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { logger } from "@/utils/devLogger";
 
-const BASE_URL = process.env.ROCKY_BE_BASE_URL;
+const BASE_URL = process.env.BASE_URL;
 
 export async function POST(request) {
   try {

@@ -3,7 +3,7 @@ import axios from "axios";
 import { cookies } from "next/headers";
 import { logger } from "@/utils/devLogger";
 
-const BASE_URL = process.env.ROCKY_BE_BASE_URL;
+const BASE_URL = process.env.BASE_URL;
 
 /**
  * POST /api/login
@@ -92,7 +92,10 @@ export async function POST(req) {
         cookieStore.set("userEmail", user.email);
         cookieStore.set("displayName", user.firstName);
         cookieStore.set("lastName", user.lastName || "");
-        cookieStore.set("userName", `${user.firstName} ${user.lastName || ""}`.trim());
+        cookieStore.set(
+          "userName",
+          `${user.firstName} ${user.lastName || ""}`.trim()
+        );
         if (user.avatar) {
           cookieStore.set("userAvatar", user.avatar);
         }

@@ -3,22 +3,22 @@ import axios from "axios";
 import { cookies } from "next/headers";
 import { logger } from "@/utils/devLogger";
 
-const BASE_URL = process.env.ROCKY_BE_BASE_URL;
+const BASE_URL = process.env.BASE_URL;
 
 /**
  * POST /api/cart/add-item
  * Add item to cart using the new API endpoint
- * 
+ *
  * AUTHENTICATED USER:
  * - Request Header: Authorization: Bearer <token>
  * - Request Body: { productId, variantId, quantity }
  * - sessionId is NOT included
- * 
+ *
  * GUEST USER:
  * - Request Header: No Authorization
  * - Request Body: { productId, variantId, quantity, sessionId }
  * - sessionId is REQUIRED
- * 
+ *
  * @param {string} productId - The main product ID (REQUIRED)
  * @param {string} variantId - The variant/variation ID (OPTIONAL, for variable products)
  * @param {number} quantity - Quantity to add (default: 1)
@@ -32,9 +32,9 @@ export async function POST(req) {
     const {
       productId,
       variationId, // Legacy parameter name (backward compatibility)
-      variantId,   // New parameter name (preferred)
+      variantId, // New parameter name (preferred)
       quantity = 1,
-      sessionId,   // From localStorage for guest users
+      sessionId, // From localStorage for guest users
     } = body;
 
     logger.log("Received payload from client:", JSON.stringify(body, null, 2));
@@ -73,8 +73,15 @@ export async function POST(req) {
       logger.log("   Token prefix:", clientAuthHeader.substring(0, 30) + "...");
     } else if (authTokenCookie) {
       logger.log("✅ Authorization from SERVER COOKIE (httpOnly)");
-      logger.log("   Token length:", authTokenCookie.value.length, "characters");
-      logger.log("   Token prefix:", authTokenCookie.value.substring(0, 30) + "...");
+      logger.log(
+        "   Token length:",
+        authTokenCookie.value.length,
+        "characters"
+      );
+      logger.log(
+        "   Token prefix:",
+        authTokenCookie.value.substring(0, 30) + "..."
+      );
     } else {
       logger.log("❌ No authorization found (guest user)");
     }
@@ -95,13 +102,17 @@ export async function POST(req) {
     if (finalVariantId && finalVariantId !== productId) {
       // Only add variantId if it's DIFFERENT from productId
       requestBody.variantId = finalVariantId;
-      logger.log(`Product has variant: productId=${productId}, variantId=${finalVariantId}`);
+      logger.log(
+        `Product has variant: productId=${productId}, variantId=${finalVariantId}`
+      );
     } else if (finalVariantId === productId) {
       // If variantId equals productId, it's a simple product with no variants
       logger.log(`Simple product (no variant): productId=${productId}`);
       // Do NOT add variantId to the request body
     } else {
-      logger.log(`Simple product (no variantId provided): productId=${productId}`);
+      logger.log(
+        `Simple product (no variantId provided): productId=${productId}`
+      );
     }
 
     // Prepare headers
@@ -118,7 +129,6 @@ export async function POST(req) {
       // Add FULL Authorization header with complete Bearer token
       // Token already contains "Bearer " prefix + full JWT token
       headers.Authorization = authToken;
-
     } else {
       // ✅ GUEST USER PATH
       // No Authorization header
@@ -135,7 +145,7 @@ export async function POST(req) {
         return NextResponse.json(
           {
             error: "Either authentication token or sessionId is required",
-            code: "AUTH_OR_SESSION_REQUIRED"
+            code: "AUTH_OR_SESSION_REQUIRED",
           },
           { status: 400 }
         );
@@ -152,15 +162,20 @@ export async function POST(req) {
       logger.log("✅ Authorization: Full Bearer token is being sent");
       logger.log("   Token length:", authToken.length, "chars");
       logger.log("   Token preview:", authToken.substring(0, 40) + "...");
-      logger.log("   Source:", clientAuthHeader ? "Client-side header" : "Server-side cookie");
+      logger.log(
+        "   Source:",
+        clientAuthHeader ? "Client-side header" : "Server-side cookie"
+      );
     } else {
       logger.log("❌ Authorization: None (guest user)");
     }
 
     logger.log("Headers being sent:", {
       "Content-Type": headers["Content-Type"],
-      "Authorization": headers.Authorization ? `Present (${headers.Authorization.length} chars)` : "None",
-      "accept": headers.accept
+      Authorization: headers.Authorization
+        ? `Present (${headers.Authorization.length} chars)`
+        : "None",
+      accept: headers.accept,
     });
 
     // Verify headers before sending
@@ -171,8 +186,14 @@ export async function POST(req) {
     logger.log("   - Authorization exists:", !!headers.Authorization);
     if (headers.Authorization) {
       logger.log("   - Authorization length:", headers.Authorization.length);
-      logger.log("   - Authorization starts with 'Bearer':", headers.Authorization.startsWith("Bearer"));
-      logger.log("   - First 50 chars:", headers.Authorization.substring(0, 50));
+      logger.log(
+        "   - Authorization starts with 'Bearer':",
+        headers.Authorization.startsWith("Bearer")
+      );
+      logger.log(
+        "   - First 50 chars:",
+        headers.Authorization.substring(0, 50)
+      );
     }
 
     // Prepare axios config
@@ -180,15 +201,24 @@ export async function POST(req) {
       headers: headers,
     };
 
-    logger.log("🔍 Axios config:", JSON.stringify({
-      url: `${BASE_URL}/api/v1/cart/items`,
-      method: "POST",
-      headers: {
-        ...headers,
-        Authorization: headers.Authorization ? headers.Authorization : undefined
-      },
-      data: requestBody
-    }, null, 2));
+    logger.log(
+      "🔍 Axios config:",
+      JSON.stringify(
+        {
+          url: `${BASE_URL}/api/v1/cart/items`,
+          method: "POST",
+          headers: {
+            ...headers,
+            Authorization: headers.Authorization
+              ? headers.Authorization
+              : undefined,
+          },
+          data: requestBody,
+        },
+        null,
+        2
+      )
+    );
 
     // Add item to cart using new API
     const response = await axios.post(
@@ -216,7 +246,10 @@ export async function POST(req) {
 
     // Handle specific error cases
     const statusCode = error.response?.status || 500;
-    const errorMessage = error.response?.data?.message || error.response?.data?.error || "Failed to add item to cart";
+    const errorMessage =
+      error.response?.data?.message ||
+      error.response?.data?.error ||
+      "Failed to add item to cart";
 
     return NextResponse.json(
       {

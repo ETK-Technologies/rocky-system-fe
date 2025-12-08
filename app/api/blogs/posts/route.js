@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import axios from "axios";
 import { logger } from "@/utils/devLogger";
 
-const API_BASE_URL = process.env.ROCKY_BE_BASE_URL;
+const API_BASE_URL = process.env.BASE_URL;
 
 export async function GET(request) {
   try {

@@ -3,7 +3,7 @@ import axios from "axios";
 import { cookies } from "next/headers";
 import { logger } from "@/utils/devLogger";
 
-const BASE_URL = process.env.ROCKY_BE_BASE_URL;
+const BASE_URL = process.env.BASE_URL;
 
 /**
  * POST /api/patient-portal-logout
@@ -68,7 +68,9 @@ export async function POST(req) {
       path: "/",
     });
 
-    logger.log("All cookies cleared and cache clear flag set for patient portal");
+    logger.log(
+      "All cookies cleared and cache clear flag set for patient portal"
+    );
 
     // Return success without redirect
     return NextResponse.json({ success: true });

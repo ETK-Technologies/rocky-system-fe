@@ -3,7 +3,7 @@ import axios from "axios";
 import { cookies } from "next/headers";
 import { logger } from "@/utils/devLogger";
 
-const ROCKY_BE_BASE_URL = process.env.ROCKY_BE_BASE_URL;
+const BASE_URL = process.env.BASE_URL;
 
 /**
  * POST /api/shipping/calculate-by-cart
@@ -36,7 +36,7 @@ export async function POST(req) {
     // Step 1: Get cart ID from the cart API
     logger.log("Fetching cart to get cart ID for shipping calculation...");
     const cartResponse = await axios.get(
-      `${ROCKY_BE_BASE_URL}/api/v1/cart`,
+      `${BASE_URL}/api/v1/cart`,
       {
         headers: {
           Authorization: authToken.value,
@@ -76,7 +76,7 @@ export async function POST(req) {
     logger.log("Calculating shipping with:", shippingRequestBody);
 
     const shippingResponse = await axios.post(
-      `${ROCKY_BE_BASE_URL}/api/v1/shipping/calculate-by-cart`,
+      `${BASE_URL}/api/v1/shipping/calculate-by-cart`,
       shippingRequestBody,
       {
         headers: {

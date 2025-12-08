@@ -3,7 +3,7 @@ import axios from "axios";
 import { logger } from "@/utils/devLogger";
 import { cookies } from "next/headers";
 
-const BASE_URL = process.env.ROCKY_BE_BASE_URL;
+const BASE_URL = process.env.BASE_URL;
 
 /**
  * POST /api/cart/merge
@@ -81,8 +81,8 @@ export async function POST(req) {
         typeof errorData === "object" && errorData?.message
           ? errorData.message
           : typeof errorData === "string"
-            ? errorData
-            : "Cart merge failed";
+          ? errorData
+          : "Cart merge failed";
 
       logger.error("Error merging cart:", {
         error: errorMessage,
@@ -133,4 +133,3 @@ export async function POST(req) {
     );
   }
 }
-

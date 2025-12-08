@@ -3,7 +3,7 @@
 import Loader from "@/components/Loader";
 import { logger } from "@/utils/devLogger";
 import CheckoutSkeleton from "@/components/ui/skeletons/CheckoutSkeleton";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import BillingAndShipping from "./BillingAndShipping";
 import CartAndPayment from "./CartAndPayment";
 import { toast } from "react-toastify";
@@ -38,7 +38,6 @@ import { Elements, useStripe } from "@stripe/react-stripe-js";
 import { loadStripe } from "@stripe/stripe-js";
 import { useAddressManager } from "@/lib/hooks/useAddressManager";
 import { debugAddressData } from "@/utils/addressDebugger";
-import { validateCart } from "@/lib/api/cartValidation";
 
 // Load Stripe outside component to avoid recreating on every render
 const stripePromise = loadStripe(
@@ -203,6 +202,12 @@ const CheckoutPageContent = () => {
   const [ageValidationFailed, setAgeValidationFailed] = useState(false);
   const [isUpdatingShipping, setIsUpdatingShipping] = useState(false);
 
+  // Cache profile data to avoid redundant API calls
+  const [cachedProfileData, setCachedProfileData] = useState(null);
+
+  // Debounce timer for shipping calculation
+  const shippingDebounceTimerRef = useRef(null);
+
   // Handle province change for real-time Quebec validation and shipping updates
   const handleProvinceChange = async (
     newProvince,
@@ -213,7 +218,10 @@ const CheckoutPageContent = () => {
     logger.log("newProvince:", newProvince);
     logger.log("addressType:", addressType);
     logger.log("shouldClearFields:", shouldClearFields);
-    logger.log("Current formData.billing_address.address_1:", formData.billing_address?.address_1);
+    logger.log(
+      "Current formData.billing_address.address_1:",
+      formData.billing_address?.address_1
+    );
     if (cartItems && cartItems.items) {
       // const restriction = checkQuebecZonnicRestriction(
       //   cartItems.items,
@@ -231,26 +239,15 @@ const CheckoutPageContent = () => {
         // First check form data (user might have changed date of birth)
         let dateOfBirthToCheck = formData.billing_address.date_of_birth;
 
-        // If no form data, fall back to profile API
-        if (!dateOfBirthToCheck) {
-          try {
-            const response = await fetch("/api/profile");
-            if (response.ok) {
-              const profileData = await response.json();
-              logger.log(
-                "Profile data for age validation (province change):",
-                profileData
-              );
-              if (profileData.success && profileData.date_of_birth) {
-                dateOfBirthToCheck = profileData.date_of_birth;
-              }
-            }
-          } catch (error) {
-            logger.log(
-              "Could not fetch user profile for age validation (province change):",
-              error
-            );
-          }
+        // If no form data, use cached profile data (avoid redundant API call)
+        if (!dateOfBirthToCheck && cachedProfileData) {
+          dateOfBirthToCheck =
+            cachedProfileData.date_of_birth ||
+            cachedProfileData.raw_profile_data?.custom_meta?.date_of_birth;
+          logger.log(
+            "Using cached profile data for age validation (province change):",
+            { dateOfBirth: dateOfBirthToCheck }
+          );
         }
 
         // Now validate the date of birth
@@ -284,145 +281,165 @@ const CheckoutPageContent = () => {
     }
 
     // Update shipping rates when province changes using the new backend API
-    try {
-      setIsUpdatingShipping(true);
+    // Debounce shipping calculation to avoid excessive API calls
+    if (shippingDebounceTimerRef.current) {
+      clearTimeout(shippingDebounceTimerRef.current);
+    }
 
-      // Get the country and postal code from the appropriate address
-      const country = addressType === "billing" 
-        ? formData.billing_address.country || "CA"
-        : formData.shipping_address.country || "CA";
-      
-      const postalCode = addressType === "billing"
-        ? formData.billing_address.postcode
-        : formData.shipping_address.postcode;
+    const debouncedShippingCalculation = async () => {
+      try {
+        setIsUpdatingShipping(true);
 
-      logger.log("Calculating shipping for province change:", {
-        country,
-        state: newProvince,
-        postalCode,
-        addressType,
-      });
+        // Get the country and postal code from the appropriate address
+        const country =
+          addressType === "billing"
+            ? formData.billing_address.country || "CA"
+            : formData.shipping_address.country || "CA";
 
-      // Call the new shipping calculation API
-      const response = await fetch("/api/shipping/calculate-by-cart", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
+        const postalCode =
+          addressType === "billing"
+            ? formData.billing_address.postcode
+            : formData.shipping_address.postcode;
+
+        logger.log("Calculating shipping for province change (debounced):", {
           country,
           state: newProvince,
-          postalCode: postalCode || "",
-        }),
-      });
+          postalCode,
+          addressType,
+        });
 
-      const result = await response.json();
-
-      if (response.ok && result.success) {
-        logger.log("Shipping options calculated:", result.shippingOptions);
-        
-        // Update cart state with new shipping options
-        // The backend returns shipping options in the format:
-        // [{ methodId, methodType, title, description, cost }]
-        
-        // Transform to cart format if needed
-        const shippingRates = result.shippingOptions.map((option) => ({
-          package_id: 0,
-          name: "Shipping",
-          destination: {
-            address_1: "",
-            address_2: "",
-            city: "",
-            state: newProvince,
-            postcode: postalCode || "",
-            country: country,
+        // Call the new shipping calculation API
+        const response = await fetch("/api/shipping/calculate-by-cart", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
           },
-          items: cartItems.items,
-          shipping_rates: [
-            {
-              rate_id: option.methodId,
-              name: option.title,
-              description: option.description || "",
-              delivery_time: "",
-              price: (option.cost * 100).toString(), // Convert to cents
-              taxes: "0",
-              instance_id: 0,
-              method_id: option.methodType || "flat_rate",
-              meta_data: [],
-              selected: true, // Select first option by default
+          body: JSON.stringify({
+            country,
+            state: newProvince,
+            postalCode: postalCode || "",
+          }),
+        });
+
+        const result = await response.json();
+
+        if (response.ok && result.success) {
+          logger.log("Shipping options calculated:", result.shippingOptions);
+
+          // Update cart state with new shipping options
+          // The backend returns shipping options in the format:
+          // [{ methodId, methodType, title, description, cost }]
+
+          // Transform to cart format if needed
+          const shippingRates = result.shippingOptions.map((option) => ({
+            package_id: 0,
+            name: "Shipping",
+            destination: {
+              address_1: "",
+              address_2: "",
+              city: "",
+              state: newProvince,
+              postcode: postalCode || "",
+              country: country,
             },
-          ],
-        }));
+            items: cartItems.items,
+            shipping_rates: [
+              {
+                rate_id: option.methodId,
+                name: option.title,
+                description: option.description || "",
+                delivery_time: "",
+                price: (option.cost * 100).toString(), // Convert to cents
+                taxes: "0",
+                instance_id: 0,
+                method_id: option.methodType || "flat_rate",
+                meta_data: [],
+                selected: true, // Select first option by default
+              },
+            ],
+          }));
 
-        setCartItems((prev) => ({
-          ...prev,
-          shipping_rates: shippingRates,
-        }));
+          setCartItems((prev) => ({
+            ...prev,
+            shipping_rates: shippingRates,
+          }));
 
-        logger.log("Cart updated with new shipping rates");
-      } else {
-        logger.error("Error calculating shipping:", result.error);
-        toast.error(result.error || "Failed to calculate shipping. Please try again.");
-      }
-
-      // Also update form data to sync UI only if we should clear fields
-      if (shouldClearFields) {
-        logger.log("Clearing address fields due to province change");
-
-        // IMPORTANT: Only clear fields if we're not in the middle of an address autocomplete selection
-        // Check if the current address looks like it was just populated (has meaningful data)
-        const hasRecentAddressData = formData.billing_address?.address_1 &&
-          formData.billing_address?.city &&
-          formData.billing_address?.postcode;
-
-        if (hasRecentAddressData) {
-          logger.log("🛡️ PREVENTING FIELD CLEARING - Recent address data detected!");
-          logger.log("🛡️ Keeping existing address data intact");
-          return; // Don't clear fields if we have recent address data
+          logger.log("Cart updated with new shipping rates");
+        } else {
+          logger.error("Error calculating shipping:", result.error);
+          toast.error(
+            result.error || "Failed to calculate shipping. Please try again."
+          );
         }
 
-        setFormData((prev) => ({
-          ...prev,
-          billing_address: {
-            ...prev.billing_address,
-            ...(addressType === "billing"
-              ? {
-                address_1: "",
-                address_2: "",
-                city: "",
-                postcode: "",
-              }
-              : {}),
-            state:
-              addressType === "billing"
-                ? newProvince
-                : prev.billing_address.state || newProvince,
-            country: country,
-          },
-          shipping_address: {
-            ...prev.shipping_address,
-            ...(addressType === "shipping"
-              ? {
-                address_1: "",
-                address_2: "",
-                city: "",
-                postcode: "",
-              }
-              : {}),
-            state:
-              addressType === "shipping"
-                ? newProvince
-                : prev.shipping_address.state || newProvince,
-            country: country,
-          },
-        }));
+        // Also update form data to sync UI only if we should clear fields
+        if (shouldClearFields) {
+          logger.log("Clearing address fields due to province change");
+
+          // IMPORTANT: Only clear fields if we're not in the middle of an address autocomplete selection
+          // Check if the current address looks like it was just populated (has meaningful data)
+          const hasRecentAddressData =
+            formData.billing_address?.address_1 &&
+            formData.billing_address?.city &&
+            formData.billing_address?.postcode;
+
+          if (hasRecentAddressData) {
+            logger.log(
+              "🛡️ PREVENTING FIELD CLEARING - Recent address data detected!"
+            );
+            logger.log("🛡️ Keeping existing address data intact");
+            return; // Don't clear fields if we have recent address data
+          }
+
+          setFormData((prev) => ({
+            ...prev,
+            billing_address: {
+              ...prev.billing_address,
+              ...(addressType === "billing"
+                ? {
+                    address_1: "",
+                    address_2: "",
+                    city: "",
+                    postcode: "",
+                  }
+                : {}),
+              state:
+                addressType === "billing"
+                  ? newProvince
+                  : prev.billing_address.state || newProvince,
+              country: country,
+            },
+            shipping_address: {
+              ...prev.shipping_address,
+              ...(addressType === "shipping"
+                ? {
+                    address_1: "",
+                    address_2: "",
+                    city: "",
+                    postcode: "",
+                  }
+                : {}),
+              state:
+                addressType === "shipping"
+                  ? newProvince
+                  : prev.shipping_address.state || newProvince,
+              country: country,
+            },
+          }));
+        }
+      } catch (error) {
+        logger.error("Error calculating shipping:", error);
+        toast.error("Failed to calculate shipping. Please try again.");
+      } finally {
+        setIsUpdatingShipping(false);
       }
-    } catch (error) {
-      logger.error("Error calculating shipping:", error);
-      toast.error("Failed to calculate shipping. Please try again.");
-    } finally {
-      setIsUpdatingShipping(false);
-    }
+    };
+
+    // Set debounce timer (400ms delay)
+    shippingDebounceTimerRef.current = setTimeout(
+      debouncedShippingCalculation,
+      400
+    );
   };
 
   // Function to check if cart contains Zonnic products
@@ -511,8 +528,9 @@ const CheckoutPageContent = () => {
               // Add the flowType=1 to the URL if not present
               const newParams = new URLSearchParams(window.location.search);
               newParams.set(match.flowType, "1");
-              const newUrl = `${window.location.pathname
-                }?${newParams.toString()}`;
+              const newUrl = `${
+                window.location.pathname
+              }?${newParams.toString()}`;
               window.history.replaceState({ path: newUrl }, "", newUrl);
               // Only add the first found flow, break
               break;
@@ -573,14 +591,16 @@ const CheckoutPageContent = () => {
         const updatedFormData = await populateAddressData(formData);
 
         // Use deep comparison to check if data actually changed
-        const hasChanges = JSON.stringify(updatedFormData) !== JSON.stringify(formData);
+        const hasChanges =
+          JSON.stringify(updatedFormData) !== JSON.stringify(formData);
 
         if (hasChanges) {
           logger.log("✅ FormData will be updated with address data:", {
             billing_address_1: updatedFormData.billing_address?.address_1,
             billing_city: updatedFormData.billing_address?.city,
             billing_postcode: updatedFormData.billing_address?.postcode,
-            billing_date_of_birth: updatedFormData.billing_address?.date_of_birth,
+            billing_date_of_birth:
+              updatedFormData.billing_address?.date_of_birth,
           });
           setFormData(updatedFormData);
 
@@ -599,61 +619,9 @@ const CheckoutPageContent = () => {
     }
   }, [cartItems, isProcessingUrlParams, isLoadingAddresses]);
 
-  // Function to fetch saved payment cards
-  const fetchSavedCards = async () => {
-    try {
-      setIsLoadingSavedCards(true);
-      logger.log("Fetching saved cards from API...");
-
-      // Explicitly wait for the fetch to complete
-      const res = await fetch("/api/payment-methods", {
-        method: "GET",
-        headers: {
-          "Cache-Control": "no-cache",
-          Pragma: "no-cache",
-        },
-      });
-
-      if (!res.ok) {
-        logger.error("API returned error status:", res.status);
-        throw new Error(`API error: ${res.status}`);
-      }
-
-      // Log the raw response
-      logger.log("API response status:", res.status);
-
-      // Parse the response
-      const data = await res.json();
-
-      logger.log("Saved cards API full response:", data);
-
-      if (
-        data.success &&
-        data.cards &&
-        Array.isArray(data.cards) &&
-        data.cards.length > 0
-      ) {
-        logger.log("Setting saved cards in state:", data.cards);
-        setSavedCards(data.cards);
-
-        // Set the default card as selected if available
-        const defaultCard = data.cards.find((card) => card.is_default);
-        if (defaultCard) {
-          logger.log("Setting default card as selected:", defaultCard);
-          // Store the card object to have access to both id and token
-          setSelectedCard(defaultCard);
-        }
-      } else {
-        logger.log("No saved cards found in API response or invalid format");
-        setSavedCards([]);
-      }
-    } catch (error) {
-      logger.error("Error fetching saved cards:", error);
-      setSavedCards([]);
-    } finally {
-      setIsLoadingSavedCards(false);
-    }
-  };
+  // Function to fetch saved payment cards - REMOVED
+  // Saved cards are no longer fetched to reduce API calls
+  // Users can still use saved cards if they're available from other sources
 
   // Function to fetch user profile data
   const fetchUserProfile = async () => {
@@ -714,8 +682,8 @@ const CheckoutPageContent = () => {
               prev.billing_address.last_name ||
               (storedUserName
                 ? decodeURIComponent(storedUserName)
-                  .replace(storedFirstName, "")
-                  .trim()
+                    .replace(storedFirstName, "")
+                    .trim()
                 : profileData.last_name || ""),
             email: prev.billing_address.email || profileData.email || "",
             phone: prev.billing_address.phone || profileData.phone || "",
@@ -762,8 +730,8 @@ const CheckoutPageContent = () => {
               prev.shipping_address.last_name ||
               (storedUserName
                 ? decodeURIComponent(storedUserName)
-                  .replace(storedFirstName, "")
-                  .trim()
+                    .replace(storedFirstName, "")
+                    .trim()
                 : profileData.last_name || ""),
             phone: prev.shipping_address.phone || profileData.phone || "",
             address_1:
@@ -828,6 +796,10 @@ const CheckoutPageContent = () => {
               "",
           };
         });
+
+        // Cache profile data to avoid redundant API calls
+        setCachedProfileData(profileData);
+        logger.log("Profile data cached for reuse");
       } else {
         logger.log("No user profile data available or user not logged in");
       }
@@ -861,26 +833,32 @@ const CheckoutPageContent = () => {
             const result = await processUrlCartParameters(searchParams);
 
             if (result.status === "success") {
-              // Refresh cart after adding products
-              // Don't update form data to avoid overwriting profile data
-              const updatedCart = await fetchCartItems(false); // false = don't update form
-              setCartItems(updatedCart);
+              // Refresh cart after adding products - reuse existing cart data structure
+              // Don't fetch cart again, just update items from the result if available
+              // This avoids redundant API call
+              if (cartData) {
+                // Update cart items from the processUrlCartParameters result
+                // The cart should already be updated by the backend, so we can refresh
+                // But we'll do it once after all URL processing is done
+                const updatedCart = await fetchCartItems(false); // false = don't update form
+                setCartItems(updatedCart);
+              }
               toast.success("Products added to your cart!");
 
               // Clean up URL parameters - use the detected flow type from result
               cleanupCartUrlParameters(
                 result.flowType ||
-                (isEdFlow
-                  ? "ed"
-                  : flowParams["hair-flow"]
+                  (isEdFlow
+                    ? "ed"
+                    : flowParams["hair-flow"]
                     ? "hair"
                     : flowParams["wl-flow"]
-                      ? "wl"
-                      : flowParams["mh-flow"]
-                        ? "mh"
-                        : flowParams["skincare-flow"]
-                          ? "skincare"
-                          : "general")
+                    ? "wl"
+                    : flowParams["mh-flow"]
+                    ? "mh"
+                    : flowParams["skincare-flow"]
+                    ? "skincare"
+                    : "general")
               );
             } else if (result.status === "error") {
               toast.error(result.message || "Failed to add products to cart.");
@@ -898,14 +876,15 @@ const CheckoutPageContent = () => {
 
         // STEP 3: Ensure address data is populated from all available sources
         logger.log("=== ENSURING ADDRESS DATA POPULATED ===");
-        const updatedFormDataWithAddresses = await populateAddressData(formData);
+        const updatedFormDataWithAddresses = await populateAddressData(
+          formData
+        );
         if (updatedFormDataWithAddresses !== formData) {
           setFormData(updatedFormDataWithAddresses);
         }
         logger.log("=== ADDRESS DATA CHECK COMPLETED ===");
 
-        // STEP 4: Load saved cards (doesn't affect form data)
-        await fetchSavedCards();
+        // STEP 4: Saved cards are no longer fetched - removed to reduce API calls
       } catch (error) {
         logger.error("Error loading checkout data:", error);
         toast.error(
@@ -915,6 +894,13 @@ const CheckoutPageContent = () => {
     };
 
     loadCheckoutData();
+
+    // Cleanup debounce timer on unmount
+    return () => {
+      if (shippingDebounceTimerRef.current) {
+        clearTimeout(shippingDebounceTimerRef.current);
+      }
+    };
   }, []);
 
   const handleSubmit = async () => {
@@ -938,92 +924,13 @@ const CheckoutPageContent = () => {
         logger.log("Form validation failed:", validationResult.errors);
         toast.error(
           validationResult.formattedMessage ||
-          "Please check your form data and try again."
+            "Please check your form data and try again."
         );
         setSubmitting(false);
         return;
       }
 
       logger.log("Form validation passed, proceeding with checkout");
-
-      // Validate cart before proceeding (stock availability, pricing, etc.)
-      try {
-        logger.log("Validating cart before checkout...");
-        // Only get sessionId if user is NOT authenticated
-        const { isAuthenticated } = await import("@/lib/cart/cartService");
-        const isAuth = isAuthenticated();
-        
-        let sessionId = null;
-        if (!isAuth) {
-        const { isAuthenticated } = await import("@/lib/cart/cartService");
-        const authenticated = isAuthenticated();
-        
-        // Only get sessionId if user is NOT authenticated
-        if (!authenticated) {
-          const { getSessionId } = await import("@/services/sessionService");
-          sessionId = getSessionId();
-        } else {
-          // Clear sessionId for authenticated users - don't send it
-          sessionId = null;
-        }
-      }
-      
-      // validateCart will check authentication and ignore sessionId if authenticated
-      const cartValidation = await validateCart(sessionId);
-        
-        if (!cartValidation.success || !cartValidation.valid) {
-          logger.error("Cart validation failed:", cartValidation);
-          
-          // Show detailed error message
-          let errorMessage = cartValidation.error || 
-                              cartValidation.message || 
-                              "Cart validation failed. Please check your cart and try again.";
-          
-          // If there are multiple errors, show them in a more readable format
-          if (cartValidation.errorList && cartValidation.errorList.length > 0) {
-            if (cartValidation.errorList.length === 1) {
-              // Single error - show it directly
-              toast.error(cartValidation.errorList[0], { autoClose: 7000 });
-            } else {
-              // Multiple errors - show a friendly summary
-              toast.error("Some items in your cart are currently unavailable. Please remove them to continue.", { autoClose: 5000 });
-              
-              // Show each specific error
-              cartValidation.errorList.forEach((err, idx) => {
-                setTimeout(() => toast.error(err, { autoClose: 6000 }), (idx + 1) * 200);
-              });
-              
-              // Log detailed errors for debugging
-              logger.warn("Cart validation errors:", cartValidation.errorList);
-            }
-          } else {
-            // No specific error list, show the general message
-            toast.error(errorMessage, { autoClose: 7000 });
-          }
-          
-          // If cart data is returned, update cart state (cart might have changed)
-          if (cartValidation.cart && setCartItems) {
-            logger.log("Updating cart with validated cart data");
-            setCartItems(cartValidation.cart);
-          }
-          
-          setSubmitting(false);
-          return;
-        }
-        
-        logger.log("Cart validation passed:", cartValidation.message);
-        
-        // Update cart state with validated cart data if available (ensures latest state)
-        if (cartValidation.cart && setCartItems) {
-          logger.log("Updating cart with validated cart data");
-          setCartItems(cartValidation.cart);
-        }
-      } catch (cartValidationError) {
-        logger.error("Error validating cart:", cartValidationError);
-        toast.error("Failed to validate cart. Please try again.");
-        setSubmitting(false);
-        return;
-      }
 
       // Check if age validation has previously failed and prevent order
       if (ageValidationFailed) {
@@ -1052,26 +959,18 @@ const CheckoutPageContent = () => {
 
         // Check age restriction for Zonnic products
         if (hasZonnicProducts(cartItems.items)) {
-          // First check form data (user might have changed date of birth)
+          // Check form data for date of birth (user might have changed it)
           let dateOfBirthToCheck = formData.billing_address.date_of_birth;
 
-          // If no form data, fall back to profile API
-          if (!dateOfBirthToCheck) {
-            try {
-              const response = await fetch("/api/profile");
-              if (response.ok) {
-                const profileData = await response.json();
-                logger.log("Profile data for age validation:", profileData);
-                if (profileData.success && profileData.date_of_birth) {
-                  dateOfBirthToCheck = profileData.date_of_birth;
-                }
-              }
-            } catch (error) {
-              logger.log(
-                "Could not fetch user profile for age validation:",
-                error
-              );
-            }
+          // If no form data, use cached profile data (avoid redundant API call)
+          if (!dateOfBirthToCheck && cachedProfileData) {
+            dateOfBirthToCheck =
+              cachedProfileData.date_of_birth ||
+              cachedProfileData.raw_profile_data?.custom_meta?.date_of_birth;
+            logger.log(
+              "Using cached profile data for age validation (before checkout):",
+              { dateOfBirth: dateOfBirthToCheck }
+            );
           }
 
           // Now validate the date of birth
@@ -1090,7 +989,8 @@ const CheckoutPageContent = () => {
               setAgeValidationFailed(false);
             }
           } else {
-            logger.log("No date of birth found in form or profile data");
+            logger.log("No date of birth found in form data");
+            // If no DOB in form, we can't validate - let backend handle it
           }
         }
       }
@@ -1157,8 +1057,8 @@ const CheckoutPageContent = () => {
         cardType: selectedCard
           ? ""
           : formData.payment_data.find(
-            (d) => d.key === "wc-bambora-credit-card-card-type"
-          )?.value,
+              (d) => d.key === "wc-bambora-credit-card-card-type"
+            )?.value,
         cardExpMonth: selectedCard ? "" : expiry.slice(0, 2),
         cardExpYear: selectedCard ? "" : expiry.slice(3),
         cardCVD: selectedCard ? "" : cvc,
@@ -1176,8 +1076,8 @@ const CheckoutPageContent = () => {
           cartItems.totals && cartItems.totals.total_price
             ? parseFloat(cartItems.totals.total_price) / 100
             : cartItems.totals && cartItems.totals.total
-              ? parseFloat(cartItems.totals.total.replace(/[^0-9.]/g, ""))
-              : 0,
+            ? parseFloat(cartItems.totals.total.replace(/[^0-9.]/g, ""))
+            : 0,
 
         // ED Flow parameter
         isEdFlow: isEdFlow,
@@ -1243,11 +1143,20 @@ const CheckoutPageContent = () => {
           const { order, payment } = checkoutResult;
           const orderId = order.id;
           const orderNumber = order.orderNumber;
-          logger.log("✅ Order created with saved card:", { orderId, orderNumber });
+          logger.log("✅ Order created with saved card:", {
+            orderId,
+            orderNumber,
+          });
 
           // Handle FREE orders (100% discount, total is $0)
-          if (!payment || order.totalAmount === 0 || order.totalAmount === "0.00") {
-            logger.log("✅ FREE ORDER detected (100% discount applied) - saved card flow");
+          if (
+            !payment ||
+            order.totalAmount === 0 ||
+            order.totalAmount === "0.00"
+          ) {
+            logger.log(
+              "✅ FREE ORDER detected (100% discount applied) - saved card flow"
+            );
 
             logger.log("✅ Free order completed successfully");
             toast.success("Order placed successfully!");
@@ -1270,9 +1179,12 @@ const CheckoutPageContent = () => {
 
           // For saved cards, the backend should have already processed the payment
           // Check payment status
-          if (payment.status === 'succeeded' || payment.status === 'processing') {
+          if (
+            payment.status === "succeeded" ||
+            payment.status === "processing"
+          ) {
             toast.success("Payment successful!");
-            
+
             // Empty cart
             try {
               const { emptyCart } = await import("@/lib/cart/cartService");
@@ -1303,7 +1215,9 @@ const CheckoutPageContent = () => {
       // For NEW CARD payments with Stripe Elements (embedded in form)
       if (!selectedCard && dataToSend.useStripe) {
         try {
-          logger.log("Processing Stripe Elements payment with new backend API...");
+          logger.log(
+            "Processing Stripe Elements payment with new backend API..."
+          );
 
           // Step 1: Create order and get payment intent from new backend API
           logger.log("Creating order via new checkout API...");
@@ -1325,7 +1239,11 @@ const CheckoutPageContent = () => {
           logger.log("✅ Order created:", { orderId, orderNumber });
 
           // Handle FREE orders (100% discount, total is $0)
-          if (!payment || order.totalAmount === 0 || order.totalAmount === "0.00") {
+          if (
+            !payment ||
+            order.totalAmount === 0 ||
+            order.totalAmount === "0.00"
+          ) {
             logger.log("✅ FREE ORDER detected (100% discount applied)");
 
             logger.log("✅ Free order completed successfully");
@@ -1369,14 +1287,17 @@ const CheckoutPageContent = () => {
 
           // Step 3: Confirm payment with Stripe using the payment intent from backend
           logger.log("Confirming payment with Stripe...");
-          const { error: confirmError, paymentIntent } = await stripe.confirmPayment({
-            elements: stripeElements,
-            clientSecret: payment.clientSecret,
-            confirmParams: {
-              return_url: `${window.location.origin}/checkout/order-received/${orderId}?key=${orderNumber}${buildFlowQueryString()}`,
-            },
-            redirect: 'if_required', // Only redirect if 3D Secure is required
-          });
+          const { error: confirmError, paymentIntent } =
+            await stripe.confirmPayment({
+              elements: stripeElements,
+              clientSecret: payment.clientSecret,
+              confirmParams: {
+                return_url: `${
+                  window.location.origin
+                }/checkout/order-received/${orderId}?key=${orderNumber}${buildFlowQueryString()}`,
+              },
+              redirect: "if_required", // Only redirect if 3D Secure is required
+            });
 
           if (confirmError) {
             throw new Error(confirmError.message);
@@ -1392,9 +1313,12 @@ const CheckoutPageContent = () => {
           });
 
           // Check payment status
-          if (paymentIntent.status === 'succeeded' || paymentIntent.status === 'processing') {
+          if (
+            paymentIntent.status === "succeeded" ||
+            paymentIntent.status === "processing"
+          ) {
             toast.success("Payment successful!");
-            
+
             // Empty cart
             try {
               const { emptyCart } = await import("@/lib/cart/cartService");
@@ -1409,7 +1333,7 @@ const CheckoutPageContent = () => {
               `/checkout/order-received/${orderId}?key=${orderNumber}${buildFlowQueryString()}`
             );
             return;
-          } else if (paymentIntent.status === 'requires_action') {
+          } else if (paymentIntent.status === "requires_action") {
             // 3D Secure required - Stripe will handle redirect
             logger.log("3D Secure authentication required");
             return;

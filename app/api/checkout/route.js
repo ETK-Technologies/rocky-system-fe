@@ -4,17 +4,21 @@ import { logger } from "@/utils/devLogger";
 /**
  * @deprecated This endpoint uses WordPress/WooCommerce APIs.
  * Use /api/checkout-new instead, which uses the new backend API.
- * 
+ *
  * This endpoint is kept for backward compatibility but should not be used for new implementations.
  */
 export async function POST(req) {
-  logger.warn("⚠️ DEPRECATED: /api/checkout endpoint called. Use /api/checkout-new instead.");
-  
+  logger.warn(
+    "⚠️ DEPRECATED: /api/checkout endpoint called. Use /api/checkout-new instead."
+  );
+
   return NextResponse.json(
     {
       success: false,
-      error: "This endpoint is deprecated. Please use /api/checkout-new instead.",
-      message: "The checkout endpoint has been migrated to use the new backend API. Please update your frontend code to use /api/checkout-new.",
+      error:
+        "This endpoint is deprecated. Please use /api/checkout-new instead.",
+      message:
+        "The checkout endpoint has been migrated to use the new backend API. Please update your frontend code to use /api/checkout-new.",
     },
     { status: 410 } // 410 Gone - indicates the resource is no longer available
   );
@@ -156,8 +160,8 @@ export async function POST_OLD(req) {
       const { searchParams } = new URL(req.url);
       const sessionId = searchParams.get("sessionId");
       
-      const ROCKY_BE_BASE_URL = process.env.ROCKY_BE_BASE_URL;
-      let validateUrl = `${ROCKY_BE_BASE_URL}/api/v1/cart/validate`;
+      const BASE_URL = process.env.BASE_URL;
+      let validateUrl = `${BASE_URL}/api/v1/cart/validate`;
       const useSessionId = !encodedCredentials && sessionId;
       
       if (useSessionId) {

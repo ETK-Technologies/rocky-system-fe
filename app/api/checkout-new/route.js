@@ -3,7 +3,7 @@ import axios from "axios";
 import { cookies } from "next/headers";
 import { logger } from "@/utils/devLogger";
 
-const ROCKY_BE_BASE_URL = process.env.ROCKY_BE_BASE_URL;
+const BASE_URL = process.env.BASE_URL;
 
 /**
  * POST /api/checkout-new
@@ -57,7 +57,7 @@ export async function POST(req) {
     // The cart API returns cart data, but we need to check if cart exists
     logger.log("Fetching cart to get cart ID...");
     const cartResponse = await axios.get(
-      `${ROCKY_BE_BASE_URL}/api/v1/cart`,
+      `${BASE_URL}/api/v1/cart`,
       {
         headers: {
           Authorization: authToken.value,
@@ -91,7 +91,7 @@ export async function POST(req) {
     try {
       logger.log("Validating cart before checkout...");
       await axios.post(
-        `${ROCKY_BE_BASE_URL}/api/v1/cart/validate`,
+        `${BASE_URL}/api/v1/cart/validate`,
         { cartId },
         {
           headers: {
@@ -196,7 +196,7 @@ export async function POST(req) {
 
     // Step 5: Create order via POST /api/v1/orders
     const orderResponse = await axios.post(
-      `${ROCKY_BE_BASE_URL}/api/v1/orders`,
+      `${BASE_URL}/api/v1/orders`,
       checkoutRequestBody,
       {
         headers: {
