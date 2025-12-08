@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { logger } from "@/utils/devLogger";
-import { api as wooApi } from "@/lib/woocommerce";
+import axios from "axios";
 
 /**
  * Automatic Northbeam Order Retry Cron Job
@@ -9,7 +9,7 @@ import { api as wooApi } from "@/lib/woocommerce";
  * retry sending orders to Northbeam that may have failed.
  * 
  * Strategy:
- * - Queries recent WooCommerce orders (last 2 hours)
+ * - Queries recent orders from new backend API (last 2 hours)
  * - Filters for completed/processing orders (orders we care about tracking)
  * - Attempts to send them to Northbeam via backfill endpoint
  * - Northbeam will deduplicate if order was already received
@@ -63,90 +63,124 @@ export async function POST(req) {
 
     logger.log(`[NB Auto-Retry] Looking for orders after ${afterDate.toISOString()}`);
 
-    // Query WooCommerce for recent orders
+    // Query new backend API for recent orders
     // Filter for orders that should be tracked in Northbeam
-    const { data: orders } = await wooApi.get("orders", {
-      after: afterDate.toISOString(),
-      status: ["processing", "completed"], // Only retry orders we care about
-      per_page: maxOrdersToRetry,
-      orderby: "date",
-      order: "desc",
-    });
-
-    if (!orders || orders.length === 0) {
-      logger.log("[NB Auto-Retry] No recent orders found to retry");
-      return NextResponse.json({
-        success: true,
-        message: "No orders to retry",
-        orderCount: 0,
-        lookbackMinutes,
-      });
-    }
-
-    logger.log(`[NB Auto-Retry] Found ${orders.length} orders to attempt retry`);
-
-    // Extract order IDs
-    const orderIds = orders.map((order) => order.id);
-
-    // Build URL for internal backfill endpoint
-    let origin;
-    try {
-      origin = new URL(req.url).origin;
-    } catch (_) {
-      origin =
-        process.env.NEXT_PUBLIC_SITE_URL ||
-        process.env.SITE_URL ||
-        "http://localhost:3000";
-    }
-
-    // Call the backfill endpoint (which handles deduplication and formatting)
-    const backfillUrl = `${origin}/api/northbeam/backfill`;
+    const BASE_URL = process.env.BASE_URL;
     
-    logger.log(`[NB Auto-Retry] Calling backfill endpoint with ${orderIds.length} orders`);
-    
-    const backfillResponse = await fetch(backfillUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        order_ids: orderIds,
-        dry_run: false,
-      }),
-    });
-
-    if (!backfillResponse.ok) {
-      const errorText = await backfillResponse.text();
-      throw new Error(
-        `Backfill failed: ${backfillResponse.status} ${errorText}`
+    if (!BASE_URL) {
+      logger.error("[NB Auto-Retry] BASE_URL not configured");
+      return NextResponse.json(
+        { error: "Backend configuration missing" },
+        { status: 500 }
       );
     }
 
-    const backfillResult = await backfillResponse.json();
-    
-    const duration = Date.now() - startTime;
-    
-    logger.log(
-      `[NB Auto-Retry] ✅ Completed in ${duration}ms:`,
-      `${backfillResult.totals?.ok || 0} succeeded,`,
-      `${backfillResult.totals?.failed || 0} failed`
-    );
+    try {
+      // Query orders from new backend API
+      // Note: This assumes the backend has an orders list endpoint
+      // Adjust the endpoint and parameters based on your actual backend API
+      const ordersResponse = await axios.get(`${BASE_URL}/api/v1/orders`, {
+        params: {
+          after: afterDate.toISOString(),
+          status: ["PROCESSING", "COMPLETED", "PENDING"], // Map to new backend statuses
+          limit: maxOrdersToRetry,
+          sortBy: "createdAt",
+          sortOrder: "desc",
+        },
+        headers: {
+          accept: "application/json",
+          "X-App-Key": process.env.NEXT_PUBLIC_APP_KEY,
+          "X-App-Secret": process.env.NEXT_PUBLIC_APP_SECRET,
+        },
+      });
 
-    return NextResponse.json({
-      success: true,
-      message: "Auto-retry completed",
-      duration: `${duration}ms`,
-      lookbackMinutes,
-      ordersAttempted: orderIds.length,
-      results: {
-        succeeded: backfillResult.totals?.ok || 0,
-        failed: backfillResult.totals?.failed || 0,
-      },
-      // Include failed order IDs for monitoring
-      failedOrderIds: backfillResult.results
-        ?.filter((r) => r.status === "failed" || r.status === "error")
-        .map((r) => r.id) || [],
-    });
+      const orders = ordersResponse.data?.data || ordersResponse.data?.orders || [];
+      
+      if (!orders || orders.length === 0) {
+        logger.log("[NB Auto-Retry] No recent orders found to retry");
+        return NextResponse.json({
+          success: true,
+          message: "No orders to retry",
+          orderCount: 0,
+          lookbackMinutes,
+        });
+      }
+
+      logger.log(`[NB Auto-Retry] Found ${orders.length} orders to attempt retry`);
+
+      // Extract order IDs (new backend may use different field names)
+      const orderIds = orders.map((order) => order.id || order.orderId || order.orderNumber).filter(Boolean);
+
+      // Build URL for internal backfill endpoint
+      let origin;
+      try {
+        origin = new URL(req.url).origin;
+      } catch (_) {
+        origin =
+          process.env.NEXT_PUBLIC_SITE_URL ||
+          process.env.SITE_URL ||
+          "http://localhost:3000";
+      }
+
+      // Call the backfill endpoint (which handles deduplication and formatting)
+      const backfillUrl = `${origin}/api/northbeam/backfill`;
+      
+      logger.log(`[NB Auto-Retry] Calling backfill endpoint with ${orderIds.length} orders`);
+      
+      const backfillResponse = await fetch(backfillUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          order_ids: orderIds,
+          dry_run: false,
+        }),
+      });
+
+      if (!backfillResponse.ok) {
+        const errorText = await backfillResponse.text();
+        throw new Error(
+          `Backfill failed: ${backfillResponse.status} ${errorText}`
+        );
+      }
+
+      const backfillResult = await backfillResponse.json();
+      
+      const duration = Date.now() - startTime;
+      
+      logger.log(
+        `[NB Auto-Retry] ✅ Completed in ${duration}ms:`,
+        `${backfillResult.totals?.ok || 0} succeeded,`,
+        `${backfillResult.totals?.failed || 0} failed`
+      );
+
+      return NextResponse.json({
+        success: true,
+        message: "Auto-retry completed",
+        duration: `${duration}ms`,
+        lookbackMinutes,
+        ordersAttempted: orderIds.length,
+        results: {
+          succeeded: backfillResult.totals?.ok || 0,
+          failed: backfillResult.totals?.failed || 0,
+        },
+        // Include failed order IDs for monitoring
+        failedOrderIds: backfillResult.results
+          ?.filter((r) => r.status === "failed" || r.status === "error")
+          .map((r) => r.id) || [],
+      });
+    } catch (fetchError) {
+      logger.error("[NB Auto-Retry] Error fetching orders from backend:", fetchError);
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Failed to fetch orders from backend",
+          details: fetchError.message,
+        },
+        { status: 500 }
+      );
+    }
   } catch (error) {
     const duration = Date.now() - startTime;
     logger.error("[NB Auto-Retry] Error during auto-retry:", error);

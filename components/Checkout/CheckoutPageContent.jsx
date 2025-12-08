@@ -38,6 +38,7 @@ import { Elements, useStripe } from "@stripe/react-stripe-js";
 import { loadStripe } from "@stripe/stripe-js";
 import { useAddressManager } from "@/lib/hooks/useAddressManager";
 import { debugAddressData } from "@/utils/addressDebugger";
+import { getCurrencyLowerCase } from "@/lib/constants/currency";
 
 // Load Stripe outside component to avoid recreating on every render
 const stripePromise = loadStripe(
@@ -52,7 +53,7 @@ const CheckoutPageWrapper = () => {
       options={{
         mode: "payment", // Setup mode for Payment Element
         amount: 1000, // Default amount, will be updated
-        currency: "usd",
+        currency: getCurrencyLowerCase(),
         appearance: {
           theme: "stripe",
         },
@@ -1330,7 +1331,8 @@ const CheckoutPageContent = () => {
           // Check payment status
           if (
             paymentIntent.status === "succeeded" ||
-            paymentIntent.status === "processing"
+            paymentIntent.status === "processing" ||
+            paymentIntent.status === "requires_capture"
           ) {
             toast.success("Payment successful!");
 

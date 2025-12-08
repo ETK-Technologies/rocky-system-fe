@@ -278,7 +278,7 @@
           {
             "key": "javascript",
             "type": "TEMPLATE",
-            "value": "function() {\n  return {{DLV – ecommerce.currency}} || 'CAD';\n}"
+            "value": "function() {\n  return {{DLV – ecommerce.currency}} || (typeof window !== 'undefined' && window.__NEXT_DATA__?.env?.NEXT_PUBLIC_CURRENCY) || 'CAD';\n}"
           }
         ]
       },

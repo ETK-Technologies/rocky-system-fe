@@ -22,15 +22,38 @@ export async function GET(req) {
       );
     }
 
-    const response = await axios.get(
-      `${BASE_URL}/wp-json/wc/v3/orders/${order_id}?consumer_key=${process.env.CONSUMER_KEY}&consumer_secret=${process.env.CONSUMER_SECRET}`,
-      {
-        headers: {
-          Authorization: `${encodedCredentials.value}`,
-          nonce: cookieStore.get("cart-nonce")?.value,
-        },
+    // Try by ID first, then by order number if needed
+    let response;
+    try {
+      response = await axios.get(
+        `${BASE_URL}/api/v1/orders/${order_id}`,
+        {
+          headers: {
+            Authorization: `${encodedCredentials.value}`,
+            accept: "application/json",
+            "X-App-Key": process.env.NEXT_PUBLIC_APP_KEY,
+            "X-App-Secret": process.env.NEXT_PUBLIC_APP_SECRET,
+          },
+        }
+      );
+    } catch (error) {
+      // If not found by ID, try by order number
+      if (error.response?.status === 404 && order_key) {
+        response = await axios.get(
+          `${BASE_URL}/api/v1/orders/order-number/${order_key}`,
+          {
+            headers: {
+              Authorization: `${encodedCredentials.value}`,
+              accept: "application/json",
+              "X-App-Key": process.env.NEXT_PUBLIC_APP_KEY,
+              "X-App-Secret": process.env.NEXT_PUBLIC_APP_SECRET,
+            },
+          }
+        );
+      } else {
+        throw error;
       }
-    );
+    }
 
     return NextResponse.json(response.data);
   } catch (error) {

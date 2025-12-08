@@ -17,6 +17,7 @@ import {
   isAuthenticated as checkIsAuthenticated,
 } from "@/lib/cart/cartService";
 import { refreshCartNonceClient } from "./nonceManager";
+import { getCurrency } from "@/lib/constants/currency";
 
 /**
  * Add products directly to cart for any flow type
@@ -237,7 +238,7 @@ function formatCartDataForDisplay(cartServiceData) {
     totals: {
       total_items: (cartServiceData.total_price || 0).toString(),
       total_price: (cartServiceData.total_price || 0).toString(),
-      currency_code: "CAD",
+      currency_code: getCurrency(),
       currency_symbol: "$",
       currency_minor_unit: 2,
       currency_decimal_separator: ".",

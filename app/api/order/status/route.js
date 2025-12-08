@@ -25,24 +25,50 @@ export async function GET(req) {
       );
     }
 
-    // Get order status from WooCommerce
-    const response = await axios.get(
-      `${BASE_URL}/wp-json/wc/v3/orders/${order_id}?consumer_key=${process.env.CONSUMER_KEY}&consumer_secret=${process.env.CONSUMER_SECRET}`,
-      {
-        headers: {
-          Authorization: `${authToken.value}`,
-        },
+    // Get order status from new backend API
+    // Try by ID first, then by order number if needed
+    let response;
+    try {
+      response = await axios.get(
+        `${BASE_URL}/api/v1/orders/${order_id}`,
+        {
+          headers: {
+            Authorization: `${authToken.value}`,
+            accept: "application/json",
+            "X-App-Key": process.env.NEXT_PUBLIC_APP_KEY,
+            "X-App-Secret": process.env.NEXT_PUBLIC_APP_SECRET,
+          },
+        }
+      );
+    } catch (error) {
+      // If not found by ID, try by order number
+      if (error.response?.status === 404) {
+        response = await axios.get(
+          `${BASE_URL}/api/v1/orders/order-number/${order_id}`,
+          {
+            headers: {
+              Authorization: `${authToken.value}`,
+              accept: "application/json",
+              "X-App-Key": process.env.NEXT_PUBLIC_APP_KEY,
+              "X-App-Secret": process.env.NEXT_PUBLIC_APP_SECRET,
+            },
+          }
+        );
+      } else {
+        throw error;
       }
-    );
+    }
 
-    // Return just the necessary status information
+    const order = response.data;
+
+    // Return just the necessary status information (mapped from new backend format)
     return NextResponse.json({
       success: true,
-      id: response.data.id,
-      status: response.data.status,
-      payment_method: response.data.payment_method,
-      transaction_id: response.data.transaction_id,
-      total: response.data.total,
+      id: order.id || order.orderId,
+      status: order.status || order.orderStatus,
+      payment_method: order.paymentMethod || order.payment?.method,
+      transaction_id: order.transactionId || order.payment?.transactionId,
+      total: order.totalAmount || order.total,
     });
   } catch (error) {
     logger.error(

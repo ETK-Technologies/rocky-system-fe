@@ -37,6 +37,7 @@ import Payment from "./Payment";
 import Trustpilot from "@/components/Navbar/Trustpilot";
 import { Elements, useStripe } from "@stripe/react-stripe-js";
 import { loadStripe } from "@stripe/stripe-js";
+import { getCurrencyLowerCase } from "@/lib/constants/currency";
 
 // Load Stripe outside component to avoid recreating on every render
 const stripePromise = loadStripe(
@@ -51,7 +52,7 @@ const CheckoutPageWrapper = () => {
       options={{
         mode: "payment",
         amount: 1000,
-        currency: "usd",
+        currency: getCurrencyLowerCase(),
         appearance: {
           theme: "stripe",
         },
@@ -1460,7 +1461,7 @@ const CheckoutPageContent = () => {
               cardExpYear: "20" + expiry.slice(3),
               cardCvc: cvc,
               amount: Math.round(parseFloat(dataToSend.totalAmount) * 100), // Convert to cents
-              currency: "usd",
+              currency: getCurrencyLowerCase(),
               description: `Order #${orderId}`,
               customerEmail: dataToSend.email,
               customerName: `${dataToSend.firstName} ${dataToSend.lastName}`,

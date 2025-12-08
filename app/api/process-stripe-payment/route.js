@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import Stripe from "stripe";
 import { logger } from "@/utils/devLogger";
+import { getCurrencyLowerCase } from "@/lib/constants/currency";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
@@ -12,7 +13,7 @@ export async function POST(req) {
       orderId,
       paymentMethodId, // From Stripe Elements
       amount, // Amount in cents
-      currency = "usd",
+      currency = getCurrencyLowerCase(),
       metadata = {},
     } = requestData;
 

@@ -14,6 +14,7 @@ import {
 import { trackNorthbeamPurchase } from "@/utils/northbeamEvents";
 import { hashEmail, hashPhone } from "./hash";
 import { mapOrderToEcommerce } from "./mappers";
+import { getCurrency } from "@/lib/constants/currency";
 
 const hasWindow = () => typeof window !== "undefined";
 
@@ -67,7 +68,7 @@ export const analyticsService = {
     try {
       const item = formatGA4Item(product, quantity);
       const ecommerce = {
-        currency: "CAD",
+        currency: getCurrency(),
         value:
           (parseFloat(item.price) || 0) * (parseInt(item.quantity, 10) || 1),
         items: [item],
@@ -92,7 +93,7 @@ export const analyticsService = {
     try {
       const item = formatGA4Item(product);
       const ecommerce = {
-        currency: "CAD",
+        currency: getCurrency(),
         value: item.price,
         items: [item],
       };
@@ -117,7 +118,7 @@ export const analyticsService = {
     try {
       const item = formatGA4Item(product, quantity);
       const ecommerce = {
-        currency: "CAD",
+        currency: getCurrency(),
         value: item.price * quantity,
         items: [item],
       };
@@ -148,7 +149,7 @@ export const analyticsService = {
         0
       );
       const ecommerce = {
-        currency: "CAD",
+        currency: getCurrency(),
         value,
         items,
       };
@@ -174,7 +175,7 @@ export const analyticsService = {
         0
       );
       const ecommerce = {
-        currency: "CAD",
+        currency: getCurrency(),
         value,
         items,
       };
@@ -213,7 +214,9 @@ export const analyticsService = {
         order?.date_created,
       ];
       let chosen = candidates.find((d) => Number.isFinite(Date.parse(d)));
-      let chosenMs = Number.isFinite(Date.parse(chosen)) ? Date.parse(chosen) : approximateNow;
+      let chosenMs = Number.isFinite(Date.parse(chosen))
+        ? Date.parse(chosen)
+        : approximateNow;
       // Clamp to near-now if skew is beyond 2h (prevents stale WP dates)
       if (Math.abs(approximateNow - chosenMs) > 2 * 60 * 60 * 1000) {
         chosenMs = approximateNow;
@@ -223,19 +226,25 @@ export const analyticsService = {
       // Establish a canonical customer_id aligned with WP/WC and Northbeam
       // Prefer Woo user id, then email, then phone. For email/phone, prefer Northbeam schema
       const rawCustomerId = order?.customer_id;
-      const nbEmail = (order?.customer_email || '').toString().trim().toLowerCase();
-      const wcEmail = (order?.billing?.email || '').toString().trim().toLowerCase();
+      const nbEmail = (order?.customer_email || "")
+        .toString()
+        .trim()
+        .toLowerCase();
+      const wcEmail = (order?.billing?.email || "")
+        .toString()
+        .trim()
+        .toLowerCase();
       const chosenEmail = nbEmail || wcEmail;
-      const nbPhone = (order?.customer_phone_number || '').toString();
-      const wcPhone = (order?.billing?.phone || '').toString();
+      const nbPhone = (order?.customer_phone_number || "").toString();
+      const wcPhone = (order?.billing?.phone || "").toString();
       const chosenPhone = nbPhone || wcPhone;
-      let canonicalCustomerId = '';
+      let canonicalCustomerId = "";
       if (rawCustomerId && Number(rawCustomerId) > 0) {
         canonicalCustomerId = `wc:${String(rawCustomerId)}`;
       } else if (chosenEmail) {
         canonicalCustomerId = `email:${chosenEmail}`;
       } else if (chosenPhone) {
-        const digits = chosenPhone.replace(/\D+/g, '');
+        const digits = chosenPhone.replace(/\D+/g, "");
         if (digits) canonicalCustomerId = `phone:${digits}`;
       }
 

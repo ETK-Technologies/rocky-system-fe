@@ -1,5 +1,6 @@
 import { formatGA4Item } from "@/utils/ga4Events";
 import { logger } from "@/utils/devLogger";
+import { getCurrency } from "@/lib/constants/currency";
 
 /**
  * Fetch product details (client-side) to enrich GA4 items with categories/attributes
@@ -67,7 +68,7 @@ export const mapOrderToEcommerce = async (order) => {
     value: parseFloat(order?.total) || 0,
     tax: parseFloat(order?.total_tax) || 0,
     shipping: parseFloat(order?.shipping_total) || 0,
-    currency: order?.currency || "CAD",
+    currency: order?.currency || getCurrency(),
     coupon: order?.coupon_lines?.map((c) => c.code).join(", ") || "",
     payment_type: order?.payment_method_title || "Visa",
     shipping_tier: order?.shipping_lines?.[0]?.method_title || "Express",

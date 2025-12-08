@@ -1,4 +1,5 @@
 import { logger } from "@/utils/devLogger";
+import { getCurrency } from "@/lib/constants/currency";
 
 /**
  * TikTok Events Utility
@@ -60,7 +61,7 @@ export const formatTikTokEventData = (product, quantity = 1) => {
     quantity: quantity,
     price: price,
     value: value,
-    currency: "CAD",
+    currency: getCurrency(),
     description: product.short_description || product.name || "",
   };
 };
@@ -116,7 +117,7 @@ export const trackTikTokInitiateCheckout = (
     content_ids: content_ids,
     quantity: totalQuantity,
     value: totalValue,
-    currency: "CAD",
+    currency: getCurrency(),
     ...additionalData,
   };
 
@@ -152,7 +153,7 @@ export const trackTikTokPurchase = (
     content_ids: content_ids,
     quantity: totalQuantity,
     value: parseFloat(order.total) || 0,
-    currency: order.currency || "CAD",
+    currency: order.currency || getCurrency(),
     description: `Order #${order.id}`,
     ...additionalData,
   };

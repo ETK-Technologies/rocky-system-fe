@@ -87,6 +87,9 @@ Define variables in your deployment environment. Never commit secrets.
   - `S3_BUCKET_NAME`
 - PostGrid (address autocomplete)
   - `POSTGRID_API_KEY`
+- Currency
+  - `CURRENCY`: Currency code for server-side usage (e.g., "CAD", "USD") - defaults to "CAD"
+  - `NEXT_PUBLIC_CURRENCY`: Currency code for client-side usage (e.g., "CAD", "USD") - defaults to "CAD"
 
 Notes:
 - Client-exposed vars must be prefixed `NEXT_PUBLIC_` per Next.js convention.

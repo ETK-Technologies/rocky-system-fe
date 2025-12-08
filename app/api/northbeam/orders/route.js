@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { logger } from "@/utils/devLogger";
+import { getCurrency } from "@/lib/constants/currency";
 
 /**
  * Convert 2-letter country code to 3-letter ISO 3166-1 alpha-3 code
@@ -312,7 +313,7 @@ export async function POST(req) {
         order_id: order.order_id,
         customer_id: derivedCustomerId, // Ensure customer_id is a string
         time_of_purchase: timeOfPurchaseIso, // Ensure proper ISO format
-        currency: order.currency || "CAD",
+        currency: order.currency || getCurrency(),
         purchase_total: parseFloat(order.purchase_total) || 0, // Keep in dollars, not cents
         tax: parseFloat(order.tax) || 0, // Keep in dollars, not cents
         shipping_cost: parseFloat(order.shipping_cost) || 0,

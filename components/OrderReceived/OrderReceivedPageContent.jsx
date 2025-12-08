@@ -10,6 +10,7 @@ import { FaArrowRight } from "react-icons/fa";
 import CustomImage from "../utils/CustomImage";
 import { analyticsService } from "@/utils/analytics/analyticsService";
 import { formatPrice } from "@/utils/priceFormatter";
+import { getCurrency } from "@/lib/constants/currency";
 
 // AWIN API configuration
 const AWIN_CONFIG = {
@@ -39,7 +40,7 @@ const fireAwinClientPixel = (orderData, s2sOrderData = null) => {
             (Number.parseFloat(orderData.total_tax || 0) || 0) -
             (Number.parseFloat(orderData.shipping_total || 0) || 0)
         );
-    const currency = s2sOrderData?.currency || orderData.currency || "CAD";
+    const currency = s2sOrderData?.currency || orderData.currency || getCurrency();
     const orderRef =
       s2sOrderData?.order_reference || orderData.number || String(orderData.id);
     const commissionGroup = s2sOrderData?.commission_group || "DEFAULT";

@@ -556,7 +556,7 @@ export async function POST_OLD(req) {
         order_key: response.data.order_key,
         status: response.data.status,
         total: response.data.total, // Add total for Stripe payment
-        currency: response.data.currency || "USD",
+        currency: response.data.currency || getCurrency(),
         payment_deferred: true,
         message:
           "Order created successfully. Payment will be processed separately.",
