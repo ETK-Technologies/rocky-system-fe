@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { logger } from "@/utils/devLogger";
 import { PHASE_1_STATES, isStateSupported } from "@/lib/constants/usStates";
+import { getOrigin } from "@/lib/utils/getOrigin";
 
 const POSTCANADA_API_KEY = process.env.POSTCANADA_API_KEY;
 const POSTCANADA_API_URL =
@@ -29,11 +30,8 @@ export async function POST(request) {
     url.searchParams.append("Key", POSTCANADA_API_KEY);
     url.searchParams.append("Id", addressId);
 
-    // Set origin based on environment
-    const origin =
-      process.env.NODE_ENV === "production"
-        ? "https://www.myrocky.com"
-        : "http://localhost:3000";
+    // Get origin for Origin and Referer headers (required for PostCanada API)
+    const origin = getOrigin(request);
 
     const response = await fetch(url.toString(), {
       method: "GET",
