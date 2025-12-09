@@ -149,11 +149,21 @@ const getProductTypeTags = async (lineItems) => {
     // Fetch product details for each line item
     const productPromises = lineItems.map(async (item) => {
       try {
-        const productDetails = await fetchProductDetails(item.product_id);
+        // Support both old format (product_id) and new backend format (productId)
+        const productId = item.productId || item.product_id || item.product?.id;
+        
+        // Skip if product ID is missing or undefined
+        if (!productId || productId === "undefined") {
+          console.warn("Skipping product fetch - product ID is missing or undefined:", item);
+          return null;
+        }
+        
+        const productDetails = await fetchProductDetails(productId);
         return productDetails;
       } catch (error) {
+        const productId = item.productId || item.product_id || item.product?.id;
         console.error(
-          `Error fetching product details for ${item.product_id}:`,
+          `Error fetching product details for ${productId}:`,
           error
         );
         return null;

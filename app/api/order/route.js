@@ -59,6 +59,7 @@ export async function GET(req) {
       }
     }
 
+    // Return backend order structure directly (no conversion)
     return NextResponse.json(response.data);
   } catch (error) {
     logger.error("Error getting order:", error.response?.data || error.message);

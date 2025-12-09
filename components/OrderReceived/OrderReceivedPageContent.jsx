@@ -259,8 +259,12 @@ const OrderReceivedContent = ({ userId }) => {
     queryParams.append("view", "consultation");
 
     // Add purchased_product parameter (use first product name from order if available)
-    if (order && order.line_items && order.line_items.length > 0) {
-      queryParams.append("purchased_product", order.line_items[0].name);
+    if (order && order.items && order.items.length > 0) {
+      const firstItem = order.items[0];
+      const productName = firstItem.product?.name || firstItem.variant?.name || "";
+      if (productName) {
+        queryParams.append("purchased_product", productName);
+      }
     }
 
     // Dynamically generate and add the seskey parameter
@@ -459,7 +463,7 @@ const OrderReceivedContent = ({ userId }) => {
     <section className="px-5 sectionWidth:px-0 py-4 md:py-8 undefined">
       <div className="flex justify-center">
         <div className="border rounded-xl w-full max-w-[480px] p-6">
-          <ThankYouMessage userEmail={order.billing.email} />
+          <ThankYouMessage userEmail={order.user?.email || order.guestEmail || ""} />
           {countdown !== null && countdown > 0 && !isQuestionnaireCompleted && (
             <div className="mt-2 mb-2 py-4 px-6 bg-[#03A670] rounded-lg text-center rounded-lg">
               <p className="text-[16px] font-[600] text-white">
@@ -517,7 +521,7 @@ const Totals = ({ order }) => {
           <span className="woocommerce-Price-amount amount">
             <bdi>
               <span className="woocommerce-Price-currencySymbol">$</span>
-              {order.total}
+              {order.subtotal || 0}
             </bdi>
           </span>
         </span>
@@ -537,17 +541,9 @@ const Totals = ({ order }) => {
           <span className="woocommerce-Price-amount amount">
             <bdi>
               <span className="woocommerce-Price-currencySymbol">$</span>
-              {order.discount_total}
+              {order.discountAmount || 0}
             </bdi>
           </span>
-        </span>
-      </li>
-      <li className="flex justify-between py-1.5">
-        <span className="text-[#4E4E4E] text-[14px] font-[500] poppins-font">
-          Initial Shipment:
-        </span>
-        <span className="text-[14px] font-[400] poppins-font">
-          {order.shipping_lines[0]?.method_title || "N/A"}
         </span>
       </li>
       <li className="flex justify-between pt-1.5 pb-3 border-b">
@@ -558,7 +554,7 @@ const Totals = ({ order }) => {
           <span className="woocommerce-Price-amount amount">
             <bdi>
               <span className="woocommerce-Price-currencySymbol">$</span>
-              {order.total_tax}
+              {order.taxAmount || 0}
             </bdi>
           </span>
         </span>
@@ -569,7 +565,7 @@ const Totals = ({ order }) => {
           <span className="woocommerce-Price-amount amount">
             <bdi>
               <span className="woocommerce-Price-currencySymbol">$</span>
-              {order.total}
+              {order.totalAmount || order.subtotal || 0}
             </bdi>
           </span>
         </span>
@@ -582,12 +578,14 @@ const OrderItems = ({ order }) => {
   return (
     <>
       <h3 className="text-[14px] font-[500] pt-3">Your Order</h3>
-      {order.line_items.map((item) => {
+      {order.items?.map((item) => {
+        const productName = item.product?.name || item.variant?.name || "Product";
+        const imageUrl = item.product?.primaryImage?.url || item.product?.images?.[0]?.url || item.variant?.imageUrl || "";
         return (
           <div key={item.id} className="flex items-start gap-3 py-3 border-b">
             <div className="min-w-[70px] w-[70px] min-h-[70px] h-[70px] rounded-[12px] overflow-hidden relative">
-              {item.image && item.image.src ? (
-                <CustomImage fill alt={item.name} src={item.image.src} />
+              {imageUrl ? (
+                <CustomImage fill alt={productName} src={imageUrl} />
               ) : (
                 <div className="w-full h-full bg-gray-200 flex items-center justify-center text-xs text-gray-500">
                   No Image
@@ -595,7 +593,7 @@ const OrderItems = ({ order }) => {
               )}
             </div>
             <div>
-              <p className="text-[14px] font-[500]">{item.name}</p>
+              <p className="text-[14px] font-[500]">{productName}</p>
               <p className="text-[12px] font-[500]">
                 Quantity: {item.quantity}
               </p>
@@ -604,7 +602,7 @@ const OrderItems = ({ order }) => {
                 <span className="woocommerce-Price-amount amount">
                   <bdi>
                     <span className="woocommerce-Price-currencySymbol">$</span>
-                    {item.total}
+                    {item.totalPrice || 0}
                   </bdi>
                 </span>
               </p>
@@ -643,13 +641,7 @@ const BasicOrderInfo = ({ order }) => {
         </div>
         <div className="py-3 border-b border-[#E2E2E1]">
           <p className="text-[14px] font-[500] mb-3">Payment Method</p>
-          <p className="text-[12px] font-[400]">{order.payment_method_title}</p>
-        </div>
-        <div className="py-3">
-          <p className="text-[14px] font-[500] mb-3">Shipping Method</p>
-          <p className="text-[12px] font-[400]">
-            {order.shipping_lines[0]?.method_title || "N/A"}
-          </p>
+          <p className="text-[12px] font-[400]">{order.payment?.method || "Credit Card"}</p>
         </div>
       </div>
     </div>

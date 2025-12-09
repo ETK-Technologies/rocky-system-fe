@@ -1,46 +1,64 @@
 import { logger } from "@/utils/devLogger";
-import { wooApiGet } from "@/lib/woocommerce";
+import axios from "axios";
+import { getClientDomain } from "@/lib/utils/getClientDomain";
+
+const BASE_URL = process.env.BASE_URL;
 
 export async function GET(request, { params }) {
   try {
     const { id } = await params;
-    if (!id) {
+    if (!id || id === "undefined") {
       return Response.json({ error: "No product ID provided" }, { status: 400 });
     }
 
-    // Fetch minimal product fields from WooCommerce
-    const response = await wooApiGet(`products/${id}`, {
-      _fields: "id,name,categories,slug,sku",
+    // Get client domain for X-Client-Domain header (required for backend domain whitelist)
+    const clientDomain = getClientDomain(request);
+
+    // Fetch product from new backend API
+    const response = await axios.get(`${BASE_URL}/api/v1/products/${id}`, {
+      headers: {
+        accept: "application/json",
+        "X-App-Key": process.env.NEXT_PUBLIC_APP_KEY,
+        "X-App-Secret": process.env.NEXT_PUBLIC_APP_SECRET,
+        "X-Client-Domain": clientDomain,
+      },
     });
 
-    if (!response.ok) {
-      const text = await response.text();
-      logger.error(
-        `Error fetching product ${id} from WooCommerce: ${response.status} ${response.statusText}`,
-        text
-      );
-      return Response.json(
-        { error: "Failed to fetch product", details: text },
-        { status: response.status }
-      );
-    }
-
-    const product = await response.json();
+    const product = response.data;
     if (!product || !product.id) {
       return Response.json({ error: "Product not found" }, { status: 404 });
     }
 
+    // Map backend product structure to expected format
     const productInfo = {
       id: product.id,
       name: product.name,
       categories: Array.isArray(product.categories)
-        ? product.categories.map((c) => ({ id: c.id, name: c.name, slug: c.slug }))
+        ? product.categories.map((c) => ({ 
+            id: c.id || c.wordpressId, 
+            name: c.name, 
+            slug: c.slug 
+          }))
         : [],
+      slug: product.slug,
+      sku: product.sku,
     };
 
     return Response.json(productInfo);
   } catch (error) {
-    logger.error("Error fetching product by ID:", error);
-    return Response.json({ error: "Failed to fetch product" }, { status: 500 });
+    logger.error("Error fetching product by ID:", error.response?.data || error.message);
+    
+    // If product not found, return 404
+    if (error.response?.status === 404) {
+      return Response.json({ error: "Product not found" }, { status: 404 });
+    }
+    
+    return Response.json(
+      { 
+        error: "Failed to fetch product", 
+        details: error.response?.data?.message || error.message 
+      },
+      { status: error.response?.status || 500 }
+    );
   }
 }

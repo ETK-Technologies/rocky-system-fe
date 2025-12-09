@@ -5,7 +5,8 @@ import { cookies } from "next/headers";
 const OrderReceivedPage = async ({ params }) => {
   const cookieStore = await cookies();
   const userId = cookieStore.get("userId")?.value;
-  const orderId = params?.id || "";
+  const { id } = await params;
+  const orderId = id || "";
 
   return (
     <Suspense fallback={<></>}>
