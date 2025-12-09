@@ -5,6 +5,9 @@ import { MainBlogsPage } from "@/components/NewBlogs";
 import BlogPageSkeleton from "@/components/NewBlogs/components/BlogPageSkeleton";
 import ErrorUI from "./ErrorUI";
 
+// Force dynamic rendering since we use no-store fetch
+export const dynamic = 'force-dynamic';
+
 async function BlogsContent() {
   try {
     // Fetch all posts (featured and regular) and categories
