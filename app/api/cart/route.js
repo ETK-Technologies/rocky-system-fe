@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { logger } from "@/utils/devLogger";
 import { fetchCartFromBackend } from "@/lib/api/cartApi";
+import { getClientDomain } from "@/lib/utils/getClientDomain";
 
 export async function GET(request) {
   try {
@@ -94,13 +95,17 @@ export async function GET(request) {
       });
     }
 
+    // Get client domain for X-Client-Domain header (required for backend domain whitelist)
+    const clientDomain = getClientDomain(request);
+
     // Fetch cart from new backend API
     // IMPORTANT: Only pass sessionId if user is NOT authenticated
     // If both authToken and sessionId are provided, prioritize authToken (authenticated user)
     const useSessionId = !authToken && sessionId; // Only use sessionId if no authToken
     const cartData = await fetchCartFromBackend(
       authToken?.value || null,
-      useSessionId ? sessionId : null
+      useSessionId ? sessionId : null,
+      clientDomain
     );
 
     if (!cartData) {

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import axios from "axios";
 import { logger } from "@/utils/devLogger";
 import { cookies } from "next/headers";
+import { getClientDomain } from "@/lib/utils/getClientDomain";
 
 const BASE_URL = process.env.BASE_URL;
 
@@ -22,20 +23,22 @@ export async function GET(req) {
       );
     }
 
+    // Get client domain for X-Client-Domain header (required for backend domain whitelist)
+    // Returns only the domain name (hostname) without protocol or port
+    const clientDomain = getClientDomain(req);
+
     // Try by ID first, then by order number if needed
     let response;
     try {
-      response = await axios.get(
-        `${BASE_URL}/api/v1/orders/${order_id}`,
-        {
-          headers: {
-            Authorization: `${encodedCredentials.value}`,
-            accept: "application/json",
-            "X-App-Key": process.env.NEXT_PUBLIC_APP_KEY,
-            "X-App-Secret": process.env.NEXT_PUBLIC_APP_SECRET,
-          },
-        }
-      );
+      response = await axios.get(`${BASE_URL}/api/v1/orders/${order_id}`, {
+        headers: {
+          Authorization: `${encodedCredentials.value}`,
+          accept: "application/json",
+          "X-App-Key": process.env.NEXT_PUBLIC_APP_KEY,
+          "X-App-Secret": process.env.NEXT_PUBLIC_APP_SECRET,
+          "X-Client-Domain": clientDomain,
+        },
+      });
     } catch (error) {
       // If not found by ID, try by order number
       if (error.response?.status === 404 && order_key) {
@@ -47,6 +50,7 @@ export async function GET(req) {
               accept: "application/json",
               "X-App-Key": process.env.NEXT_PUBLIC_APP_KEY,
               "X-App-Secret": process.env.NEXT_PUBLIC_APP_SECRET,
+              "X-Client-Domain": clientDomain,
             },
           }
         );

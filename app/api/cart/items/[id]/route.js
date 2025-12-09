@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import axios from "axios";
 import { cookies } from "next/headers";
 import { logger } from "@/utils/devLogger";
+import { getClientDomain } from "@/lib/utils/getClientDomain";
 
 const BASE_URL = process.env.BASE_URL;
 
@@ -103,6 +104,7 @@ export async function PATCH(req, { params }) {
         accept: "application/json",
         "X-App-Key": process.env.NEXT_PUBLIC_APP_KEY,
         "X-App-Secret": process.env.NEXT_PUBLIC_APP_SECRET,
+        "X-Client-Domain": clientDomain,
       };
 
       if (authToken) {
