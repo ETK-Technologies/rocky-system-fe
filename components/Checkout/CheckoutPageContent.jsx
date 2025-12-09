@@ -130,6 +130,7 @@ const CheckoutPageContent = () => {
     populateAddressData,
     saveAddressData,
     clearStoredAddresses,
+    fetchProfileData,
   } = useAddressManager();
   const [formData, setFormData] = useState({
     additional_fields: [],
@@ -583,10 +584,15 @@ const CheckoutPageContent = () => {
     }
   }, [formData.billing_address, formData.shipping_address, saveAddressData]);
 
+  // Track if we've already populated address data to prevent redundant calls
+  const [hasPopulatedAddresses, setHasPopulatedAddresses] = useState(false);
+
   // Effect to populate address data after initial load
+  // Only run once after cart and profile are loaded
   useEffect(() => {
     // Only run this after the initial cart and profile data have been loaded
-    if (cartItems && !isProcessingUrlParams && !isLoadingAddresses) {
+    // AND only if we haven't already populated addresses
+    if (cartItems && !isProcessingUrlParams && !isLoadingAddresses && !hasPopulatedAddresses) {
       const timer = setTimeout(async () => {
         logger.log("=== POPULATING ADDRESS DATA WITH HOOK ===");
         logger.log("Current formData before population:", {
@@ -621,20 +627,29 @@ const CheckoutPageContent = () => {
           // Still debug to see what's in localStorage
           debugAddressData();
         }
+
+        // Mark as populated to prevent redundant calls
+        setHasPopulatedAddresses(true);
       }, 1000); // Small delay to ensure other data loading is complete
 
       return () => clearTimeout(timer);
     }
-  }, [cartItems, isProcessingUrlParams, isLoadingAddresses]);
+  }, [cartItems, isProcessingUrlParams, isLoadingAddresses, hasPopulatedAddresses, populateAddressData]);
 
   // Function to fetch saved payment cards - REMOVED
   // Saved cards are no longer fetched to reduce API calls
   // Users can still use saved cards if they're available from other sources
 
   // Function to fetch user profile data
-  const fetchUserProfile = async () => {
+  // Only fetch once and cache the result to avoid redundant API calls
+  const fetchUserProfile = async (forceRefresh = false) => {
+    // Return cached data if available and not forcing refresh
+    if (cachedProfileData && !forceRefresh) {
+      logger.log("Using cached profile data from CheckoutPageContent (avoiding redundant API call)");
+      return cachedProfileData;
+    }
+
     try {
-      // Always fetch fresh data from API for checkout to ensure latest billing info
       // Get user name from cookies if available
       const cookies = document.cookie.split(";").reduce((cookies, cookie) => {
         const [name, value] = cookie.trim().split("=");
@@ -646,7 +661,7 @@ const CheckoutPageContent = () => {
       const storedFirstName = decodeURIComponent(cookies.displayName || "");
       const storedUserName = decodeURIComponent(cookies.userName || "");
 
-      // Fetch fresh profile data without caching - add timestamp to prevent any caching
+      // Fetch fresh profile data - add timestamp to prevent any caching
       const timestamp = new Date().getTime();
       const res = await fetch(`/api/profile?t=${timestamp}`, {
         // Prevent browser caching
@@ -878,9 +893,14 @@ const CheckoutPageContent = () => {
 
         // STEP 2: Load profile data AFTER cart completes to override cart data
         // This ensures logged-in users always see their latest profile data
-        logger.log("=== LOADING PROFILE DATA ===");
-        await fetchUserProfile();
-        logger.log("=== PROFILE DATA LOADED ===");
+        // Only fetch if not already cached
+        if (!cachedProfileData) {
+          logger.log("=== LOADING PROFILE DATA ===");
+          await fetchUserProfile();
+          logger.log("=== PROFILE DATA LOADED ===");
+        } else {
+          logger.log("=== USING CACHED PROFILE DATA ===");
+        }
 
         // STEP 3: Ensure address data is populated from all available sources
         logger.log("=== ENSURING ADDRESS DATA POPULATED ===");

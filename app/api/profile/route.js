@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import axios from "axios";
 import { logger } from "@/utils/devLogger";
 import { cookies } from "next/headers";
+import { getClientDomain } from "@/lib/utils/getClientDomain";
 
 const BASE_URL = process.env.BASE_URL;
 
@@ -21,78 +22,85 @@ export async function GET(request) {
       );
     }
 
-    // Fetch user profile data from WordPress API
+    // Get client domain for X-Client-Domain header (required for backend domain whitelist)
+    const clientDomain = getClientDomain(request);
+
+    // Fetch user profile data from backend API
     const response = await axios.get(
-      `${BASE_URL}/wp-json/custom/v1/user-profile`,
+      `${BASE_URL}/api/v1/auth/profile`,
       {
         headers: {
-          Authorization: authToken.value,
+          "Content-Type": "application/json",
+          accept: "application/json",
+          "X-App-Key": process.env.NEXT_PUBLIC_APP_KEY,
+          "X-App-Secret": process.env.NEXT_PUBLIC_APP_SECRET,
+          "X-Client-Domain": clientDomain,
+          Authorization: authToken.value, // Should already include "Bearer " prefix
         },
       }
     );
 
-    // Extract the profile data
+    // Extract the profile data from backend API
     const profileData = response.data;
 
-    if (profileData.error) {
+    // Handle error responses
+    if (profileData.error || !profileData) {
       return NextResponse.json(
         {
           success: false,
-          message: profileData.message || "Failed to get user profile",
+          message: profileData?.message || "Failed to get user profile",
         },
-        { status: 400 }
+        { status: profileData?.statusCode || 400 }
       );
     }
+
+    // Backend API returns user object with nested billing/shipping addresses
+    // Map the backend response structure to our frontend format
+    const user = profileData.user || profileData;
+    const billing = user.billingAddress || user.billing || {};
+    const shipping = user.shippingAddress || user.shipping || {};
+    const customMeta = user.customMeta || user.meta || {};
 
     // Format the response for our frontend
     return NextResponse.json({
       success: true,
-      // Merge user data with billing data
-      first_name:
-        profileData.user_data.first_name ||
-        profileData.billing_data.first_name ||
-        "",
-      last_name:
-        profileData.user_data.last_name ||
-        profileData.billing_data.last_name ||
-        "",
-      email:
-        profileData.user_data.email || profileData.billing_data.email || "",
-      phone:
-        profileData.billing_data.phone ||
-        profileData.custom_meta.phone_number ||
-        "",
+      // User data
+      first_name: user.firstName || user.first_name || "",
+      last_name: user.lastName || user.last_name || "",
+      email: user.email || "",
+      phone: user.phone || billing.phone || customMeta.phone_number || "",
 
       // Custom meta
-      gender: profileData.custom_meta.gender || "",
-      date_of_birth: profileData.custom_meta.date_of_birth || "",
+      gender: customMeta.gender || user.gender || "",
+      date_of_birth: customMeta.date_of_birth || customMeta.dateOfBirth || user.date_of_birth || user.dateOfBirth || "",
       province:
-        profileData.custom_meta.province ||
-        profileData.billing_data.state ||
+        customMeta.province ||
+        billing.state ||
+        billing.province ||
+        user.province ||
         "",
 
       // Billing address fields
-      billing_address_1: profileData.billing_data.address_1 || "",
-      billing_address_2: profileData.billing_data.address_2 || "",
-      billing_city: profileData.billing_data.city || "",
-      billing_state:
-        profileData.billing_data.state ||
-        profileData.custom_meta.province ||
-        "",
-      billing_postcode: profileData.billing_data.postcode || "",
-      billing_country: profileData.billing_data.country || "CA",
+      billing_address_1: billing.address1 || billing.address_1 || billing.street || "",
+      billing_address_2: billing.address2 || billing.address_2 || "",
+      billing_city: billing.city || "",
+      billing_state: billing.state || billing.province || customMeta.province || "",
+      billing_postcode: billing.postalCode || billing.postcode || billing.postal_code || "",
+      billing_country: billing.country || "CA",
 
       // Shipping address fields
-      shipping_address_1: profileData.shipping_data.address_1 || "",
-      shipping_address_2: profileData.shipping_data.address_2 || "",
-      shipping_city: profileData.shipping_data.city || "",
+      shipping_address_1: shipping.address1 || shipping.address_1 || shipping.street || "",
+      shipping_address_2: shipping.address2 || shipping.address_2 || "",
+      shipping_city: shipping.city || "",
       shipping_state:
-        profileData.shipping_data.state ||
-        profileData.billing_data.state ||
-        profileData.custom_meta.province ||
+        shipping.state ||
+        shipping.province ||
+        billing.state ||
+        billing.province ||
+        customMeta.province ||
         "",
-      shipping_postcode: profileData.shipping_data.postcode || "",
-      shipping_country: profileData.shipping_data.country || "CA",
+      shipping_postcode: shipping.postalCode || shipping.postcode || shipping.postal_code || "",
+      shipping_country: shipping.country || "CA",
 
       // Include the raw data for debugging or additional use cases
       raw_profile_data: profileData,
