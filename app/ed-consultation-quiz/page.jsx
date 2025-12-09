@@ -2,8 +2,8 @@ import EDConsultationQuiz from "@/components/EdQuestionnaire/EDConsultationQuiz"
 import { cookies } from "next/headers";
 import { logger } from "@/utils/devLogger";
 
-export default function EDConsultationQuizPage() {
-  const cookieStore = cookies();
+export default async function EDConsultationQuizPage() {
+  const cookieStore = await cookies();
   const pn = cookieStore.get("pn")?.value;
   const userName = cookieStore.get("userName")?.value;
   const userEmail = cookieStore.get("userEmail")?.value;
