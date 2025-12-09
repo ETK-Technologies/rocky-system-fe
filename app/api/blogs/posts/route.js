@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import axios from "axios";
 import { logger } from "@/utils/devLogger";
+import { getClientDomain } from "@/lib/utils/getClientDomain";
 
 const API_BASE_URL = process.env.BASE_URL;
 
@@ -40,12 +41,16 @@ export async function GET(request) {
 
     logger.log("Fetching blog posts with params:", params);
 
+    // Get client domain for X-Client-Domain header (required for backend domain whitelist)
+    const clientDomain = getClientDomain(request);
+
     const response = await axios.get(`${API_BASE_URL}/api/v1/blogs/posts`, {
       params,
       headers: {
         accept: "application/json",
         "X-App-Key": process.env.NEXT_PUBLIC_APP_KEY,
         "X-App-Secret": process.env.NEXT_PUBLIC_APP_SECRET,
+        "X-Client-Domain": clientDomain,
       },
     });
 

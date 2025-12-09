@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { logger } from "@/utils/devLogger";
+import { getClientDomain } from "@/lib/utils/getClientDomain";
 
 const BASE_URL = process.env.BASE_URL;
 const APP_KEY = process.env.NEXT_PUBLIC_APP_KEY;
@@ -17,12 +18,16 @@ export async function GET(request, { params }) {
       return NextResponse.json({ error: "Slug is required" }, { status: 400 });
     }
 
+    // Get client domain for X-Client-Domain header (required for backend domain whitelist)
+    const clientDomain = getClientDomain(request);
+
     const response = await fetch(`${BASE_URL}/api/v1/pages/slug/${slug}`, {
       method: "GET",
       headers: {
         accept: "*/*",
         "X-App-Key": APP_KEY,
         "X-App-Secret": APP_SECRET,
+        "X-Client-Domain": clientDomain,
       },
       next: { revalidate: 3600 }, // Cache for 1 hour
     });

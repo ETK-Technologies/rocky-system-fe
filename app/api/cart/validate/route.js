@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import axios from "axios";
 import { logger } from "@/utils/devLogger";
 import { cookies } from "next/headers";
+import { getClientDomain } from "@/lib/utils/getClientDomain";
 
 const BASE_URL = process.env.BASE_URL;
 

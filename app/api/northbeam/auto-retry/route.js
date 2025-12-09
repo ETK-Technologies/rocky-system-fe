@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { logger } from "@/utils/devLogger";
 import axios from "axios";
+import { getClientDomain } from "@/lib/utils/getClientDomain";
 
 /**
  * Automatic Northbeam Order Retry Cron Job
@@ -76,6 +77,9 @@ export async function POST(req) {
     }
 
     try {
+      // Get client domain for X-Client-Domain header (required for backend domain whitelist)
+      const clientDomain = getClientDomain(req);
+
       // Query orders from new backend API
       // Note: This assumes the backend has an orders list endpoint
       // Adjust the endpoint and parameters based on your actual backend API
@@ -91,6 +95,7 @@ export async function POST(req) {
           accept: "application/json",
           "X-App-Key": process.env.NEXT_PUBLIC_APP_KEY,
           "X-App-Secret": process.env.NEXT_PUBLIC_APP_SECRET,
+          "X-Client-Domain": clientDomain,
         },
       });
 
