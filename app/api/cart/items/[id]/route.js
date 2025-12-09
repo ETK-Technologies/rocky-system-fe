@@ -269,9 +269,7 @@ export async function DELETE(req, { params }) {
         cartUrl += `?sessionId=${encodedSessionId}`;
       }
 
-      // Get origin for Origin header (required for backend domain whitelist)
-      const origin = getOrigin(req);
-
+      // Reuse the origin we already got above (line 235)
       logger.log("Cart item removed successfully, fetching updated cart");
       const cartHeaders = {
         accept: "application/json",

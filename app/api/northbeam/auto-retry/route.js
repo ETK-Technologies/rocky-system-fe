@@ -117,18 +117,18 @@ export async function POST(req) {
       const orderIds = orders.map((order) => order.id || order.orderId || order.orderNumber).filter(Boolean);
 
       // Build URL for internal backfill endpoint
-      let origin;
+      let baseOrigin;
       try {
-        origin = new URL(req.url).origin;
+        baseOrigin = new URL(req.url).origin;
       } catch (_) {
-        origin =
+        baseOrigin =
           process.env.NEXT_PUBLIC_SITE_URL ||
           process.env.SITE_URL ||
           "http://localhost:3000";
       }
 
       // Call the backfill endpoint (which handles deduplication and formatting)
-      const backfillUrl = `${origin}/api/northbeam/backfill`;
+      const backfillUrl = `${baseOrigin}/api/northbeam/backfill`;
       
       logger.log(`[NB Auto-Retry] Calling backfill endpoint with ${orderIds.length} orders`);
       
