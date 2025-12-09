@@ -11,7 +11,7 @@ export async function GET(request, { params }) {
     }
 
     // Fetch product data from new backend API
-    // Pass request to include X-Client-Domain header
+    // Pass request to include Origin header
     const apiProduct = await fetchProductBySlugFromBackend(slug, false, request);
 
     if (!apiProduct) {

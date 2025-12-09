@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { logger } from "@/utils/devLogger";
-import { getClientDomain } from "@/lib/utils/getClientDomain";
+import { getOrigin } from "@/lib/utils/getOrigin";
 
 const BASE_URL = process.env.BASE_URL;
 
@@ -10,8 +10,8 @@ const BASE_URL = process.env.BASE_URL;
  */
 export async function GET(request) {
   try {
-    // Get client domain for X-Client-Domain header (required for backend domain whitelist)
-    const clientDomain = getClientDomain(request);
+    // Get origin for Origin header (required for backend domain whitelist)
+    const origin = getOrigin(request);
 
     const response = await fetch(`${BASE_URL}/api/v1/auth/provinces`, {
       method: "GET",
@@ -19,7 +19,7 @@ export async function GET(request) {
         accept: "application/json",
         "X-App-Key": process.env.NEXT_PUBLIC_APP_KEY,
         "X-App-Secret": process.env.NEXT_PUBLIC_APP_SECRET,
-        "X-Client-Domain": clientDomain,
+        "Origin": origin,
       },
       next: { revalidate: 3600 }, // Cache for 1 hour
     });

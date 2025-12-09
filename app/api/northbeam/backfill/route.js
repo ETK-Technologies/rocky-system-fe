@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { logger } from "@/utils/devLogger";
 import axios from "axios";
 import { getCurrency } from "@/lib/constants/currency";
-import { getClientDomain } from "@/lib/utils/getClientDomain";
+import { getOrigin } from "@/lib/utils/getOrigin";
 
 /**
  * Convert 2-letter country code to 3-letter ISO 3166-1 alpha-3 code
@@ -241,15 +241,15 @@ export async function POST(req) {
         // 1) Fetch order from new backend API
         // Try by ID first, then by order number if ID doesn't work
         let order = null;
-        // Get client domain for X-Client-Domain header (required for backend domain whitelist)
-        const clientDomain = getClientDomain(req);
+        // Get origin for Origin header (required for backend domain whitelist)
+        const origin = getOrigin(req);
         try {
           const orderResponse = await axios.get(`${BASE_URL}/api/v1/orders/${id}`, {
             headers: {
               accept: "application/json",
               "X-App-Key": process.env.NEXT_PUBLIC_APP_KEY,
               "X-App-Secret": process.env.NEXT_PUBLIC_APP_SECRET,
-              "X-Client-Domain": clientDomain,
+              "Origin": origin,
             },
           });
           order = orderResponse.data;
@@ -262,7 +262,7 @@ export async function POST(req) {
                   accept: "application/json",
                   "X-App-Key": process.env.NEXT_PUBLIC_APP_KEY,
                   "X-App-Secret": process.env.NEXT_PUBLIC_APP_SECRET,
-                  "X-Client-Domain": clientDomain,
+                  "Origin": origin,
                 },
               });
               order = orderNumberResponse.data;

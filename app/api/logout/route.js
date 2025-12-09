@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import axios from "axios";
 import { cookies } from "next/headers";
 import { logger } from "@/utils/devLogger";
-import { getClientDomain } from "@/lib/utils/getClientDomain";
+import { getOrigin } from "@/lib/utils/getOrigin";
 
 const BASE_URL = process.env.BASE_URL;
 
@@ -25,8 +25,8 @@ export async function POST(req) {
 
         logger.log("Logging out user with new auth API");
 
-        // Get client domain for X-Client-Domain header (required for backend domain whitelist)
-        const clientDomain = getClientDomain(req);
+        // Get origin for Origin header (required for backend domain whitelist)
+        const origin = getOrigin(req);
 
         await axios.post(
           `${BASE_URL}/api/v1/auth/logout`,
@@ -37,7 +37,7 @@ export async function POST(req) {
               accept: "application/json",
               "X-App-Key": process.env.NEXT_PUBLIC_APP_KEY,
               "X-App-Secret": process.env.NEXT_PUBLIC_APP_SECRET,
-              "X-Client-Domain": clientDomain,
+              "Origin": origin,
               Authorization: `Bearer ${token}`,
             },
           }

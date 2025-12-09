@@ -1,6 +1,6 @@
 import { logger } from "@/utils/devLogger";
 import axios from "axios";
-import { getClientDomain } from "@/lib/utils/getClientDomain";
+import { getOrigin } from "@/lib/utils/getOrigin";
 
 const BASE_URL = process.env.BASE_URL;
 
@@ -11,8 +11,8 @@ export async function GET(request, { params }) {
       return Response.json({ error: "No product ID provided" }, { status: 400 });
     }
 
-    // Get client domain for X-Client-Domain header (required for backend domain whitelist)
-    const clientDomain = getClientDomain(request);
+    // Get origin for Origin header (required for backend domain whitelist)
+    const origin = getOrigin(request);
 
     // Fetch product from new backend API
     const response = await axios.get(`${BASE_URL}/api/v1/products/${id}`, {
@@ -20,7 +20,7 @@ export async function GET(request, { params }) {
         accept: "application/json",
         "X-App-Key": process.env.NEXT_PUBLIC_APP_KEY,
         "X-App-Secret": process.env.NEXT_PUBLIC_APP_SECRET,
-        "X-Client-Domain": clientDomain,
+        "Origin": origin,
       },
     });
 

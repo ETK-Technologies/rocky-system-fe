@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import axios from "axios";
 import { logger } from "@/utils/devLogger";
 import { cookies } from "next/headers";
-import { getClientDomain } from "@/lib/utils/getClientDomain";
+import { getOrigin } from "@/lib/utils/getOrigin";
 
 const BASE_URL = process.env.BASE_URL;
 
@@ -22,8 +22,8 @@ export async function GET(request) {
       );
     }
 
-    // Get client domain for X-Client-Domain header (required for backend domain whitelist)
-    const clientDomain = getClientDomain(request);
+    // Get origin for Origin header (required for backend domain whitelist)
+    const origin = getOrigin(request);
 
     // Fetch user profile data from backend API
     const response = await axios.get(
@@ -34,7 +34,7 @@ export async function GET(request) {
           accept: "application/json",
           "X-App-Key": process.env.NEXT_PUBLIC_APP_KEY,
           "X-App-Secret": process.env.NEXT_PUBLIC_APP_SECRET,
-          "X-Client-Domain": clientDomain,
+          "Origin": origin,
           Authorization: authToken.value, // Should already include "Bearer " prefix
         },
       }

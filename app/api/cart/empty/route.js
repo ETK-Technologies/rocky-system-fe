@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import axios from "axios";
 import { logger } from "@/utils/devLogger";
 import { cookies } from "next/headers";
-import { getClientDomain } from "@/lib/utils/getClientDomain";
+import { getOrigin } from "@/lib/utils/getOrigin";
 
 const BASE_URL = process.env.BASE_URL;
 
@@ -41,8 +41,8 @@ export async function DELETE(req) {
         url += `?sessionId=${encodeURIComponent(sessionId)}`;
       }
 
-      // Get client domain for X-Client-Domain header (required for backend domain whitelist)
-      const clientDomain = getClientDomain(req);
+      // Get origin for Origin header (required for backend domain whitelist)
+      const origin = getOrigin(req);
 
       // Prepare headers
       const headers = {
@@ -50,7 +50,7 @@ export async function DELETE(req) {
         accept: "application/json",
         "X-App-Key": process.env.NEXT_PUBLIC_APP_KEY,
         "X-App-Secret": process.env.NEXT_PUBLIC_APP_SECRET,
-        "X-Client-Domain": clientDomain,
+        "Origin": origin,
       };
 
       // Add Authorization header ONLY if user is authenticated

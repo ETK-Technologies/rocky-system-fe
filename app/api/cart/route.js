@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { logger } from "@/utils/devLogger";
 import { fetchCartFromBackend } from "@/lib/api/cartApi";
-import { getClientDomain } from "@/lib/utils/getClientDomain";
+import { getOrigin } from "@/lib/utils/getOrigin";
 
 export async function GET(request) {
   try {
@@ -95,8 +95,8 @@ export async function GET(request) {
       });
     }
 
-    // Get client domain for X-Client-Domain header (required for backend domain whitelist)
-    const clientDomain = getClientDomain(request);
+    // Get origin for Origin header (required for backend domain whitelist)
+    const origin = getOrigin(request);
 
     // Fetch cart from new backend API
     // IMPORTANT: Only pass sessionId if user is NOT authenticated
@@ -105,7 +105,7 @@ export async function GET(request) {
     const cartData = await fetchCartFromBackend(
       authToken?.value || null,
       useSessionId ? sessionId : null,
-      clientDomain
+      origin
     );
 
     if (!cartData) {

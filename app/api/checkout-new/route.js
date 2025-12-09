@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import axios from "axios";
 import { cookies } from "next/headers";
 import { logger } from "@/utils/devLogger";
-import { getClientDomain } from "@/lib/utils/getClientDomain";
+import { getOrigin } from "@/lib/utils/getOrigin";
 
 const BASE_URL = process.env.BASE_URL;
 
@@ -54,8 +54,8 @@ export async function POST(req) {
       paymentMethodId,
     } = requestData;
 
-    // Get client domain for X-Client-Domain header (required for backend domain whitelist)
-    const clientDomain = getClientDomain(req);
+    // Get origin for Origin header (required for backend domain whitelist)
+    const origin = getOrigin(req);
 
     // Step 1: Get cart ID from the cart API
     // The cart API returns cart data, but we need to check if cart exists
@@ -66,7 +66,7 @@ export async function POST(req) {
         accept: "application/json",
         "X-App-Key": process.env.NEXT_PUBLIC_APP_KEY,
         "X-App-Secret": process.env.NEXT_PUBLIC_APP_SECRET,
-        "X-Client-Domain": clientDomain,
+        "Origin": origin,
       },
     });
 
@@ -102,7 +102,7 @@ export async function POST(req) {
             accept: "application/json",
             "X-App-Key": process.env.NEXT_PUBLIC_APP_KEY,
             "X-App-Secret": process.env.NEXT_PUBLIC_APP_SECRET,
-            "X-Client-Domain": clientDomain,
+            "Origin": origin,
           },
         }
       );
@@ -209,7 +209,7 @@ export async function POST(req) {
           accept: "application/json",
           "X-App-Key": process.env.NEXT_PUBLIC_APP_KEY,
           "X-App-Secret": process.env.NEXT_PUBLIC_APP_SECRET,
-          "X-Client-Domain": clientDomain,
+          "Origin": origin,
         },
       }
     );
