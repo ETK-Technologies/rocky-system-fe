@@ -11,7 +11,8 @@ export async function GET(request, { params }) {
     }
 
     // Fetch product data from new backend API
-    const apiProduct = await fetchProductBySlugFromBackend(slug, false);
+    // Pass request to include X-Client-Domain header
+    const apiProduct = await fetchProductBySlugFromBackend(slug, false, request);
 
     if (!apiProduct) {
       return Response.json({ error: "Product not found" }, { status: 404 });

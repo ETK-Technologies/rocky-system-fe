@@ -3,6 +3,7 @@ import ProductClientWrapper from "@/components/Product/ProductClientWrapper";
 import { logger } from "@/utils/devLogger";
 import { fetchProductBySlugFromBackend } from "@/lib/api/productApi";
 import { transformBackendProductToWooCommerceFormat } from "@/lib/api/productAdapter";
+import { headers } from "next/headers";
 import {
   ProductFactory,
   CategoryHandlerFactory,
@@ -25,8 +26,11 @@ export async function generateMetadata({ params }) {
       };
     }
 
+    // Get headers to pass client domain
+    const headersList = await headers();
+
     // Fetch product data from backend API for all products
-    const apiProduct = await fetchProductBySlugFromBackend(slug, false);
+    const apiProduct = await fetchProductBySlugFromBackend(slug, false, headersList);
 
     if (!apiProduct) {
       return {
@@ -61,8 +65,11 @@ export default async function ProductPage({ params }) {
   }
 
   try {
+    // Get headers to pass client domain
+    const headersList = await headers();
+
     // Fetch product data from new backend API for all products dynamically
-    const apiProduct = await fetchProductBySlugFromBackend(slug, false);
+    const apiProduct = await fetchProductBySlugFromBackend(slug, false, headersList);
 
     if (!apiProduct) {
       return <ErrorPage />;
