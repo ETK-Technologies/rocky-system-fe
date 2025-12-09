@@ -42,7 +42,14 @@ export async function GET(request, { params }) {
       variationManager
     );
 
-    return Response.json(pageProps);
+    // Ensure we return a proper 200 response, not 103
+    return Response.json(pageProps, {
+      status: 200,
+      headers: {
+        "Content-Type": "application/json",
+        "Cache-Control": "public, s-maxage=3600, stale-while-revalidate=86400",
+      },
+    });
   } catch (error) {
     logger.error("Error fetching product:", error);
     return Response.json({ error: "Failed to fetch product" }, { status: 500 });

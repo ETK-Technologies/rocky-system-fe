@@ -35,7 +35,14 @@ export async function GET(request, { params }) {
       })),
     };
 
-    return Response.json(basicProductInfo);
+    // Ensure we return a proper 200 response, not 103
+    return Response.json(basicProductInfo, {
+      status: 200,
+      headers: {
+        "Content-Type": "application/json",
+        "Cache-Control": "public, s-maxage=3600, stale-while-revalidate=86400",
+      },
+    });
   } catch (error) {
     logger.error("Error fetching basic product info:", error);
     return Response.json(
