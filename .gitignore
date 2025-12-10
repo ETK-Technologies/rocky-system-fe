@@ -54,7 +54,5 @@ post-copilot.bat
 /nb_backfill_scripts
 
 .cursor
-# Sentry Config File
-.env.sentry-build-plugin
 
 *.php
