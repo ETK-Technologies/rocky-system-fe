@@ -5,7 +5,7 @@ import Link from "next/link";
 import ScrollArrows from "../ScrollArrows";
 import EdProductCard from "./EdProductCard";
 import CustomImage from "../utils/CustomImage";
-import HighesttRate from "../convert_test/Flows/HighestRate";
+// import HighesttRate from "../convert_test/Flows/HighestRate"; // Removed - convert_test directory deleted
 import EdComparisonTable from "../Sex/EdComparisonTable";
 
 const EdProducts = ({ showonly }) => {
