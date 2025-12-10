@@ -20,6 +20,7 @@ import {
 } from "../../utils/crossSellCheckout";
 import { processSavedFlowProducts } from "../../utils/flowCartHandler";
 import DOBInput from "@/components/shared/DOBInput";
+import PhoneInput from "@/components/shared/PhoneInput";
 
 const RegisterContent = ({ setActiveTab, registerRef }) => {
   const router = useRouter();
@@ -110,26 +111,12 @@ const RegisterContent = ({ setActiveTab, registerRef }) => {
     }
   };
 
-  const formatPhoneNumber = (value) => {
-    const phoneNumber = value.replace(/\D/g, "");
-
-    if (phoneNumber.length <= 3) {
-      return `(${phoneNumber}`;
-    } else if (phoneNumber.length <= 6) {
-      return `(${phoneNumber.slice(0, 3)}) ${phoneNumber.slice(3)}`;
-    } else {
-      return `(${phoneNumber.slice(0, 3)}) ${phoneNumber.slice(
-        3,
-        6
-      )}-${phoneNumber.slice(6, 10)}`;
-    }
-  };
-
   const handlePhoneChange = (e) => {
-    const formattedPhoneNumber = formatPhoneNumber(e.target.value);
+    // PhoneInput returns value in E.164 format (e.g., +1234567890)
+    const phoneValue = e.target.value || "";
     setFormData((prev) => ({
       ...prev,
-      phone: formattedPhoneNumber,
+      phone: phoneValue,
     }));
 
     // Clear validation error when user types
@@ -138,6 +125,11 @@ const RegisterContent = ({ setActiveTab, registerRef }) => {
         ...prev,
         phone: "",
       }));
+    }
+
+    // Validate phone number on change
+    if (phoneValue) {
+      validateField("phone", phoneValue);
     }
   };
 
@@ -167,8 +159,12 @@ const RegisterContent = ({ setActiveTab, registerRef }) => {
         if (!value.trim()) {
           error = "Phone number is required";
         } else {
-          const phoneDigits = value.replace(/\D/g, "");
-          if (phoneDigits.length < 10) {
+          // PhoneInput returns E.164 format (e.g., +1234567890)
+          // Validate that it's a valid international phone number
+          const phoneDigits = value.replace(/[^\d]/g, "");
+          // E.164 format: country code (1-3 digits) + national number (varies by country)
+          // Minimum would be country code + at least 7 digits for most countries
+          if (phoneDigits.length < 10 || phoneDigits.length > 15) {
             error = "Please enter a valid phone number";
           }
         }
@@ -304,8 +300,10 @@ const RegisterContent = ({ setActiveTab, registerRef }) => {
         newErrors.phone = "Phone number is required";
         valid = false;
       } else {
-        const phoneDigits = formData.phone.replace(/\D/g, "");
-        if (phoneDigits.length < 10) {
+        // PhoneInput returns E.164 format (e.g., +1234567890)
+        const phoneDigits = formData.phone.replace(/[^\d]/g, "");
+        // E.164 format validation: country code (1-3 digits) + national number
+        if (phoneDigits.length < 10 || phoneDigits.length > 15) {
           newErrors.phone = "Please enter a valid phone number";
           valid = false;
         }
@@ -502,7 +500,7 @@ const RegisterContent = ({ setActiveTab, registerRef }) => {
         lastName: formData.lastName,
         email: formData.email,
         password: formData.password,
-        phone: formData.phone.replace(/\D/g, ""), // Remove formatting for API
+        phone: formData.phone, // PhoneInput already provides E.164 format (e.g., +1234567890)
         dateOfBirth: formData.dateOfBirth,
         gender: formData.gender,
         province: formData.province,
@@ -931,26 +929,16 @@ const RegisterContent = ({ setActiveTab, registerRef }) => {
                 </button>
               </div>
 
-              <div className="w-full flex flex-col items-start justify-center gap-2">
-                <label htmlFor="phone">Phone Number</label>
-                <input
-                  type="tel"
-                  id="phone"
+              <div className="w-full">
+                <PhoneInput
+                  title="Phone Number"
                   name="phone"
-                  className={`block w-[100%] rounded-[8px] h-[40px] text-md m-auto border px-4 focus:outline focus:outline-2 focus:outline-black focus:ring-0 focus:border-transparent ${
-                    errors.phone ? "border-red-500" : "border-gray-500"
-                  }`}
-                  placeholder="(___) ___-____"
                   value={formData.phone}
-                  onChange={handlePhoneChange}
-                  onBlur={(e) => validateField("phone", e.target.value)}
-                  style={{ outlineColor: "black" }}
                   required
-                  maxLength={14}
+                  onChange={handlePhoneChange}
+                  error={errors.phone}
+                  defaultCountry="US"
                 />
-                {errors.phone && (
-                  <span className="text-red-500 text-sm">{errors.phone}</span>
-                )}
               </div>
 
               <div className="w-full flex flex-col items-start justify-center gap-2">

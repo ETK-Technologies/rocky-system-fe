@@ -100,14 +100,22 @@ export const validateField = (fieldType, value, country = "CA") => {
     return { isValid: true, message: "" };
   }
 
-  // Special handling for phone numbers - normalize and validate
+  // Special handling for phone numbers - validate international format (E.164)
   if (fieldType === "phone") {
-    // Remove all non-digit characters except + at the start
-    const cleaned = trimmedValue.replace(/[^\d+]/g, '');
-    // Remove leading +1 or 1 for US numbers
-    const normalized = cleaned.replace(/^\+?1?/, '');
-    // Should have exactly 10 digits for US/Canada
-    if (normalized.length !== 10 || !/^\d+$/.test(normalized)) {
+    // E.164 format: + followed by 1-15 digits
+    // This format is used by react-phone-number-input library
+    const e164Pattern = /^\+[1-9]\d{1,14}$/;
+    
+    if (!e164Pattern.test(trimmedValue)) {
+      // If not in E.164 format, try to validate as US/Canada format for backward compatibility
+      const cleaned = trimmedValue.replace(/[^\d+]/g, '');
+      const normalized = cleaned.replace(/^\+?1?/, '');
+      
+      // Allow US/Canada format (10 digits) for backward compatibility
+      if (normalized.length === 10 && /^\d+$/.test(normalized)) {
+        return { isValid: true, message: "" };
+      }
+      
       return {
         isValid: false,
         message: rule.message,

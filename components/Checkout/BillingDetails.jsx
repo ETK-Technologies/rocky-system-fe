@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import FormInput from "./FormInput";
 import DOBInput from "../shared/DOBInput";
+import PhoneInput from "../shared/PhoneInput";
 import PostCanadaAddressAutocomplete from "./PostCanada/PostCanadaAddressAutocomplete";
 import { checkAgeRestriction } from "@/utils/ageValidation";
 import { logger } from "@/utils/devLogger";
@@ -303,13 +304,14 @@ const BillingDetails = ({
         />
       </div>
       <div className="mb-4">
-        <FormInput
+        <PhoneInput
           title="Phone Number"
           name="phone"
           value={formData.billing_address?.phone || ""}
-          placeholder="Enter your phone number"
           required
           onChange={handleBillingAddressChange}
+          disabled={isUpdatingShipping}
+          defaultCountry="US"
         />
       </div>
       <div className="mb-4">

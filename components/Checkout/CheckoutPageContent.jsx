@@ -64,7 +64,7 @@ const CheckoutPageWrapper = () => {
         },
         paymentMethodCreation: "manual", // Required for createPaymentMethod with PaymentElement
         // Configure payment methods at the Elements level
-        paymentMethodTypes: ["card", "link"], // Allow card and link payments
+        paymentMethodTypes: ["card"], // Allow card and link payments
         // Note: capture_method is set on the PaymentIntent, not Elements
         // We'll need to ensure the PaymentIntent matches Elements expectations
       }}

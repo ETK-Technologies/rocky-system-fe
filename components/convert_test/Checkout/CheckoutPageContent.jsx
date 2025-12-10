@@ -58,7 +58,7 @@ const CheckoutPageWrapper = () => {
         },
         paymentMethodCreation: "manual", // Required for createPaymentMethod with PaymentElement
         // Configure payment methods at the Elements level
-        paymentMethodTypes: ["card", "link"], // Allow card and link payments
+        paymentMethodTypes: ["card"], // Allow card and link payments
       }}
     >
       <CheckoutPageContent />
