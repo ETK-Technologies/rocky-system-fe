@@ -21,9 +21,10 @@ const VALIDATION_RULES = {
   },
 
   // Phone validation - Canadian/US format
+  // Accepts various formats: (123) 456-7890, 123-456-7890, 123.456.7890, +1 123 456 7890, 1234567890, etc.
   phone: {
-    pattern:
-      /^[\+]?[1]?[\s\-\.]?[(]?[0-9]{3}[)]?[\s\-\.]?[0-9]{3}[\s\-\.]?[0-9]{4}$/,
+    // More flexible pattern that accepts common US phone formats
+    pattern: /^[\+]?[1]?[\s\-\.\(\)]*[0-9][\s\-\.\(\)0-9]{8,14}[0-9]$/,
     message: "Please enter a valid phone number",
   },
 
@@ -96,6 +97,22 @@ export const validateField = (fieldType, value, country = "CA") => {
   const rule = VALIDATION_RULES[fieldType];
   if (!rule) {
     logger.warn(`No validation rule found for field type: ${fieldType}`);
+    return { isValid: true, message: "" };
+  }
+
+  // Special handling for phone numbers - normalize and validate
+  if (fieldType === "phone") {
+    // Remove all non-digit characters except + at the start
+    const cleaned = trimmedValue.replace(/[^\d+]/g, '');
+    // Remove leading +1 or 1 for US numbers
+    const normalized = cleaned.replace(/^\+?1?/, '');
+    // Should have exactly 10 digits for US/Canada
+    if (normalized.length !== 10 || !/^\d+$/.test(normalized)) {
+      return {
+        isValid: false,
+        message: rule.message,
+      };
+    }
     return { isValid: true, message: "" };
   }
 

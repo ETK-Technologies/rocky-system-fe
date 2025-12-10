@@ -25,17 +25,26 @@ export async function GET(request) {
     // Get origin for Origin header (required for backend domain whitelist)
     const origin = getOrigin(request);
 
+    // Ensure BASE_URL is set, fallback to production URL if needed
+    const apiUrl = BASE_URL || "https://rocky-be-production.up.railway.app";
+    const appKey = process.env.NEXT_PUBLIC_APP_KEY;
+    const appSecret = process.env.NEXT_PUBLIC_APP_SECRET;
+
+    // Ensure Authorization header has "Bearer " prefix
+    const authHeader = authToken.value.startsWith("Bearer ")
+      ? authToken.value
+      : `Bearer ${authToken.value}`;
+
     // Fetch user profile data from backend API
     const response = await axios.get(
-      `${BASE_URL}/api/v1/auth/profile`,
+      `${apiUrl}/api/v1/auth/profile`,
       {
         headers: {
-          "Content-Type": "application/json",
-          accept: "application/json",
-          "X-App-Key": process.env.NEXT_PUBLIC_APP_KEY,
-          "X-App-Secret": process.env.NEXT_PUBLIC_APP_SECRET,
+          accept: "*/*",
+          "X-App-Key": appKey,
+          "X-App-Secret": appSecret,
+          Authorization: authHeader,
           "Origin": origin,
-          Authorization: authToken.value, // Should already include "Bearer " prefix
         },
       }
     );
@@ -44,7 +53,7 @@ export async function GET(request) {
     const profileData = response.data;
 
     // Handle error responses
-    if (profileData.error || !profileData) {
+    if (!profileData || profileData.error) {
       return NextResponse.json(
         {
           success: false,
@@ -54,53 +63,37 @@ export async function GET(request) {
       );
     }
 
-    // Backend API returns user object with nested billing/shipping addresses
+    // API returns flat structure with all fields directly in the response
     // Map the backend response structure to our frontend format
-    const user = profileData.user || profileData;
-    const billing = user.billingAddress || user.billing || {};
-    const shipping = user.shippingAddress || user.shipping || {};
-    const customMeta = user.customMeta || user.meta || {};
-
-    // Format the response for our frontend
+    // The API response already has the correct field names, just pass them through
     return NextResponse.json({
-      success: true,
-      // User data
-      first_name: user.firstName || user.first_name || "",
-      last_name: user.lastName || user.last_name || "",
-      email: user.email || "",
-      phone: user.phone || billing.phone || customMeta.phone_number || "",
+      success: profileData.success !== false,
+      // User data - API returns these fields directly
+      first_name: profileData.first_name || "",
+      last_name: profileData.last_name || "",
+      email: profileData.email || "",
+      phone: profileData.phone || "",
 
-      // Custom meta
-      gender: customMeta.gender || user.gender || "",
-      date_of_birth: customMeta.date_of_birth || customMeta.dateOfBirth || user.date_of_birth || user.dateOfBirth || "",
-      province:
-        customMeta.province ||
-        billing.state ||
-        billing.province ||
-        user.province ||
-        "",
+      // Custom meta fields
+      gender: profileData.gender || "",
+      date_of_birth: profileData.date_of_birth || "",
+      province: profileData.province || "",
 
-      // Billing address fields
-      billing_address_1: billing.address1 || billing.address_1 || billing.street || "",
-      billing_address_2: billing.address2 || billing.address_2 || "",
-      billing_city: billing.city || "",
-      billing_state: billing.state || billing.province || customMeta.province || "",
-      billing_postcode: billing.postalCode || billing.postcode || billing.postal_code || "",
-      billing_country: billing.country || "CA",
+      // Billing address fields - API returns these directly
+      billing_address_1: profileData.billing_address_1 || "",
+      billing_address_2: profileData.billing_address_2 || "",
+      billing_city: profileData.billing_city || "",
+      billing_state: profileData.billing_state || "",
+      billing_postcode: profileData.billing_postcode || "",
+      billing_country: profileData.billing_country || "US",
 
-      // Shipping address fields
-      shipping_address_1: shipping.address1 || shipping.address_1 || shipping.street || "",
-      shipping_address_2: shipping.address2 || shipping.address_2 || "",
-      shipping_city: shipping.city || "",
-      shipping_state:
-        shipping.state ||
-        shipping.province ||
-        billing.state ||
-        billing.province ||
-        customMeta.province ||
-        "",
-      shipping_postcode: shipping.postalCode || shipping.postcode || shipping.postal_code || "",
-      shipping_country: shipping.country || "CA",
+      // Shipping address fields - API returns these directly
+      shipping_address_1: profileData.shipping_address_1 || "",
+      shipping_address_2: profileData.shipping_address_2 || "",
+      shipping_city: profileData.shipping_city || "",
+      shipping_state: profileData.shipping_state || "",
+      shipping_postcode: profileData.shipping_postcode || "",
+      shipping_country: profileData.shipping_country || "US",
 
       // Include the raw data for debugging or additional use cases
       raw_profile_data: profileData,
