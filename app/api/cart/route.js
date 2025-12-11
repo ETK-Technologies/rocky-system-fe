@@ -101,7 +101,11 @@ export async function GET(request) {
     // Fetch cart from new backend API
     // IMPORTANT: Only pass sessionId if user is NOT authenticated
     // If both authToken and sessionId are provided, prioritize authToken (authenticated user)
+    // Authenticated users should NOT use sessionId - cart services use authentication instead
     const useSessionId = !authToken && sessionId; // Only use sessionId if no authToken
+    if (authToken && sessionId) {
+      logger.log("⚠️ Warning: sessionId provided but user is authenticated. Ignoring sessionId and using authentication.");
+    }
     const cartData = await fetchCartFromBackend(
       authToken?.value || null,
       useSessionId ? sessionId : null,

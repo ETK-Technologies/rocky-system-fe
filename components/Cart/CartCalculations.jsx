@@ -28,13 +28,7 @@ const CartCalculations = ({ cartItems, setCartItems }) => {
       const origin =
         typeof window !== "undefined" ? window.location.origin : "";
       const redirectTo = encodeURIComponent(`${origin}/checkout`);
-      // Get sessionId to pass to login for cart merging
-      const { getSessionId } = await import("@/services/sessionService");
-      const sessionId = getSessionId();
-      let loginUrl = `${origin}/login-register?redirect_to=${redirectTo}&viewshow=login`;
-      if (sessionId) {
-        loginUrl += `&sessionId=${encodeURIComponent(sessionId)}`;
-      }
+      const loginUrl = `${origin}/login-register?redirect_to=${redirectTo}&viewshow=login`;
       window.location.href = loginUrl;
       return;
     }

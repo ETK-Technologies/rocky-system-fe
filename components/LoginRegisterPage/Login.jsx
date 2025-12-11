@@ -13,18 +13,15 @@ import {
 } from "../../utils/crossSellCheckout";
 import { processSavedFlowProducts } from "../../utils/flowCartHandler";
 import Link from "next/link";
-import { mergeGuestCart } from "@/lib/api/cartMerge";
 import GoogleSignInButton from "./GoogleSignInButton";
-import CartMigrationOverlay from "@/components/CartMigrationOverlay";
-import { getSessionId } from "@/services/sessionService";
 import ReCaptcha from "@/components/shared/ReCaptcha";
+import { getSessionId, clearSessionId } from "@/services/sessionService";
 
 const LoginContent = ({ setActiveTab, loginRef }) => {
   const searchParams = useSearchParams();
   const router = useRouter();
   const [submitting, setSubmitting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const [isMigratingCart, setIsMigratingCart] = useState(false);
   const [recaptchaToken, setRecaptchaToken] = useState("");
   const recaptchaRef = useRef(null);
   const [formData, setFormData] = useState({
@@ -87,14 +84,14 @@ const LoginContent = ({ setActiveTab, loginRef }) => {
           searchParams.get("ed-flow") === "1"
             ? "ed"
             : searchParams.get("wl-flow") === "1"
-              ? "wl"
-              : searchParams.get("hair-flow") === "1"
-                ? "hair"
-                : searchParams.get("mh-flow") === "1"
-                  ? "mh"
-                  : searchParams.get("skincare-flow") === "1"
-                    ? "skincare"
-                    : savedProducts.flowType || "ed"; // Use saved flow type or default to "ed"
+            ? "wl"
+            : searchParams.get("hair-flow") === "1"
+            ? "hair"
+            : searchParams.get("mh-flow") === "1"
+            ? "mh"
+            : searchParams.get("skincare-flow") === "1"
+            ? "skincare"
+            : savedProducts.flowType || "ed"; // Use saved flow type or default to "ed"
 
         logger.log(
           "Using flow type for direct cart addition after login:",
@@ -194,8 +191,10 @@ const LoginContent = ({ setActiveTab, loginRef }) => {
   useEffect(() => {
     const checkGoogleCallback = async () => {
       const error = searchParams.get("error");
-      const googleOAuthProcessing = searchParams.get("google_oauth") === "processing";
-      const googleAuthSuccess = searchParams.get("google_auth_success") === "true";
+      const googleOAuthProcessing =
+        searchParams.get("google_oauth") === "processing";
+      const googleAuthSuccess =
+        searchParams.get("google_auth_success") === "true";
 
       if (error) {
         logger.error("Google OAuth error:", error);
@@ -203,8 +202,8 @@ const LoginContent = ({ setActiveTab, loginRef }) => {
           error === "oauth_failed"
             ? "Google sign-in failed. Please try again."
             : error === "authentication_failed"
-              ? "Authentication failed. Please try again."
-              : decodeURIComponent(error)
+            ? "Authentication failed. Please try again."
+            : decodeURIComponent(error)
         );
         // Remove error from URL
         const newParams = new URLSearchParams(searchParams.toString());
@@ -216,12 +215,16 @@ const LoginContent = ({ setActiveTab, loginRef }) => {
       // If we have the success flag, handle post-login tasks and stay on current page
       // The callback route already redirected us to the target page (home or redirect_to)
       if (googleAuthSuccess) {
-        logger.log("Google auth success flag detected, handling post-login tasks");
+        logger.log(
+          "Google auth success flag detected, handling post-login tasks"
+        );
 
         // Remove the flag from URL
         const newParams = new URLSearchParams(searchParams.toString());
         newParams.delete("google_auth_success");
-        const cleanUrl = window.location.pathname + (newParams.toString() ? `?${newParams.toString()}` : '');
+        const cleanUrl =
+          window.location.pathname +
+          (newParams.toString() ? `?${newParams.toString()}` : "");
         router.replace(cleanUrl);
 
         // Handle post-login tasks in background
@@ -242,36 +245,29 @@ const LoginContent = ({ setActiveTab, loginRef }) => {
           // Show success message
           toast.success("You logged in successfully with Google");
 
-          // Merge guest cart if sessionId exists
+          // Clear sessionId after successful login - authenticated users don't need it
+          // Cart services will now use authentication instead of sessionId
           try {
-            const sessionId = getSessionId();
-            if (sessionId) {
-              logger.log("Merging guest cart after Google login...");
-              setIsMigratingCart(true);
-
-              const mergeResult = await mergeGuestCart(sessionId);
-
-              if (mergeResult.success && mergeResult.merged) {
-                logger.log("Guest cart merged successfully:", mergeResult);
-                document.getElementById("cart-refresher")?.click();
-                const cartUpdatedEvent = new CustomEvent("cart-updated");
-                document.dispatchEvent(cartUpdatedEvent);
-              } else {
-                logger.warn("Cart merge failed or not needed:", mergeResult);
-              }
-            } else {
-              logger.log("No sessionId found, skipping cart merge");
-            }
-          } catch (mergeError) {
-            logger.error("Error merging cart:", mergeError);
-          } finally {
-            setIsMigratingCart(false);
+            clearSessionId();
+            logger.log(
+              "SessionId cleared after Google login - now using authentication for cart"
+            );
+          } catch (error) {
+            logger.warn("Could not clear sessionId after Google login:", error);
           }
+
+          // Refresh the cart display
+          document.getElementById("cart-refresher")?.click();
+          const cartUpdatedEvent = new CustomEvent("cart-updated");
+          document.dispatchEvent(cartUpdatedEvent);
 
           // Handle cross-sell products - if there are any, redirect to checkout
           const redirectPath = await handleCrossSellProducts();
           if (redirectPath) {
-            logger.log("Cross-sell products found, redirecting to:", redirectPath);
+            logger.log(
+              "Cross-sell products found, redirecting to:",
+              redirectPath
+            );
             setTimeout(() => {
               router.push(redirectPath);
               setTimeout(() => router.refresh(), 300);
@@ -336,31 +332,10 @@ const LoginContent = ({ setActiveTab, loginRef }) => {
                 // Show success message
                 toast.success("You logged in successfully with Google");
 
-                // Merge guest cart if sessionId exists
-                try {
-                  const sessionId = getSessionId();
-                  if (sessionId) {
-                    logger.log("Merging guest cart after Google login...");
-                    setIsMigratingCart(true);
-
-                    const mergeResult = await mergeGuestCart(sessionId);
-
-                    if (mergeResult.success && mergeResult.merged) {
-                      logger.log("Guest cart merged successfully:", mergeResult);
-                      document.getElementById("cart-refresher")?.click();
-                      const cartUpdatedEvent = new CustomEvent("cart-updated");
-                      document.dispatchEvent(cartUpdatedEvent);
-                    } else {
-                      logger.warn("Cart merge failed or not needed:", mergeResult);
-                    }
-                  } else {
-                    logger.log("No sessionId found, skipping cart merge");
-                  }
-                } catch (mergeError) {
-                  logger.error("Error merging cart:", mergeError);
-                } finally {
-                  setIsMigratingCart(false);
-                }
+                // Refresh the cart display
+                document.getElementById("cart-refresher")?.click();
+                const cartUpdatedEvent = new CustomEvent("cart-updated");
+                document.dispatchEvent(cartUpdatedEvent);
 
                 // Handle cross-sell and redirect
                 const redirectPath = await handleCrossSellProducts();
@@ -385,7 +360,9 @@ const LoginContent = ({ setActiveTab, loginRef }) => {
               }, 100);
             } else {
               logger.error("Authentication not verified after waiting");
-              toast.error("Authentication failed. Please try logging in again.");
+              toast.error(
+                "Authentication failed. Please try logging in again."
+              );
               const newParams = new URLSearchParams(searchParams.toString());
               newParams.delete("google_oauth");
               router.replace(`/login-register?${newParams.toString()}`);
@@ -414,38 +391,31 @@ const LoginContent = ({ setActiveTab, loginRef }) => {
               }
             }
           } catch (profileError) {
-            logger.error("Error fetching profile after Google login:", profileError);
+            logger.error(
+              "Error fetching profile after Google login:",
+              profileError
+            );
             // Continue anyway - cookies might already be set
           }
 
           // Show success message
           toast.success("You logged in successfully with Google");
 
-          // Merge guest cart if sessionId exists
+          // Clear sessionId after successful login - authenticated users don't need it
+          // Cart services will now use authentication instead of sessionId
           try {
-            const sessionId = getSessionId();
-            if (sessionId) {
-              logger.log("Merging guest cart after Google login...");
-              setIsMigratingCart(true);
-
-              const mergeResult = await mergeGuestCart(sessionId);
-
-              if (mergeResult.success && mergeResult.merged) {
-                logger.log("Guest cart merged successfully:", mergeResult);
-                document.getElementById("cart-refresher")?.click();
-                const cartUpdatedEvent = new CustomEvent("cart-updated");
-                document.dispatchEvent(cartUpdatedEvent);
-              } else {
-                logger.warn("Cart merge failed or not needed:", mergeResult);
-              }
-            } else {
-              logger.log("No sessionId found, skipping cart merge");
-            }
-          } catch (mergeError) {
-            logger.error("Error merging cart:", mergeError);
-          } finally {
-            setIsMigratingCart(false);
+            clearSessionId();
+            logger.log(
+              "SessionId cleared after Google login - now using authentication for cart"
+            );
+          } catch (error) {
+            logger.warn("Could not clear sessionId after Google login:", error);
           }
+
+          // Refresh the cart display
+          document.getElementById("cart-refresher")?.click();
+          const cartUpdatedEvent = new CustomEvent("cart-updated");
+          document.dispatchEvent(cartUpdatedEvent);
 
           // Handle cross-sell products
           const redirectPath = await handleCrossSellProducts();
@@ -466,7 +436,10 @@ const LoginContent = ({ setActiveTab, loginRef }) => {
             }
           }
 
-          logger.log("Final redirect path after Google login:", finalRedirectPath);
+          logger.log(
+            "Final redirect path after Google login:",
+            finalRedirectPath
+          );
 
           // Small delay to show toast, then navigate smoothly to home page
           setTimeout(() => {
@@ -512,20 +485,8 @@ const LoginContent = ({ setActiveTab, loginRef }) => {
     setSubmitting(true);
 
     try {
-      // Get sessionId from localStorage or URL params for guest cart merging
-      let sessionId = getSessionId();
-      
-      // Fallback: Check URL params for sessionId (in case it was passed from redirect)
-      if (!sessionId && typeof window !== "undefined") {
-        const urlParams = new URLSearchParams(window.location.search);
-        const urlSessionId = urlParams.get("sessionId");
-        if (urlSessionId) {
-          sessionId = urlSessionId;
-          // Store it in localStorage for future use
-          const { setSessionId } = await import("@/services/sessionService");
-          setSessionId(sessionId);
-        }
-      }
+      // Get sessionId for guest cart migration - backend will merge guest cart into authenticated user's cart
+      const sessionId = getSessionId(); // This will auto-generate if it doesn't exist (but should exist if user added items)
 
       // Prepare request body
       const requestBody = {
@@ -534,9 +495,13 @@ const LoginContent = ({ setActiveTab, loginRef }) => {
         recaptchaToken: token,
       };
 
-      // Include sessionId if available
+      // Include sessionId if available - backend will use it to migrate guest cart
       if (sessionId) {
         requestBody.sessionId = sessionId;
+        logger.log(
+          "Including sessionId in login request for cart migration:",
+          sessionId
+        );
       }
 
       const res = await fetch("/api/login", {
@@ -577,60 +542,21 @@ const LoginContent = ({ setActiveTab, loginRef }) => {
           toast.success("You logged in successfully");
         }
 
-        // Handle cart merging
-        // The API may merge automatically when sessionId is provided, but we'll explicitly merge as well
-        let cartMerged = data.data?.cart?.merged || false;
-
-        // If cart wasn't merged automatically and we have a sessionId, merge it explicitly
-        if (!cartMerged && sessionId) {
-          try {
-            logger.log("Cart not merged automatically, merging explicitly...");
-            setIsMigratingCart(true);
-
-            const mergeResult = await mergeGuestCart(sessionId);
-
-            if (mergeResult.success && mergeResult.merged) {
-              logger.log("Guest cart merged successfully:", mergeResult);
-              cartMerged = true;
-            } else {
-              logger.warn("Cart merge failed or not needed:", mergeResult);
-            }
-          } catch (mergeError) {
-            logger.error("Error merging cart:", mergeError);
-            // Don't block login flow if merge fails
-          } finally {
-            setIsMigratingCart(false);
-          }
-        } else if (cartMerged) {
-          logger.log("Guest cart was automatically merged into user cart");
-        }
-
-        // Refresh the cart display after merge
-        if (cartMerged) {
-          document.getElementById("cart-refresher")?.click();
-          const cartUpdatedEvent = new CustomEvent("cart-updated");
-          document.dispatchEvent(cartUpdatedEvent);
-        }
-
-        // Clear sessionId after successful login and cart merge
-        // SessionId is no longer needed since user is authenticated
-        if (sessionId) {
-          try {
-            const { clearSessionId } = await import("@/services/sessionService");
-            clearSessionId();
-            logger.log("SessionId cleared after successful login");
-          } catch (error) {
-            logger.warn("Could not clear sessionId after login:", error);
-          }
-        }
-
-        // Small delay to ensure cart operations have time to complete
-        if (redirectTo && redirectTo.includes("/checkout")) {
+        // Clear sessionId after successful login - authenticated users don't need it
+        // Cart services will now use authentication instead of sessionId
+        try {
+          clearSessionId();
           logger.log(
-            "Waiting for cart operations to complete before checkout redirect..."
+            "SessionId cleared after successful login - now using authentication for cart"
           );
-          await new Promise((resolve) => setTimeout(resolve, 500));
+        } catch (error) {
+          logger.warn("Could not clear sessionId after login:", error);
         }
+
+        // Refresh the cart display
+        document.getElementById("cart-refresher")?.click();
+        const cartUpdatedEvent = new CustomEvent("cart-updated");
+        document.dispatchEvent(cartUpdatedEvent);
 
         // Determine the redirect path after successful login
         let redirectPath;
@@ -783,7 +709,6 @@ const LoginContent = ({ setActiveTab, loginRef }) => {
 
   return (
     <>
-      <CartMigrationOverlay show={isMigratingCart} />
       <div className="px-3 mx-auto pt-5 text-center">
         <h2 className="text-[#251f20] text-[32px] headers-font font-[450] leading-[44.80px]">
           Sign in to your account
@@ -813,8 +738,9 @@ const LoginContent = ({ setActiveTab, loginRef }) => {
               type="email"
               id="email"
               name="email"
-              className={`block w-[100%] rounded-[8px] h-[40px] text-md m-auto border px-4 focus:outline focus:outline-2 focus:outline-black focus:ring-0 focus:border-transparent ${errors.email ? "border-red-500" : "border-gray-500"
-                }`}
+              className={`block w-[100%] rounded-[8px] h-[40px] text-md m-auto border px-4 focus:outline focus:outline-2 focus:outline-black focus:ring-0 focus:border-transparent ${
+                errors.email ? "border-red-500" : "border-gray-500"
+              }`}
               tabIndex="1"
               autoComplete="email"
               placeholder="Enter your email address"
@@ -843,8 +769,9 @@ const LoginContent = ({ setActiveTab, loginRef }) => {
                 id="password"
                 placeholder="Enter your password"
                 name="password"
-                className={`block w-[100%] rounded-[8px] h-[40px] text-md m-auto border px-4 focus:outline focus:outline-2 focus:outline-black focus:ring-0 focus:border-transparent ${errors.password ? "border-red-500" : "border-gray-500"
-                  }`}
+                className={`block w-[100%] rounded-[8px] h-[40px] text-md m-auto border px-4 focus:outline focus:outline-2 focus:outline-black focus:ring-0 focus:border-transparent ${
+                  errors.password ? "border-red-500" : "border-gray-500"
+                }`}
                 tabIndex="2"
                 autoComplete="off"
                 value={formData.password}
@@ -892,8 +819,9 @@ const LoginContent = ({ setActiveTab, loginRef }) => {
             </div>
             <div className="basis-1/2">
               <Link
-                href={`/forgot-password${redirectTo ? "?redirect_to=" + redirectTo : ""
-                  }${isEdFlow ? (redirectTo ? "&" : "?") + "ed-flow=1" : ""}`}
+                href={`/forgot-password${
+                  redirectTo ? "?redirect_to=" + redirectTo : ""
+                }${isEdFlow ? (redirectTo ? "&" : "?") + "ed-flow=1" : ""}`}
                 className="text-[#AE7E56] text-sm font-normal block text-right underline"
               >
                 Forgot Password?

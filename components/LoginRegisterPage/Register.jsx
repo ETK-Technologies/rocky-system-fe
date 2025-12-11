@@ -12,14 +12,13 @@ import {
 import { toast } from "react-toastify";
 import { useSearchParams, useRouter } from "next/navigation";
 import Loader from "@/components/Loader";
-import { getSessionId } from "@/services/sessionService";
-import { mergeGuestCart } from "@/lib/api/cartMerge";
 import {
   getSavedProducts,
   clearSavedProducts,
 } from "../../utils/crossSellCheckout";
 import { processSavedFlowProducts } from "../../utils/flowCartHandler";
 import DOBInput from "@/components/shared/DOBInput";
+import { getSessionId, clearSessionId } from "@/services/sessionService";
 import PhoneInput from "@/components/shared/PhoneInput";
 import ReCaptcha from "@/components/shared/ReCaptcha";
 import { useRef } from "react";
@@ -509,8 +508,8 @@ const RegisterContent = ({ setActiveTab, registerRef }) => {
     setLoading(true);
 
     try {
-      // Get sessionId from localStorage for guest cart merging
-      const sessionId = getSessionId();
+      // Get sessionId for guest cart migration - backend will merge guest cart into authenticated user's cart
+      const sessionId = getSessionId(); // This will auto-generate if it doesn't exist (but should exist if user added items)
 
       // Prepare request body
       const requestBody = {
@@ -525,9 +524,13 @@ const RegisterContent = ({ setActiveTab, registerRef }) => {
         recaptchaToken: token,
       };
 
-      // Include sessionId if available
+      // Include sessionId if available - backend will use it to migrate guest cart
       if (sessionId) {
         requestBody.sessionId = sessionId;
+        logger.log(
+          "Including sessionId in register request for cart migration:",
+          sessionId
+        );
       }
 
       const res = await fetch("/api/register", {
@@ -547,6 +550,17 @@ const RegisterContent = ({ setActiveTab, registerRef }) => {
         document.getElementById("cart-refresher")?.click();
         toast.success(data.message || "You registered successfully!");
 
+        // Clear sessionId after successful registration - authenticated users don't need it
+        // Cart services will now use authentication instead of sessionId
+        try {
+          clearSessionId();
+          logger.log(
+            "SessionId cleared after successful registration - now using authentication for cart"
+          );
+        } catch (error) {
+          logger.warn("Could not clear sessionId after registration:", error);
+        }
+
         // Check if we came from a cross-sell popup
         const isFromCrossSell =
           searchParams.get("ed-flow") === "1" ||
@@ -554,56 +568,10 @@ const RegisterContent = ({ setActiveTab, registerRef }) => {
           searchParams.get("hair-flow") === "1" ||
           searchParams.get("mh-flow") === "1";
 
-        // Handle cart merging
-        // The API may merge automatically when sessionId is provided, but we'll explicitly merge as well
-        let cartMerged = data.data?.cart?.merged || false;
-
-        // If cart wasn't merged automatically and we have a sessionId, merge it explicitly
-        if (!cartMerged && sessionId) {
-          try {
-            logger.log("Cart not merged automatically, merging explicitly...");
-
-            const mergeResult = await mergeGuestCart(sessionId);
-
-            if (mergeResult.success && mergeResult.merged) {
-              logger.log("Guest cart merged successfully:", mergeResult);
-              cartMerged = true;
-            } else {
-              logger.warn("Cart merge failed or not needed:", mergeResult);
-            }
-          } catch (mergeError) {
-            logger.error("Error merging cart:", mergeError);
-            // Don't block registration flow if merge fails
-          }
-        } else if (cartMerged) {
-          logger.log("Guest cart was automatically merged into user cart");
-        }
-
-        // Refresh the cart display after merge
-        if (cartMerged) {
-          document.getElementById("cart-refresher")?.click();
-          const cartUpdatedEvent = new CustomEvent("cart-updated");
-          document.dispatchEvent(cartUpdatedEvent);
-        }
-
-        // Clear sessionId after successful registration and cart merge
-        // SessionId is no longer needed since user is authenticated
-        if (sessionId) {
-          try {
-            const { clearSessionId } = await import(
-              "@/services/sessionService"
-            );
-            clearSessionId();
-            logger.log("SessionId cleared after successful registration");
-          } catch (error) {
-            logger.warn("Could not clear sessionId after registration:", error);
-          }
-        }
-
-        // Small delay to ensure everything is processed
-        if (redirectTo && redirectTo.includes("/checkout")) {
-          await new Promise((resolve) => setTimeout(resolve, 500));
-        }
+        // Refresh the cart display
+        document.getElementById("cart-refresher")?.click();
+        const cartUpdatedEvent = new CustomEvent("cart-updated");
+        document.dispatchEvent(cartUpdatedEvent);
 
         let redirectPath;
 
@@ -1105,7 +1073,9 @@ const RegisterContent = ({ setActiveTab, registerRef }) => {
                 }}
                 onError={(error) => {
                   logger.error("reCAPTCHA error:", error);
-                  toast.error("reCAPTCHA verification failed. Please try again.");
+                  toast.error(
+                    "reCAPTCHA verification failed. Please try again."
+                  );
                 }}
               />
 

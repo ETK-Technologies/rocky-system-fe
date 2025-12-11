@@ -13,7 +13,7 @@ const BASE_URL = process.env.BASE_URL;
  */
 export async function POST(req) {
   try {
-    const { email, password, sessionId, recaptchaToken } = await req.json();
+    const { email, password, recaptchaToken, sessionId } = await req.json();
 
     // Verify reCAPTCHA if token is provided
     if (recaptchaToken) {
@@ -64,9 +64,10 @@ export async function POST(req) {
         password,
       };
 
-      // Include sessionId if provided (for guest cart merging)
+      // Include sessionId if provided - backend will use it to migrate guest cart to authenticated user
       if (sessionId) {
         requestBody.sessionId = sessionId;
+        logger.log("Including sessionId in backend login request for cart migration");
       }
 
       logger.log("Logging in user with new auth API");

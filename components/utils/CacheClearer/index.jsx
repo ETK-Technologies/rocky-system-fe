@@ -3,12 +3,37 @@
 import { useEffect } from "react";
 import { logger } from "@/utils/devLogger";
 import { usePathname } from "next/navigation";
-import { clearSessionId } from "@/services/sessionService";
+import { clearSessionId, getSessionId } from "@/services/sessionService";
 
 const CacheClearer = () => {
   const pathname = usePathname();
 
   useEffect(() => {
+    // Initialize sessionId on site entry if user is not authenticated
+    // This ensures sessionId exists for guest cart operations
+    try {
+      // Check authentication status (check userId cookie, not httpOnly authToken)
+      const getCookie = (name) => {
+        const match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
+        return match ? match[2] : null;
+      };
+      const userId = getCookie("userId");
+      const authenticated = !!userId;
+
+      if (!authenticated) {
+        // Auto-generate sessionId if it doesn't exist (getSessionId does this automatically)
+        const sessionId = getSessionId();
+        if (sessionId) {
+          logger.log("SessionId initialized for guest user:", sessionId);
+        }
+      } else {
+        // If user is authenticated, ensure sessionId is cleared (shouldn't exist, but double-check)
+        clearSessionId();
+      }
+    } catch (error) {
+      logger.warn("Error initializing sessionId:", error);
+    }
+
     // Function to check for the clearCache cookie and clear localStorage if found
     const checkAndClearCache = () => {
       const cookies = document.cookie.split(";");

@@ -22,8 +22,8 @@ export async function POST(req) {
       dateOfBirth,
       gender,
       province,
-      sessionId,
       recaptchaToken,
+      sessionId,
     } = await req.json();
 
     // Verify reCAPTCHA if token is provided
@@ -141,9 +141,10 @@ export async function POST(req) {
         province,
       };
 
-      // Include sessionId if provided (for guest cart merging)
+      // Include sessionId if provided - backend will use it to migrate guest cart to authenticated user
       if (sessionId) {
         requestBody.sessionId = sessionId;
+        logger.log("Including sessionId in backend register request for cart migration");
       }
 
       logger.log("Registering user with new auth API");

@@ -129,11 +129,20 @@ export async function POST(req) {
     };
 
     // AUTHENTICATION LOGIC - This determines the final payload structure
+    // IMPORTANT: Authenticated users should NOT use sessionId
+    // If authToken exists, we ignore sessionId and use authentication only
     if (authToken) {
       // ✅ AUTHENTICATED USER PATH
       // Add FULL Authorization header with complete Bearer token
       // Token already contains "Bearer " prefix + full JWT token
       headers.Authorization = authToken;
+      
+      // Explicitly remove sessionId from request body if it was sent
+      // Authenticated users should NOT use sessionId
+      if (sessionId) {
+        logger.log("⚠️ Warning: sessionId provided but user is authenticated. Ignoring sessionId and using authentication.");
+      }
+      // Do NOT include sessionId in requestBody for authenticated users
     } else {
       // ✅ GUEST USER PATH
       // No Authorization header
