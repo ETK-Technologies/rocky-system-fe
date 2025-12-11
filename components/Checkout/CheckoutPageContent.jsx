@@ -39,6 +39,7 @@ import { loadStripe } from "@stripe/stripe-js";
 import { useAddressManager } from "@/lib/hooks/useAddressManager";
 import { debugAddressData } from "@/utils/addressDebugger";
 import { getCurrencyLowerCase } from "@/lib/constants/currency";
+import { useRef, useState } from "react";
 
 // Load Stripe outside component to avoid recreating on every render
 const stripePromise = loadStripe(

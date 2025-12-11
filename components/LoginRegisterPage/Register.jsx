@@ -21,6 +21,8 @@ import {
 import { processSavedFlowProducts } from "../../utils/flowCartHandler";
 import DOBInput from "@/components/shared/DOBInput";
 import PhoneInput from "@/components/shared/PhoneInput";
+import ReCaptcha from "@/components/shared/ReCaptcha";
+import { useRef } from "react";
 
 const RegisterContent = ({ setActiveTab, registerRef }) => {
   const router = useRouter();
@@ -55,6 +57,8 @@ const RegisterContent = ({ setActiveTab, registerRef }) => {
   const [provinces, setProvinces] = useState([]);
   const [loadingProvinces, setLoadingProvinces] = useState(false);
   const [provincesError, setProvincesError] = useState("");
+  const [recaptchaToken, setRecaptchaToken] = useState("");
+  const recaptchaRef = useRef(null);
   const redirectTo = searchParams.get("redirect_to");
   const isEdFlow = searchParams.get("ed-flow") === "1";
 
@@ -488,6 +492,20 @@ const RegisterContent = ({ setActiveTab, registerRef }) => {
       return;
     }
 
+    // Execute reCAPTCHA v3 (invisible, gets token automatically)
+    let token = null;
+    try {
+      token = await recaptchaRef.current?.execute("register");
+      if (!token) {
+        toast.error("reCAPTCHA verification failed. Please try again.");
+        return;
+      }
+    } catch (error) {
+      logger.error("reCAPTCHA execution error:", error);
+      toast.error("reCAPTCHA verification failed. Please try again.");
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -504,6 +522,7 @@ const RegisterContent = ({ setActiveTab, registerRef }) => {
         dateOfBirth: formData.dateOfBirth,
         gender: formData.gender,
         province: formData.province,
+        recaptchaToken: token,
       };
 
       // Include sessionId if available
@@ -613,7 +632,17 @@ const RegisterContent = ({ setActiveTab, registerRef }) => {
           province: "",
         });
         setCurrentStep(1);
+        // Reset reCAPTCHA on success
+        if (recaptchaRef.current) {
+          recaptchaRef.current.reset();
+        }
+        setRecaptchaToken("");
       } else {
+        // Reset reCAPTCHA on error
+        if (recaptchaRef.current) {
+          recaptchaRef.current.reset();
+        }
+        setRecaptchaToken("");
         logger.log("Register API Error Response:", {
           status: res.status,
           ok: res.ok,
@@ -701,6 +730,11 @@ const RegisterContent = ({ setActiveTab, registerRef }) => {
       toast.error(
         "An error occurred during registration. Please try again later."
       );
+      // Reset reCAPTCHA on error
+      if (recaptchaRef.current) {
+        recaptchaRef.current.reset();
+      }
+      setRecaptchaToken("");
     } finally {
       setLoading(false);
     }
@@ -1062,6 +1096,18 @@ const RegisterContent = ({ setActiveTab, registerRef }) => {
                   <span className="text-red-500 text-sm">{errors.gender}</span>
                 )}
               </div>
+
+              <ReCaptcha
+                ref={recaptchaRef}
+                siteKey={process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY}
+                onVerify={(token) => {
+                  setRecaptchaToken(token);
+                }}
+                onError={(error) => {
+                  logger.error("reCAPTCHA error:", error);
+                  toast.error("reCAPTCHA verification failed. Please try again.");
+                }}
+              />
 
               <div className="w-full flex justify-center items-center my-5">
                 <button

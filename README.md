@@ -3,6 +3,7 @@
 A modern, headless storefront for Rocky built with Next.js App Router. It renders a fast, SEO-friendly frontend while integrating with a WordPress + WooCommerce backend via serverless API routes. This repo focuses on UX, performance, tracking, and a robust checkout that mirrors WooCommerce Store API behavior.
 
 ## Tech Stack
+
 - Next.js 15 (App Router)
 - React 19
 - Tailwind CSS
@@ -13,6 +14,7 @@ A modern, headless storefront for Rocky built with Next.js App Router. It render
 - PostGrid (CA address autocomplete)
 
 ## Project Structure
+
 - `app/`: App Router pages, layouts, and server actions
   - `layout.jsx`: Global layout, fonts, GTM, tracking providers, toast container
   - `middleware.js`: Auth + routing helpers, protected routes, header injection
@@ -26,6 +28,7 @@ A modern, headless storefront for Rocky built with Next.js App Router. It render
 - `config/`: product lists and configuration
 
 ## Key Behaviors
+
 - Global layout injects:
   - Google Tag Manager
   - Convert Experiences experiments
@@ -40,6 +43,7 @@ A modern, headless storefront for Rocky built with Next.js App Router. It render
 - Image domains configured in `next.config.mjs` to safely optimize remote images
 
 ## API Routes (Selected)
+
 All routes are under `app/api/*` and run server-side; they never expose secrets to the browser.
 
 - Auth & Profile
@@ -62,6 +66,7 @@ All routes are under `app/api/*` and run server-side; they never expose secrets 
   - Various domain routes: `ed`, `wl`, `hair`, `mental-health`, `blogs`, `search`, etc.
 
 ## Environment Variables
+
 Define variables in your deployment environment. Never commit secrets.
 
 - WordPress / WooCommerce
@@ -90,25 +95,35 @@ Define variables in your deployment environment. Never commit secrets.
 - Currency
   - `CURRENCY`: Currency code for server-side usage (e.g., "CAD", "USD") - defaults to "CAD"
   - `NEXT_PUBLIC_CURRENCY`: Currency code for client-side usage (e.g., "CAD", "USD") - defaults to "CAD"
+- Google reCAPTCHA
+  - `NEXT_PUBLIC_RECAPTCHA_SITE_KEY`: reCAPTCHA v3 site key (public, required for frontend)
+  - `RECAPTCHA_SECRET_KEY`: reCAPTCHA v3 secret key (server-side only, required for verification)
+  - `RECAPTCHA_MIN_SCORE` (optional): Minimum score threshold (0.0-1.0, default: 0.5). Scores below this will be rejected.
+  - **Note**: This implementation uses reCAPTCHA v3 (invisible, score-based). Make sure to create v3 keys. See `RECAPTCHA_SETUP.md` for detailed setup instructions.
 
 Notes:
+
 - Client-exposed vars must be prefixed `NEXT_PUBLIC_` per Next.js convention.
 - Keys like `CONSUMER_SECRET`, `ADMIN_TOKEN`, and Northbeam credentials must remain server-only.
 
 ## Local Development
+
 ```bash
 npm install
 npm run dev
 ```
+
 - App runs at `http://localhost:3000`
 - Ensure required env vars are present for any features you test; some routes will fail gracefully if missing
 
 ## Deployment
+
 - Designed for Vercel; uses `vercel.json` for redirects/rewrites and a cron to hit `/api/wp-cron`
 - Set environment variables in your hosting platform
 - `next.config.mjs` restricts allowed remote image hosts
 
 ## WooCommerce Integration Highlights
+
 - `lib/woocommerce.js` wraps REST API with:
   - Product fetch by slug and ID
   - Variation normalization (matching legacy PHP shape)
@@ -117,36 +132,43 @@ npm run dev
 - Store API calls (cart/checkout) are proxied server-side to keep auth secure
 
 ## Auth & Cookies
+
 - `authToken` stores Basic credentials (generated from user login) for server-to-server requests
 - Additional cookies store user metadata used by the UI
 - Middleware protects sensitive routes and preserves `redirect_to` across login
 
 ## Styling
+
 - Tailwind is configured in both `tailwind.config.mjs` and `tailwind.config.js`
 - Custom animations and gradients
 - DatePicker CSS scanning via `./node_modules/react-tailwindcss-datepicker/dist/index.esm.js`
 
 ## Analytics & Experiments
+
 - GTM is injected early (`beforeInteractive`), noscript iframe fallback included
 - Convert Experiences is loaded globally
 - TikTok Pixel is optional and uses a public env var
 - Vercel Analytics and Speed Insights are enabled
 
 ## Image Optimization
+
 - Remote patterns are explicitly whitelisted in `next.config.mjs`
 - Use `next/image` for all external assets from approved domains
 
 ## Security & Privacy
+
 - Never log PII or secrets; server logs only contain high-level events
 - Secrets are read only in server contexts (`app/api`, Node server code)
 - API routes validate inputs, limit file types, and sanitize when possible
 
 ## Common Issues
+
 - Missing env variables will throw clear errors (e.g., WooCommerce client validation)
 - Cart operations require a fresh `cart-nonce`; the API refreshes it on failure
 - Some routes rely on WordPress custom endpoints; ensure they exist on the backend
 
 ## Scripts
+
 ```json
 {
   "dev": "next dev --turbopack",
@@ -157,4 +179,5 @@ npm run dev
 ```
 
 ## License
+
 Proprietary. All rights reserved.

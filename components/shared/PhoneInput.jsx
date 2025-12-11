@@ -97,7 +97,7 @@ const PhoneInput = ({
     <div className={`mb-4 md:mb-0 w-full ${className}`}>
       <label
         htmlFor={name}
-        className="block text-[14px] leading-[19.6px] font-[500] text-[#212121] mb-2"
+        className="block text-left text-[14px] leading-[19.6px] font-[500] text-[#212121] mb-2"
       >
         {title}
         {required && <span className="text-red-500 ml-1">*</span>}

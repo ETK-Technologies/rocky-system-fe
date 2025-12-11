@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, Suspense } from "react";
+import { useState, useEffect, Suspense, useRef } from "react";
 import { logger } from "@/utils/devLogger";
 import { useSearchParams, useRouter } from "next/navigation";
 import { toast } from "react-toastify";
@@ -17,6 +17,7 @@ import { mergeGuestCart } from "@/lib/api/cartMerge";
 import GoogleSignInButton from "./GoogleSignInButton";
 import CartMigrationOverlay from "@/components/CartMigrationOverlay";
 import { getSessionId } from "@/services/sessionService";
+import ReCaptcha from "@/components/shared/ReCaptcha";
 
 const LoginContent = ({ setActiveTab, loginRef }) => {
   const searchParams = useSearchParams();
@@ -24,6 +25,8 @@ const LoginContent = ({ setActiveTab, loginRef }) => {
   const [submitting, setSubmitting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [isMigratingCart, setIsMigratingCart] = useState(false);
+  const [recaptchaToken, setRecaptchaToken] = useState("");
+  const recaptchaRef = useRef(null);
   const [formData, setFormData] = useState({
     email: "",
     password: "",
@@ -492,6 +495,20 @@ const LoginContent = ({ setActiveTab, loginRef }) => {
       return;
     }
 
+    // Execute reCAPTCHA v3 (invisible, gets token automatically)
+    let token = null;
+    try {
+      token = await recaptchaRef.current?.execute("login");
+      if (!token) {
+        toast.error("reCAPTCHA verification failed. Please try again.");
+        return;
+      }
+    } catch (error) {
+      logger.error("reCAPTCHA execution error:", error);
+      toast.error("reCAPTCHA verification failed. Please try again.");
+      return;
+    }
+
     setSubmitting(true);
 
     try {
@@ -514,6 +531,7 @@ const LoginContent = ({ setActiveTab, loginRef }) => {
       const requestBody = {
         email: formData.email,
         password: formData.password,
+        recaptchaToken: token,
       };
 
       // Include sessionId if available
@@ -690,6 +708,12 @@ const LoginContent = ({ setActiveTab, loginRef }) => {
             router.refresh();
           }, 300);
         }, 1500); // 1.5 second delay to show the success toast
+
+        // Reset reCAPTCHA on success
+        if (recaptchaRef.current) {
+          recaptchaRef.current.reset();
+        }
+        setRecaptchaToken("");
       } else {
         // Handle error responses
         let errorMessage =
@@ -736,11 +760,22 @@ const LoginContent = ({ setActiveTab, loginRef }) => {
           ...prev,
           password: "",
         }));
+
+        // Reset reCAPTCHA on error
+        if (recaptchaRef.current) {
+          recaptchaRef.current.reset();
+        }
+        setRecaptchaToken("");
       }
     } catch (err) {
       // Handle any unexpected errors during the fetch operation
       logger.error("Login exception:", err);
       toast.error("An error occurred during login. Please try again later.");
+      // Reset reCAPTCHA on error
+      if (recaptchaRef.current) {
+        recaptchaRef.current.reset();
+      }
+      setRecaptchaToken("");
     } finally {
       setSubmitting(false);
     }
@@ -865,6 +900,19 @@ const LoginContent = ({ setActiveTab, loginRef }) => {
               </Link>
             </div>
           </div>
+
+          <ReCaptcha
+            ref={recaptchaRef}
+            siteKey={process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY}
+            onVerify={(token) => {
+              setRecaptchaToken(token);
+            }}
+            onError={(error) => {
+              logger.error("reCAPTCHA error:", error);
+              toast.error("reCAPTCHA verification failed. Please try again.");
+            }}
+          />
+
           <div className="w-full flex justify-center items-center my-5">
             <button
               type="submit"

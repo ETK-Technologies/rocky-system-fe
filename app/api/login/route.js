@@ -3,6 +3,7 @@ import axios from "axios";
 import { cookies } from "next/headers";
 import { logger } from "@/utils/devLogger";
 import { getOrigin } from "@/lib/utils/getOrigin";
+import { verifyRecaptchaToken } from "@/lib/utils/recaptchaVerify";
 
 const BASE_URL = process.env.BASE_URL;
 
@@ -12,7 +13,28 @@ const BASE_URL = process.env.BASE_URL;
  */
 export async function POST(req) {
   try {
-    const { email, password, sessionId } = await req.json();
+    const { email, password, sessionId, recaptchaToken } = await req.json();
+
+    // Verify reCAPTCHA if token is provided
+    if (recaptchaToken) {
+      const recaptchaResult = await verifyRecaptchaToken(recaptchaToken);
+
+      if (!recaptchaResult.success) {
+        logger.error("reCAPTCHA verification failed:", recaptchaResult.error);
+        return NextResponse.json(
+          {
+            success: false,
+            error: recaptchaResult.error || "reCAPTCHA verification failed. Please try again.",
+          },
+          { status: 400 }
+        );
+      }
+
+      logger.log("reCAPTCHA verified successfully", {
+        score: recaptchaResult.score,
+        hostname: recaptchaResult.hostname,
+      });
+    }
 
     // Validate required fields
     if (!email) {
@@ -63,6 +85,7 @@ export async function POST(req) {
             "X-App-Secret": process.env.NEXT_PUBLIC_APP_SECRET,
             "Origin": origin,
           },
+          timeout: 25000, // 25 second timeout (before Next.js 30s default)
         }
       );
 
@@ -128,6 +151,28 @@ export async function POST(req) {
         error.response?.data || error.message
       );
 
+      // Handle timeout errors
+      if (error.code === "ECONNABORTED" || error.message.includes("timeout")) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: "Request timeout. The server took too long to respond. Please try again.",
+          },
+          { status: 408 }
+        );
+      }
+
+      // Handle network errors
+      if (error.code === "ECONNREFUSED" || error.code === "ENOTFOUND") {
+        return NextResponse.json(
+          {
+            success: false,
+            error: "Unable to connect to the server. Please check your connection and try again.",
+          },
+          { status: 503 }
+        );
+      }
+
       // Handle specific error responses from the API
       if (error.response?.status === 401) {
         return NextResponse.json(
@@ -136,6 +181,17 @@ export async function POST(req) {
             error: "Invalid credentials. Please check your email and password.",
           },
           { status: 401 }
+        );
+      }
+
+      // Handle 408 timeout from backend
+      if (error.response?.status === 408) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: "Request timeout. The server took too long to respond. Please try again.",
+          },
+          { status: 408 }
         );
       }
 
