@@ -21,6 +21,7 @@ export async function GET(request, { params }) {
     // Get origin for Origin header (required for backend domain whitelist)
     const origin = getOrigin(request);
 
+    // Make the request - axios will automatically wait for final response after 103 Early Hints
     const response = await axios.get(
       `${API_BASE_URL}/api/v1/blogs/posts/${id}`,
       {
@@ -30,31 +31,25 @@ export async function GET(request, { params }) {
           "X-App-Secret": process.env.NEXT_PUBLIC_APP_SECRET,
           "Origin": origin,
         },
-        // Explicitly validate status - only accept 2xx responses, reject 103 and others
+        // Accept all status codes initially - we'll validate the final response ourselves
+        // This ensures axios waits for the final response after 103 Early Hints
         validateStatus: function (status) {
-          // Only accept 2xx status codes, explicitly reject 103 Early Hints
-          const isValid = status >= 200 && status < 300 && status !== 103;
-          if (!isValid && process.env.NODE_ENV === "development") {
-            console.warn(`[Blog API] Received unexpected status code: ${status}`);
-          }
-          return isValid;
+          // Accept 2xx as success, reject everything else to let error handling take over
+          // This ensures axios waits for final 200 response even if 103 Early Hints is sent first
+          return status >= 200 && status < 300;
         },
-        // Set timeout to prevent hanging
         timeout: 30000,
-        // Disable automatic redirects that might cause issues
         maxRedirects: 5,
-        // Ensure we get the actual response, not early hints
-        transitional: {
-          silentJSONParsing: false,
-          forcedJSONParsing: true,
-          clarifyTimeoutError: true,
-        },
+        // Ensure we get the complete response data
+        responseType: 'json',
       }
     );
 
-    // Double-check we got a valid response with 2xx status
-    if (!response || response.status < 200 || response.status >= 300 || response.status === 103) {
-      throw new Error(`Invalid response status: ${response?.status || 'unknown'}`);
+    // Validate final response status - should be 2xx after axios handles 103 Early Hints
+    const finalStatus = response?.status;
+    if (!response || !finalStatus || finalStatus < 200 || finalStatus >= 300) {
+      logger.error(`Invalid final response status: ${finalStatus}`);
+      throw new Error(`Invalid response status: ${finalStatus || 'unknown'}`);
     }
 
     return NextResponse.json(response.data, {
