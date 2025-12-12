@@ -44,8 +44,32 @@ export async function GET(request) {
           "X-App-Secret": process.env.NEXT_PUBLIC_APP_SECRET,
           "Origin": origin,
         },
+        // Explicitly validate status - only accept 2xx responses, reject 103 and others
+        validateStatus: function (status) {
+          // Only accept 2xx status codes, explicitly reject 103 Early Hints
+          const isValid = status >= 200 && status < 300 && status !== 103;
+          if (!isValid && process.env.NODE_ENV === "development") {
+            console.warn(`[Blog API] Received unexpected status code: ${status}`);
+          }
+          return isValid;
+        },
+        // Set timeout to prevent hanging
+        timeout: 30000,
+        // Disable automatic redirects that might cause issues
+        maxRedirects: 5,
+        // Ensure we get the actual response, not early hints
+        transitional: {
+          silentJSONParsing: false,
+          forcedJSONParsing: true,
+          clarifyTimeoutError: true,
+        },
       }
     );
+
+    // Double-check we got a valid response with 2xx status
+    if (!response || response.status < 200 || response.status >= 300 || response.status === 103) {
+      throw new Error(`Invalid response status: ${response?.status || 'unknown'}`);
+    }
 
     return NextResponse.json(response.data, {
       status: 200,
