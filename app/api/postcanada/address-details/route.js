@@ -32,6 +32,7 @@ export async function POST(request) {
 
     // Get origin for Origin and Referer headers (required for PostCanada API)
     const origin = getOrigin(request);
+    logger.log("Post Canada API - Using origin:", origin);
 
     const response = await fetch(url.toString(), {
       method: "GET",
