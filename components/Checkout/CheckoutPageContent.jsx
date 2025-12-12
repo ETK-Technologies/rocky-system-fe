@@ -50,6 +50,24 @@ const stripePromise = loadStripe(
 // The actual amount will come from the PaymentIntent when confirming payment
 // Note: Backend creates PaymentIntent with manual capture, so we need to handle this
 const CheckoutPageWrapper = () => {
+  const [customerEmail, setCustomerEmail] = useState(null);
+
+  // Get current user's email for Stripe Link wallet to show correct user's payment methods
+  useEffect(() => {
+    const loadUserEmail = async () => {
+      try {
+        const { getUserData } = await import("@/services/userDataService");
+        const userData = getUserData();
+        if (userData?.user?.email) {
+          setCustomerEmail(userData.user.email);
+        }
+      } catch (error) {
+        logger.warn("Failed to load user email for Stripe:", error);
+      }
+    };
+    loadUserEmail();
+  }, []);
+
   return (
     <Elements
       stripe={stripePromise}
@@ -64,7 +82,13 @@ const CheckoutPageWrapper = () => {
         },
         paymentMethodCreation: "manual", // Required for createPaymentMethod with PaymentElement
         // Configure payment methods at the Elements level
-        paymentMethodTypes: ["card"], // Allow card and link payments
+        // Only "card" - Link will appear as a wallet option (configured in PaymentElement options)
+        paymentMethodTypes: ["card"],
+        // Set customer email for Stripe Link wallet to show correct user's payment methods
+        // Link wallet will use this email to display the appropriate saved payment methods
+        ...(customerEmail && {
+          customerEmail: customerEmail,
+        }),
         // Note: capture_method is set on the PaymentIntent, not Elements
         // We'll need to ensure the PaymentIntent matches Elements expectations
       }}
@@ -557,14 +581,14 @@ const CheckoutPageContent = () => {
         // Check if user is authenticated - if so, don't let cart override profile data
         const { getUserId } = await import("@/services/userDataService");
         const userId = getUserId();
-        
+
         logger.log("=== SETTING FORM DATA FROM CART ===", {
           billing_address_1: data.billing_address?.address_1,
           billing_city: data.billing_address?.city,
           billing_state: data.billing_address?.state,
           userAuthenticated: !!userId,
         });
-        
+
         // For authenticated users, only merge cart data that doesn't conflict with profile
         // For guest users, use cart data fully
         if (!userId) {
@@ -578,19 +602,27 @@ const CheckoutPageContent = () => {
         } else {
           // User is authenticated - merge cart data carefully to not override profile fields
           // Only use cart data for fields that don't exist in profile
-          logger.log("User authenticated - carefully merging cart data with profile data");
+          logger.log(
+            "User authenticated - carefully merging cart data with profile data"
+          );
           setFormData((prev) => {
             // Only merge if prev.billing_address doesn't already have profile data
-            const hasProfilePhone = prev.billing_address?.phone && prev.billing_address.phone.trim();
-            const hasProfileState = prev.billing_address?.state && prev.billing_address.state.trim();
-            
+            const hasProfilePhone =
+              prev.billing_address?.phone && prev.billing_address.phone.trim();
+            const hasProfileState =
+              prev.billing_address?.state && prev.billing_address.state.trim();
+
             return {
               ...prev,
               billing_address: {
                 ...(data.billing_address || {}),
                 // Don't override phone/state if profile already has them
-                ...(hasProfilePhone ? { phone: prev.billing_address.phone } : {}),
-                ...(hasProfileState ? { state: prev.billing_address.state } : {}),
+                ...(hasProfilePhone
+                  ? { phone: prev.billing_address.phone }
+                  : {}),
+                ...(hasProfileState
+                  ? { state: prev.billing_address.state }
+                  : {}),
                 // But keep any other fields from prev (like from profile)
                 ...prev.billing_address,
               },
@@ -624,7 +656,12 @@ const CheckoutPageContent = () => {
   useEffect(() => {
     // Only run this after the initial cart and profile data have been loaded
     // AND only if we haven't already populated addresses
-    if (cartItems && !isProcessingUrlParams && !isLoadingAddresses && !hasPopulatedAddresses) {
+    if (
+      cartItems &&
+      !isProcessingUrlParams &&
+      !isLoadingAddresses &&
+      !hasPopulatedAddresses
+    ) {
       const timer = setTimeout(async () => {
         logger.log("=== POPULATING ADDRESS DATA WITH HOOK ===");
         logger.log("Current formData before population:", {
@@ -666,7 +703,13 @@ const CheckoutPageContent = () => {
 
       return () => clearTimeout(timer);
     }
-  }, [cartItems, isProcessingUrlParams, isLoadingAddresses, hasPopulatedAddresses, populateAddressData]);
+  }, [
+    cartItems,
+    isProcessingUrlParams,
+    isLoadingAddresses,
+    hasPopulatedAddresses,
+    populateAddressData,
+  ]);
 
   // Function to fetch saved payment cards - REMOVED
   // Saved cards are no longer fetched to reduce API calls
@@ -679,7 +722,7 @@ const CheckoutPageContent = () => {
     // This prevents showing previous user's data after logout/login
     const { getUserId } = await import("@/services/userDataService");
     const currentUserId = getUserId();
-    
+
     // If we have cached data, verify user is still authenticated (authToken is httpOnly, check userId)
     if (cachedProfileData && !forceRefresh) {
       // Check if user is still authenticated
@@ -687,17 +730,19 @@ const CheckoutPageContent = () => {
         logger.log("User not authenticated - clearing cached profile data");
         setCachedProfileData(null);
       } else {
-        logger.log("Using cached profile data from CheckoutPageContent (user authenticated)");
+        logger.log(
+          "Using cached profile data from CheckoutPageContent (user authenticated)"
+        );
         return cachedProfileData;
       }
     }
-    
+
     // If cached but no auth, clear it
     if (cachedProfileData && !currentUserId) {
       logger.log("Clearing cached profile data - user not authenticated");
       setCachedProfileData(null);
     }
-    
+
     // If not authenticated, don't fetch profile
     if (!currentUserId) {
       logger.log("User not authenticated - skipping profile fetch");
@@ -746,7 +791,7 @@ const CheckoutPageContent = () => {
 
         // Helper function to check if a value is valid (non-empty after trim)
         const isValidValue = (value) => {
-          return value && typeof value === 'string' && value.trim().length > 0;
+          return value && typeof value === "string" && value.trim().length > 0;
         };
 
         // Update form data with user profile information
@@ -764,24 +809,24 @@ const CheckoutPageContent = () => {
               isValidValue(prev.billing_address.first_name) ||
               isValidValue(storedFirstName) ||
               isValidValue(profileData.first_name)
-                ? (isValidValue(prev.billing_address.first_name) 
-                    ? prev.billing_address.first_name.trim()
-                    : isValidValue(storedFirstName)
-                    ? storedFirstName.trim()
-                    : profileData.first_name.trim())
+                ? isValidValue(prev.billing_address.first_name)
+                  ? prev.billing_address.first_name.trim()
+                  : isValidValue(storedFirstName)
+                  ? storedFirstName.trim()
+                  : profileData.first_name.trim()
                 : "",
             last_name:
               isValidValue(prev.billing_address.last_name) ||
               (storedUserName && storedUserName.trim())
-                ? (isValidValue(prev.billing_address.last_name)
-                    ? prev.billing_address.last_name.trim()
-                    : decodeURIComponent(storedUserName)
-                        .replace(storedFirstName, "")
-                        .trim())
+                ? isValidValue(prev.billing_address.last_name)
+                  ? prev.billing_address.last_name.trim()
+                  : decodeURIComponent(storedUserName)
+                      .replace(storedFirstName, "")
+                      .trim()
                 : isValidValue(profileData.last_name)
                 ? profileData.last_name.trim()
                 : "",
-            email: isValidValue(prev.billing_address.email) 
+            email: isValidValue(prev.billing_address.email)
               ? prev.billing_address.email.trim()
               : isValidValue(profileData.email)
               ? profileData.email.trim()
@@ -792,32 +837,29 @@ const CheckoutPageContent = () => {
               : isValidValue(profileData.phone)
               ? profileData.phone.trim()
               : "",
-            address_1:
-              isValidValue(prev.billing_address.address_1)
-                ? prev.billing_address.address_1.trim()
-                : isValidValue(profileData.billing_address_1)
-                ? profileData.billing_address_1.trim()
-                : "",
-            address_2:
-              isValidValue(prev.billing_address.address_2)
-                ? prev.billing_address.address_2.trim()
-                : isValidValue(profileData.billing_address_2)
-                ? profileData.billing_address_2.trim()
-                : "",
+            address_1: isValidValue(prev.billing_address.address_1)
+              ? prev.billing_address.address_1.trim()
+              : isValidValue(profileData.billing_address_1)
+              ? profileData.billing_address_1.trim()
+              : "",
+            address_2: isValidValue(prev.billing_address.address_2)
+              ? prev.billing_address.address_2.trim()
+              : isValidValue(profileData.billing_address_2)
+              ? profileData.billing_address_2.trim()
+              : "",
             city: isValidValue(prev.billing_address.city)
               ? prev.billing_address.city.trim()
               : isValidValue(profileData.billing_city)
               ? profileData.billing_city.trim()
               : "",
             // Prioritize: existing state > profile billing_state > profile province
-            state:
-              isValidValue(prev.billing_address.state)
-                ? prev.billing_address.state.trim()
-                : isValidValue(profileData.billing_state)
-                ? profileData.billing_state.trim()
-                : isValidValue(profileData.province)
-                ? profileData.province.trim()
-                : "",
+            state: isValidValue(prev.billing_address.state)
+              ? prev.billing_address.state.trim()
+              : isValidValue(profileData.billing_state)
+              ? profileData.billing_state.trim()
+              : isValidValue(profileData.province)
+              ? profileData.province.trim()
+              : "",
             postcode:
               prev.billing_address.postcode ||
               profileData.billing_postcode ||
@@ -995,7 +1037,7 @@ const CheckoutPageContent = () => {
         // Check if user is authenticated
         const { getUserId } = await import("@/services/userDataService");
         const userId = getUserId();
-        
+
         if (userId) {
           // User is authenticated - fetch fresh profile data
           // Always fetch fresh to ensure we have current user's data (not cached from previous user)
@@ -1005,7 +1047,9 @@ const CheckoutPageContent = () => {
         } else {
           // User not authenticated - clear any cached profile data
           if (cachedProfileData) {
-            logger.log("=== CLEARING CACHED PROFILE DATA (user not authenticated) ===");
+            logger.log(
+              "=== CLEARING CACHED PROFILE DATA (user not authenticated) ==="
+            );
             setCachedProfileData(null);
           }
         }
@@ -1042,7 +1086,9 @@ const CheckoutPageContent = () => {
   // Listen for logout events and authentication changes to clear cached profile data
   useEffect(() => {
     const handleUserLogout = () => {
-      logger.log("User logged out event detected - clearing cached profile data");
+      logger.log(
+        "User logged out event detected - clearing cached profile data"
+      );
       setCachedProfileData(null);
       // Clear saved cards to prevent showing previous user's payment methods
       setSavedCards([]);
@@ -1073,17 +1119,22 @@ const CheckoutPageContent = () => {
       // Check if user is authenticated
       const { getUserId } = await import("@/services/userDataService");
       const userId = getUserId();
-      
+
       // If userId changed, clear saved cards first
       if (currentUserId && currentUserId !== userId) {
-        logger.log("User changed - clearing saved cards. Previous:", currentUserId, "Current:", userId);
+        logger.log(
+          "User changed - clearing saved cards. Previous:",
+          currentUserId,
+          "Current:",
+          userId
+        );
         setSavedCards([]);
         setSelectedCard(null);
         setCurrentUserId(userId);
       } else if (!currentUserId && userId) {
         setCurrentUserId(userId);
       }
-      
+
       // Only fetch saved cards if user is authenticated
       if (!userId) {
         // User not authenticated - clear any saved cards
@@ -1107,7 +1158,7 @@ const CheckoutPageContent = () => {
 
         if (response.ok) {
           const data = await response.json();
-          
+
           // Double-check userId hasn't changed during fetch
           const { getUserId } = await import("@/services/userDataService");
           const currentUserIdAfterFetch = getUserId();
@@ -1118,11 +1169,16 @@ const CheckoutPageContent = () => {
             setCurrentUserId(currentUserIdAfterFetch);
             return;
           }
-          
+
           if (data.success && Array.isArray(data.cards)) {
-            logger.log("Saved payment methods fetched:", data.cards.length, "cards for user:", userId);
+            logger.log(
+              "Saved payment methods fetched:",
+              data.cards.length,
+              "cards for user:",
+              userId
+            );
             setSavedCards(data.cards);
-            
+
             // Auto-select default card if available
             const defaultCard = data.cards.find((card) => card.is_default);
             if (defaultCard) {
@@ -1137,7 +1193,10 @@ const CheckoutPageContent = () => {
             setSelectedCard(null);
           }
         } else {
-          logger.warn("Failed to fetch saved payment methods:", response.status);
+          logger.warn(
+            "Failed to fetch saved payment methods:",
+            response.status
+          );
           setSavedCards([]);
           setSelectedCard(null);
         }
