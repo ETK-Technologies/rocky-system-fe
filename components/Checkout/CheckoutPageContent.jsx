@@ -941,11 +941,6 @@ const CheckoutPageContent = () => {
 
   // Initial loading of cart and processing URL parameters
   useEffect(() => {
-    // Reset retry mechanism state on page load/refresh
-    setShouldUseDirectPayment(false);
-    setSavedOrderId("");
-    setSavedOrderKey("");
-
     // Initialize loading
     const loadCheckoutData = async () => {
       try {
