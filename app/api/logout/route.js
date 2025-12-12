@@ -3,6 +3,7 @@ import axios from "axios";
 import { cookies } from "next/headers";
 import { logger } from "@/utils/devLogger";
 import { getOrigin } from "@/lib/utils/getOrigin";
+import { clearUserDataFromCookies, getUserDataFromCookies } from "@/services/userDataService";
 
 const BASE_URL = process.env.BASE_URL;
 
@@ -13,12 +14,13 @@ const BASE_URL = process.env.BASE_URL;
 export async function POST(req) {
   try {
     const cookieStore = await cookies();
-    const authToken = cookieStore.get("authToken")?.value;
+    const userData = getUserDataFromCookies(cookieStore);
 
     // Call the new logout API if we have an auth token
-    if (authToken) {
+    if (userData?.auth?.accessToken) {
       try {
         // Extract Bearer token if present
+        const authToken = userData.auth.accessToken;
         const token = authToken.startsWith("Bearer ")
           ? authToken.substring(7)
           : authToken;
@@ -53,21 +55,8 @@ export async function POST(req) {
       }
     }
 
-    // Clear all authentication-related cookies
-    cookieStore.delete("authToken");
-    cookieStore.delete("refreshToken");
-    cookieStore.delete("userId");
-    cookieStore.delete("userEmail");
-    cookieStore.delete("userName");
-    cookieStore.delete("displayName");
-    cookieStore.delete("lastName");
-    cookieStore.delete("userAvatar");
-    cookieStore.delete("stripeCustomerId");
-    cookieStore.delete("province");
-    cookieStore.delete("phone");
-    cookieStore.delete("DOB");
-    cookieStore.delete("pn");
-    cookieStore.delete("dob");
+    // Clear all user-related cookies using unified service
+    clearUserDataFromCookies(cookieStore);
 
     // Set a flag in cookies to trigger client-side cache clearing
     // This will clear localStorage items like sessionId
@@ -89,12 +78,7 @@ export async function POST(req) {
     // Even if there's an error, try to clear cookies
     try {
       const cookieStore = await cookies();
-      cookieStore.delete("authToken");
-      cookieStore.delete("refreshToken");
-      cookieStore.delete("userId");
-      cookieStore.delete("userEmail");
-      cookieStore.delete("userName");
-      cookieStore.delete("displayName");
+      clearUserDataFromCookies(cookieStore);
     } catch (clearError) {
       logger.error("Error clearing cookies:", clearError);
     }

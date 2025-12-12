@@ -4,6 +4,8 @@ import { useEffect } from "react";
 import { logger } from "@/utils/devLogger";
 import { usePathname } from "next/navigation";
 import { clearSessionId, getSessionId } from "@/services/sessionService";
+import { clearAllCache } from "@/utils/clearAllCache";
+import { isAuthenticated } from "@/services/userDataService";
 
 const CacheClearer = () => {
   const pathname = usePathname();
@@ -12,13 +14,8 @@ const CacheClearer = () => {
     // Initialize sessionId on site entry if user is not authenticated
     // This ensures sessionId exists for guest cart operations
     try {
-      // Check authentication status (check userId cookie, not httpOnly authToken)
-      const getCookie = (name) => {
-        const match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
-        return match ? match[2] : null;
-      };
-      const userId = getCookie("userId");
-      const authenticated = !!userId;
+      // Check authentication status using unified service
+      const authenticated = isAuthenticated();
 
       if (!authenticated) {
         // Auto-generate sessionId if it doesn't exist (getSessionId does this automatically)
@@ -42,22 +39,11 @@ const CacheClearer = () => {
         if (cookie.startsWith("clearCache=true")) {
           logger.log("Clearing all cached data due to logout");
 
-          // Clear all cached data from localStorage
-          localStorage.removeItem("userProfileData");
-          localStorage.removeItem("cartData");
-          localStorage.removeItem("savedCards");
-          localStorage.removeItem("userDetails");
-
-          // Clear sessionId using the session service
-          clearSessionId();
-
-          // Clear any other cached data that might be stored
-          // You can add more specific items here as needed
+          // Clear ALL cached and saved data using comprehensive cleanup function
+          clearAllCache();
 
           // Delete the clearCache cookie itself
           document.cookie = "clearCache=; max-age=0; path=/;";
-
-          logger.log("All cached data and sessionId cleared");
 
           break;
         }

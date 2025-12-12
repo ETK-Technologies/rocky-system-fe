@@ -4,6 +4,12 @@ import { cookies } from "next/headers";
 import { logger } from "@/utils/devLogger";
 import { getOrigin } from "@/lib/utils/getOrigin";
 import { verifyRecaptchaToken } from "@/lib/utils/recaptchaVerify";
+import {
+  setUserDataToCookies,
+  transformAuthResponse,
+  transformProfileResponse,
+  mergeProfileData,
+} from "@/services/userDataService";
 
 const BASE_URL = process.env.BASE_URL;
 
@@ -169,39 +175,63 @@ export async function POST(req) {
 
       const { access_token, refresh_token, user, cart } = response.data;
 
-      // Set up cookies for our Next.js app
+      // Get cookie store
       const cookieStore = await cookies();
 
-      // Store access token
-      if (access_token) {
-        cookieStore.set("authToken", `Bearer ${access_token}`, {
-          httpOnly: true,
-          secure: process.env.NODE_ENV === "production",
-          sameSite: "lax",
-          maxAge: 24 * 60 * 60, // 24 hours
-        });
-      }
+      // Transform registration response to user data structure
+      const userData = transformAuthResponse({
+        access_token,
+        refresh_token,
+        user,
+      });
 
-      // Store refresh token
-      if (refresh_token) {
-        cookieStore.set("refreshToken", refresh_token, {
-          httpOnly: true,
-          secure: process.env.NODE_ENV === "production",
-          sameSite: "lax",
-          maxAge: 7 * 24 * 60 * 60, // 7 days
-        });
-      }
+      // Add registration form data to profile
+      userData.profile = {
+        phone: phone || null,
+        province: province || null,
+        dateOfBirth: dateOfBirth || null,
+        gender: gender || null,
+      };
 
-      // Store user information
-      if (user) {
-        cookieStore.set("userId", user.id);
-        cookieStore.set("userEmail", user.email);
-        cookieStore.set("displayName", user.firstName);
-        cookieStore.set("lastName", user.lastName);
-        cookieStore.set("userName", `${user.firstName} ${user.lastName}`);
-        if (user.avatar) {
-          cookieStore.set("userAvatar", user.avatar);
+      // Store user data (auth + user info + registration profile data) to cookies
+      setUserDataToCookies(cookieStore, userData);
+
+      // Fetch full profile data including billing/shipping addresses
+      // This ensures all profile data is available after registration
+      try {
+        const profileResponse = await axios.get(
+          `${BASE_URL}/api/v1/auth/profile`,
+          {
+            headers: {
+              accept: "*/*",
+              "X-App-Key": process.env.NEXT_PUBLIC_APP_KEY,
+              "X-App-Secret": process.env.NEXT_PUBLIC_APP_SECRET,
+              Authorization: `Bearer ${access_token}`,
+              Origin: origin,
+            },
+          }
+        );
+
+        const profileDataRaw = profileResponse.data;
+        
+        // Transform profile response to profile data structure
+        if (profileDataRaw) {
+          const profileData = transformProfileResponse(profileDataRaw);
+          
+          // Merge profile data into user data (profile API data takes precedence)
+          const mergedUserData = mergeProfileData(userData, profileData);
+          
+          // Update cookies with merged data
+          setUserDataToCookies(cookieStore, mergedUserData);
+          
+          logger.log("Profile data fetched and merged after registration");
         }
+      } catch (profileError) {
+        // Log error but don't fail registration if profile fetch fails
+        logger.warn(
+          "Failed to fetch profile data after registration (non-critical):",
+          profileError.response?.data || profileError.message
+        );
       }
 
       logger.log("User registered successfully:", {

@@ -3,6 +3,12 @@ import axios from "axios";
 import { logger } from "@/utils/devLogger";
 import { cookies } from "next/headers";
 import { getOrigin } from "@/lib/utils/getOrigin";
+import {
+  getUserDataFromCookies,
+  setUserDataToCookies,
+  transformProfileResponse,
+  mergeProfileData,
+} from "@/services/userDataService";
 
 const BASE_URL = process.env.BASE_URL;
 
@@ -61,6 +67,27 @@ export async function GET(request) {
         },
         { status: profileData?.statusCode || 400 }
       );
+    }
+
+    // Get existing user data from cookies
+    const existingUserData = getUserDataFromCookies(cookieStore);
+    
+    // Transform profile response to profile data structure
+    const profileDataTransformed = transformProfileResponse(profileData);
+    
+    // Merge profile data into existing user data
+    const updatedUserData = existingUserData
+      ? mergeProfileData(existingUserData, profileDataTransformed)
+      : {
+          auth: {},
+          user: {},
+          profile: profileDataTransformed,
+        };
+    
+    // Update cookies with merged profile data
+    if (existingUserData) {
+      setUserDataToCookies(cookieStore, updatedUserData);
+      logger.log("Profile data updated in cookies");
     }
 
     // API returns flat structure with all fields directly in the response

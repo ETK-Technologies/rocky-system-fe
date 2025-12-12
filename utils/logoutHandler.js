@@ -1,6 +1,6 @@
 "use client";
 
-import { clearSessionId } from "@/services/sessionService";
+import { clearAllCache } from "@/utils/clearAllCache";
 import { logger } from "@/utils/devLogger";
 import { toast } from "react-toastify";
 
@@ -27,14 +27,24 @@ export const handleLogout = async (router) => {
     if (response.ok && data.success) {
       logger.log("Logout API call successful");
 
-      // Clear sessionId from localStorage
-      clearSessionId();
+      // Clear ALL cached and saved data (comprehensive cleanup)
+      clearAllCache();
 
-      // Clear other localStorage items
-      localStorage.removeItem("userProfileData");
-      localStorage.removeItem("cartData");
-      localStorage.removeItem("savedCards");
-      localStorage.removeItem("userDetails");
+      // Clear Stripe cookies (set by Stripe.js SDK)
+      // These are client-side cookies, so we need to clear them via document.cookie
+      try {
+        const stripeCookies = ["_stripe_mid", "_stripe_sid"];
+        stripeCookies.forEach((cookieName) => {
+          // Clear for current domain
+          document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`;
+          // Also try clearing for .localhost and current domain variations
+          document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=${window.location.hostname};`;
+          document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=.${window.location.hostname};`;
+        });
+        logger.log("Stripe cookies cleared");
+      } catch (error) {
+        logger.warn("Error clearing Stripe cookies:", error);
+      }
 
       // Dispatch multiple events to ensure all components update
       // 1. Cart updated event (for cart components)
@@ -80,12 +90,8 @@ export const handleLogout = async (router) => {
   } catch (error) {
     logger.error("Logout exception:", error);
 
-    // Even on error, try to clear local data
-    clearSessionId();
-    localStorage.removeItem("userProfileData");
-    localStorage.removeItem("cartData");
-    localStorage.removeItem("savedCards");
-    localStorage.removeItem("userDetails");
+    // Even on error, try to clear ALL local data
+    clearAllCache();
 
     // Dispatch events even on error to update UI
     document.dispatchEvent(new CustomEvent("cart-updated"));

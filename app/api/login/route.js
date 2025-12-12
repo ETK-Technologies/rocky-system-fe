@@ -4,6 +4,13 @@ import { cookies } from "next/headers";
 import { logger } from "@/utils/devLogger";
 import { getOrigin } from "@/lib/utils/getOrigin";
 import { verifyRecaptchaToken } from "@/lib/utils/recaptchaVerify";
+import {
+  setUserDataToCookies,
+  transformAuthResponse,
+  transformProfileResponse,
+  mergeProfileData,
+  getUserDataFromCookies,
+} from "@/services/userDataService";
 
 const BASE_URL = process.env.BASE_URL;
 
@@ -24,7 +31,9 @@ export async function POST(req) {
         return NextResponse.json(
           {
             success: false,
-            error: recaptchaResult.error || "reCAPTCHA verification failed. Please try again.",
+            error:
+              recaptchaResult.error ||
+              "reCAPTCHA verification failed. Please try again.",
           },
           { status: 400 }
         );
@@ -67,7 +76,9 @@ export async function POST(req) {
       // Include sessionId if provided - backend will use it to migrate guest cart to authenticated user
       if (sessionId) {
         requestBody.sessionId = sessionId;
-        logger.log("Including sessionId in backend login request for cart migration");
+        logger.log(
+          "Including sessionId in backend login request for cart migration"
+        );
       }
 
       logger.log("Logging in user with new auth API");
@@ -84,7 +95,7 @@ export async function POST(req) {
             accept: "application/json",
             "X-App-Key": process.env.NEXT_PUBLIC_APP_KEY,
             "X-App-Secret": process.env.NEXT_PUBLIC_APP_SECRET,
-            "Origin": origin,
+            Origin: origin,
           },
           timeout: 25000, // 25 second timeout (before Next.js 30s default)
         }
@@ -92,42 +103,55 @@ export async function POST(req) {
 
       const { access_token, refresh_token, user, cart } = response.data;
 
-      // Set up cookies for our Next.js app
+      // Get cookie store
       const cookieStore = await cookies();
 
-      // Store access token
-      if (access_token) {
-        cookieStore.set("authToken", `Bearer ${access_token}`, {
-          httpOnly: true,
-          secure: process.env.NODE_ENV === "production",
-          sameSite: "lax",
-          maxAge: 24 * 60 * 60, // 24 hours
-        });
-      }
+      // Transform login response to user data structure
+      const userData = transformAuthResponse({
+        access_token,
+        refresh_token,
+        user,
+      });
 
-      // Store refresh token
-      if (refresh_token) {
-        cookieStore.set("refreshToken", refresh_token, {
-          httpOnly: true,
-          secure: process.env.NODE_ENV === "production",
-          sameSite: "lax",
-          maxAge: 7 * 24 * 60 * 60, // 7 days
-        });
-      }
+      // Store user data (auth + user info) to cookies
+      setUserDataToCookies(cookieStore, userData);
 
-      // Store user information
-      if (user) {
-        cookieStore.set("userId", user.id);
-        cookieStore.set("userEmail", user.email);
-        cookieStore.set("displayName", user.firstName);
-        cookieStore.set("lastName", user.lastName || "");
-        cookieStore.set(
-          "userName",
-          `${user.firstName} ${user.lastName || ""}`.trim()
+      // Fetch full profile data including billing/shipping addresses, phone, province, DOB
+      // This ensures all profile data is available in cookies for checkout
+      try {
+        const profileResponse = await axios.get(
+          `${BASE_URL}/api/v1/auth/profile`,
+          {
+            headers: {
+              accept: "*/*",
+              "X-App-Key": process.env.NEXT_PUBLIC_APP_KEY,
+              "X-App-Secret": process.env.NEXT_PUBLIC_APP_SECRET,
+              Authorization: `Bearer ${access_token}`,
+              Origin: origin,
+            },
+          }
         );
-        if (user.avatar) {
-          cookieStore.set("userAvatar", user.avatar);
+
+        const profileDataRaw = profileResponse.data;
+
+        // Transform profile response to profile data structure
+        if (profileDataRaw) {
+          const profileData = transformProfileResponse(profileDataRaw);
+
+          // Merge profile data into user data
+          const mergedUserData = mergeProfileData(userData, profileData);
+
+          // Update cookies with merged data
+          setUserDataToCookies(cookieStore, mergedUserData);
+
+          logger.log("Profile data fetched and merged after login");
         }
+      } catch (profileError) {
+        // Log error but don't fail login if profile fetch fails
+        logger.warn(
+          "Failed to fetch profile data after login (non-critical):",
+          profileError.response?.data || profileError.message
+        );
       }
 
       logger.log("User logged in successfully:", {
@@ -157,7 +181,8 @@ export async function POST(req) {
         return NextResponse.json(
           {
             success: false,
-            error: "Request timeout. The server took too long to respond. Please try again.",
+            error:
+              "Request timeout. The server took too long to respond. Please try again.",
           },
           { status: 408 }
         );
@@ -168,7 +193,8 @@ export async function POST(req) {
         return NextResponse.json(
           {
             success: false,
-            error: "Unable to connect to the server. Please check your connection and try again.",
+            error:
+              "Unable to connect to the server. Please check your connection and try again.",
           },
           { status: 503 }
         );
@@ -190,7 +216,8 @@ export async function POST(req) {
         return NextResponse.json(
           {
             success: false,
-            error: "Request timeout. The server took too long to respond. Please try again.",
+            error:
+              "Request timeout. The server took too long to respond. Please try again.",
           },
           { status: 408 }
         );
