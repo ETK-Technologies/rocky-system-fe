@@ -130,9 +130,6 @@ const CheckoutPageContent = () => {
   const [submitting, setSubmitting] = useState(false);
   const [cartItems, setCartItems] = useState();
   const [isProcessingUrlParams, setIsProcessingUrlParams] = useState(false);
-  const [savedCards, setSavedCards] = useState([]);
-  const [selectedCard, setSelectedCard] = useState(null);
-  const [isLoadingSavedCards, setIsLoadingSavedCards] = useState(false);
 
   // Stripe Elements state (for embedded payment form)
   const [stripeElements, setStripeElements] = useState(null);
@@ -191,44 +188,17 @@ const CheckoutPageContent = () => {
     ],
   });
 
-  const [cardNumber, setCardNumber] = useState("");
-  const [expiry, setExpiry] = useState("");
-  const [cvc, setCvc] = useState("");
-  const [cardType, setCardType] = useState("");
-
   // Payment validation state
   const [isPaymentValid, setIsPaymentValid] = useState(false);
   const [paymentValidationMessage, setPaymentValidationMessage] = useState("");
 
-  // Retry mechanism state for saved card payments
-  const [shouldUseDirectPayment, setShouldUseDirectPayment] = useState(false);
-  const [savedOrderId, setSavedOrderId] = useState("");
-  const [savedOrderKey, setSavedOrderKey] = useState("");
-
-  // Validate payment method whenever payment state changes
+  // Validate payment method - Stripe Elements handles validation internally
   useEffect(() => {
-    // For NEW CARD payments with Stripe Elements, always consider valid
+    // For Stripe Elements payments, always consider valid
     // (Stripe Elements handles validation internally on submit)
-    if (!selectedCard) {
-      setIsPaymentValid(true);
-      setPaymentValidationMessage("");
-      return;
-    }
-
-    // For SAVED CARD payments, validate normally
-    const paymentState = {
-      selectedCard,
-      cardNumber,
-      expiry,
-      cvc,
-    };
-
-    const isValid = isPaymentMethodValid(paymentState);
-    const message = getPaymentValidationMessage(paymentState);
-
-    setIsPaymentValid(isValid);
-    setPaymentValidationMessage(message);
-  }, [selectedCard, cardNumber, expiry, cvc]);
+    setIsPaymentValid(true);
+    setPaymentValidationMessage("");
+  }, []);
 
   const [showQuebecPopup, setShowQuebecPopup] = useState(false);
   const [showAgePopup, setShowAgePopup] = useState(false);
@@ -711,9 +681,7 @@ const CheckoutPageContent = () => {
     populateAddressData,
   ]);
 
-  // Function to fetch saved payment cards - REMOVED
-  // Saved cards are no longer fetched to reduce API calls
-  // Users can still use saved cards if they're available from other sources
+  // Saved cards functionality has been removed - all payments now use Stripe Elements
 
   // Function to fetch user profile data
   // Only fetch once and cache the result to avoid redundant API calls
@@ -1064,7 +1032,7 @@ const CheckoutPageContent = () => {
         }
         logger.log("=== ADDRESS DATA CHECK COMPLETED ===");
 
-        // STEP 4: Saved cards are no longer fetched - removed to reduce API calls
+        // STEP 4: Saved cards functionality has been removed - all payments use Stripe Elements
       } catch (error) {
         logger.error("Error loading checkout data:", error);
         toast.error(
@@ -1090,9 +1058,6 @@ const CheckoutPageContent = () => {
         "User logged out event detected - clearing cached profile data"
       );
       setCachedProfileData(null);
-      // Clear saved cards to prevent showing previous user's payment methods
-      setSavedCards([]);
-      setSelectedCard(null);
       // Also clear form data to prevent showing previous user's info
       setFormData((prev) => ({
         ...prev,
@@ -1110,128 +1075,20 @@ const CheckoutPageContent = () => {
     };
   }, []);
 
-  // Track current userId to detect user changes
-  const [currentUserId, setCurrentUserId] = useState(null);
-
-  // Fetch saved payment methods for authenticated users
-  useEffect(() => {
-    const fetchSavedCards = async () => {
-      // Check if user is authenticated
-      const { getUserId } = await import("@/services/userDataService");
-      const userId = getUserId();
-
-      // If userId changed, clear saved cards first
-      if (currentUserId && currentUserId !== userId) {
-        logger.log(
-          "User changed - clearing saved cards. Previous:",
-          currentUserId,
-          "Current:",
-          userId
-        );
-        setSavedCards([]);
-        setSelectedCard(null);
-        setCurrentUserId(userId);
-      } else if (!currentUserId && userId) {
-        setCurrentUserId(userId);
-      }
-
-      // Only fetch saved cards if user is authenticated
-      if (!userId) {
-        // User not authenticated - clear any saved cards
-        logger.log("User not authenticated - clearing saved cards");
-        setSavedCards([]);
-        setSelectedCard(null);
-        setCurrentUserId(null);
-        return;
-      }
-
-      // User is authenticated - fetch saved payment methods
-      setIsLoadingSavedCards(true);
-      try {
-        logger.log("Fetching saved payment methods for user:", userId);
-        const response = await fetch("/api/payment-methods", {
-          cache: "no-store",
-          headers: {
-            "Cache-Control": "no-cache, no-store, must-revalidate",
-          },
-        });
-
-        if (response.ok) {
-          const data = await response.json();
-
-          // Double-check userId hasn't changed during fetch
-          const { getUserId } = await import("@/services/userDataService");
-          const currentUserIdAfterFetch = getUserId();
-          if (currentUserIdAfterFetch !== userId) {
-            logger.warn("UserId changed during fetch - discarding results");
-            setSavedCards([]);
-            setSelectedCard(null);
-            setCurrentUserId(currentUserIdAfterFetch);
-            return;
-          }
-
-          if (data.success && Array.isArray(data.cards)) {
-            logger.log(
-              "Saved payment methods fetched:",
-              data.cards.length,
-              "cards for user:",
-              userId
-            );
-            setSavedCards(data.cards);
-
-            // Auto-select default card if available
-            const defaultCard = data.cards.find((card) => card.is_default);
-            if (defaultCard) {
-              setSelectedCard(defaultCard);
-              logger.log("Auto-selected default card:", defaultCard.id);
-            } else {
-              setSelectedCard(null);
-            }
-          } else {
-            logger.log("No saved payment methods found for user:", userId);
-            setSavedCards([]);
-            setSelectedCard(null);
-          }
-        } else {
-          logger.warn(
-            "Failed to fetch saved payment methods:",
-            response.status
-          );
-          setSavedCards([]);
-          setSelectedCard(null);
-        }
-      } catch (error) {
-        logger.error("Error fetching saved payment methods:", error);
-        setSavedCards([]);
-        setSelectedCard(null);
-      } finally {
-        setIsLoadingSavedCards(false);
-      }
-    };
-
-    // Small delay to ensure cookies are set after login/register
-    const timer = setTimeout(() => {
-      fetchSavedCards();
-    }, 500);
-
-    return () => clearTimeout(timer);
-  }, [currentUserId]); // Re-run when userId changes
-
   const handleSubmit = async () => {
     try {
       setSubmitting(true);
 
       // Validate form data before processing
-      // For NEW CARD payments with Stripe Elements, skip card validation
-      // (Stripe Elements handles card validation internally)
+      // Stripe Elements handles card validation internally
       const validationResult = validateForm({
         billing_address: formData.billing_address,
         shipping_address: formData.shipping_address,
-        cardNumber: selectedCard ? cardNumber : "dummy", // Skip validation for Stripe Elements
-        cardExpMonth: selectedCard ? expiry?.split("/")[0] : "12", // Skip validation for Stripe Elements
-        cardExpYear: selectedCard ? expiry?.split("/")[1] : "30", // Skip validation for Stripe Elements
-        cardCVD: selectedCard ? cvc : "123", // Skip validation for Stripe Elements
-        useSavedCard: !!selectedCard,
+        cardNumber: "dummy", // Skip validation for Stripe Elements
+        cardExpMonth: "12", // Skip validation for Stripe Elements
+        cardExpYear: "30", // Skip validation for Stripe Elements
+        cardCVD: "123", // Skip validation for Stripe Elements
+        useSavedCard: false,
       });
 
       if (!validationResult.isValid) {
@@ -1366,26 +1223,20 @@ const CheckoutPageContent = () => {
           formData.extensions["checkout-fields-for-blocks"]._meta_mail_box,
         customerNotes: formData.customer_note,
 
-        // Payment Details
-        cardNumber: selectedCard ? "" : cardNumber,
-        cardType: selectedCard
-          ? ""
-          : formData.payment_data.find(
-              (d) => d.key === "wc-bambora-credit-card-card-type"
-            )?.value,
-        cardExpMonth: selectedCard ? "" : expiry.slice(0, 2),
-        cardExpYear: selectedCard ? "" : expiry.slice(3),
-        cardCVD: selectedCard ? "" : cvc,
+        // Payment Details - Stripe Elements handles card input
+        cardNumber: "",
+        cardType:
+          formData.payment_data.find(
+            (d) => d.key === "wc-bambora-credit-card-card-type"
+          )?.value || "",
+        cardExpMonth: "",
+        cardExpYear: "",
+        cardCVD: "",
 
-        // If using a saved card, include the token and id
-        savedCardToken: selectedCard ? selectedCard.token : null,
-        savedCardId: selectedCard ? selectedCard.id : null,
-        useSavedCard: !!selectedCard,
+        // Use Stripe for all payments
+        useStripe: true,
 
-        // NEW: Use Stripe for new card payments
-        useStripe: !selectedCard, // Use Stripe only when NOT using a saved card
-
-        // Add total amount for saved card payments
+        // Add total amount
         totalAmount:
           cartItems.totals && cartItems.totals.total_price
             ? parseFloat(cartItems.totals.total_price) / 100
@@ -1409,125 +1260,19 @@ const CheckoutPageContent = () => {
 
       // Enhanced client-side logging
       logger.log("=== PAYMENT METHOD DEBUG ===");
-      logger.log("selectedCard:", selectedCard);
-      logger.log("useStripe:", !selectedCard);
-      logger.log("useSavedCard:", !!selectedCard);
-      logger.log("willTokenizeOnBackend:", !selectedCard && !!cardNumber);
+      logger.log("useStripe: true");
       logger.log("===========================");
 
       logger.log("Client-side checkout data:", {
         ...dataToSend,
-        cardNumber: dataToSend.cardNumber ? "[REDACTED]" : "",
-        cardCVD: dataToSend.cardCVD ? "[REDACTED]" : "",
+        cardNumber: "[REDACTED]",
+        cardCVD: "[REDACTED]",
         cartTotals: cartItems.totals,
-        selectedCardId: selectedCard,
         totalAmount: dataToSend.totalAmount,
       });
 
-      // For saved cards, use the new checkout API with paymentMethodId
-      // Stripe handles saved cards automatically when paymentMethodId is provided
-      if (selectedCard && cartItems.totals) {
-        try {
-          logger.log(`Processing checkout with saved card: ${selectedCard.id}`);
-          // The token field contains the Stripe payment method ID (pm_xxx)
-          const paymentMethodId = selectedCard.token;
-          logger.log("Saved card payment method ID:", paymentMethodId);
-
-          if (!paymentMethodId) {
-            throw new Error("Saved card payment method ID not found");
-          }
-
-          // Use the new checkout API with saved card payment method ID
-          const checkoutResponse = await fetch("/api/checkout-new", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              ...dataToSend,
-              // Pass the Stripe payment method ID for the saved card
-              paymentMethodId: paymentMethodId,
-            }),
-          });
-
-          const checkoutResult = await checkoutResponse.json();
-
-          if (!checkoutResult.success) {
-            throw new Error(checkoutResult.error || "Failed to create order");
-          }
-
-          const { order, payment } = checkoutResult;
-          const orderId = order.id;
-          const orderNumber = order.orderNumber;
-          logger.log("✅ Order created with saved card:", {
-            orderId,
-            orderNumber,
-          });
-
-          // Handle FREE orders (100% discount, total is $0)
-          if (
-            !payment ||
-            order.totalAmount === 0 ||
-            order.totalAmount === "0.00"
-          ) {
-            logger.log(
-              "✅ FREE ORDER detected (100% discount applied) - saved card flow"
-            );
-
-            logger.log("✅ Free order completed successfully");
-            toast.success("Order placed successfully!");
-
-            // Empty cart
-            try {
-              const { emptyCart } = await import("@/lib/cart/cartService");
-              await emptyCart();
-              logger.log("Cart emptied successfully");
-            } catch (error) {
-              logger.error("Error emptying cart:", error);
-            }
-
-            // Redirect to success page
-            router.push(
-              `/checkout/order-received/${orderId}?key=${orderNumber}${buildFlowQueryString()}`
-            );
-            return;
-          }
-
-          // For saved cards, the backend should have already processed the payment
-          // Check payment status
-          if (
-            payment.status === "succeeded" ||
-            payment.status === "processing"
-          ) {
-            toast.success("Payment successful!");
-
-            // Empty cart
-            try {
-              const { emptyCart } = await import("@/lib/cart/cartService");
-              await emptyCart();
-              logger.log("Cart emptied successfully");
-            } catch (error) {
-              logger.error("Error emptying cart:", error);
-            }
-
-            // Redirect to success page
-            router.push(
-              `/checkout/order-received/${orderId}?key=${orderNumber}${buildFlowQueryString()}`
-            );
-            return;
-          } else {
-            // Payment might require confirmation or failed
-            logger.warn("Payment status:", payment.status);
-            throw new Error(`Payment status: ${payment.status}`);
-          }
-        } catch (error) {
-          logger.error("❌ Saved card payment error:", error);
-          toast.error(error.message || "Payment failed. Please try again.");
-          setSubmitting(false);
-          return;
-        }
-      }
-
-      // For NEW CARD payments with Stripe Elements (deferred mode)
-      if (!selectedCard && dataToSend.useStripe) {
+      // Process payment with Stripe Elements (deferred mode)
+      if (dataToSend.useStripe) {
         try {
           logger.log("Processing Stripe Elements payment in deferred mode...");
 
@@ -1804,21 +1549,8 @@ const CheckoutPageContent = () => {
           setFormData={setFormData}
           formData={formData}
           handleSubmit={handleSubmit}
-          cardNumber={cardNumber}
           isUpdatingShipping={isUpdatingShipping}
-          setCardNumber={setCardNumber}
-          expiry={expiry}
-          setExpiry={setExpiry}
-          cvc={cvc}
-          setCvc={setCvc}
-          cardType={cardType}
-          setCardType={setCardType}
           isEdFlow={isEdFlow}
-          savedCards={savedCards}
-          setSavedCards={setSavedCards}
-          selectedCard={selectedCard}
-          setSelectedCard={setSelectedCard}
-          isLoadingSavedCards={isLoadingSavedCards}
           ageValidationFailed={ageValidationFailed}
           isPaymentValid={isPaymentValid}
           paymentValidationMessage={paymentValidationMessage}
