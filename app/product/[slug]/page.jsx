@@ -72,30 +72,44 @@ export default async function ProductPage({ params }) {
     const apiProduct = await fetchProductBySlugFromBackend(slug, false, headersList);
 
     if (!apiProduct) {
+      logger.error(`[ProductPage] Product not found or failed to fetch for slug: ${slug}`);
       return <ErrorPage />;
     }
 
     // Transform the API response to WooCommerce-like format
-    const productData = transformBackendProductToWooCommerceFormat(apiProduct);
+    let productData;
+    try {
+      productData = transformBackendProductToWooCommerceFormat(apiProduct);
+    } catch (transformError) {
+      logger.error(`[ProductPage] Error transforming product data for slug "${slug}":`, transformError);
+      return <ErrorPage />;
+    }
 
     if (!productData) {
+      logger.error(`[ProductPage] Product transformation returned null for slug: ${slug}`);
       return <ErrorPage />;
     }
 
     // Process the product data using existing models
-    const product = ProductFactory(productData);
-    const categoryHandler = CategoryHandlerFactory(product);
-    const variationManager = new VariationManager(product, categoryHandler);
-    const pageProps = adaptForProductPage(
-      product,
-      categoryHandler,
-      variationManager
-    );
+    let pageProps;
+    try {
+      const product = ProductFactory(productData);
+      const categoryHandler = CategoryHandlerFactory(product);
+      const variationManager = new VariationManager(product, categoryHandler);
+      pageProps = adaptForProductPage(
+        product,
+        categoryHandler,
+        variationManager
+      );
+    } catch (modelError) {
+      logger.error(`[ProductPage] Error processing product models for slug "${slug}":`, modelError);
+      return <ErrorPage />;
+    }
 
     // Pass the pre-fetched data to the client component
     return <ProductClientWrapper slug={slug} initialData={pageProps} />;
   } catch (error) {
-    logger.error("Error in ProductPage:", error);
+    logger.error(`[ProductPage] Unexpected error for slug "${slug}":`, error);
     return <ErrorPage />;
   }
 }
