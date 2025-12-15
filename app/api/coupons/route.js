@@ -66,7 +66,7 @@ export async function POST(req) {
         accept: "application/json",
         "X-App-Key": process.env.NEXT_PUBLIC_APP_KEY,
         "X-App-Secret": process.env.NEXT_PUBLIC_APP_SECRET,
-        "Origin": origin,
+        Origin: origin,
       };
 
       // Add Authorization header ONLY if user is authenticated
@@ -110,7 +110,7 @@ export async function POST(req) {
         accept: "application/json",
         "X-App-Key": process.env.NEXT_PUBLIC_APP_KEY,
         "X-App-Secret": process.env.NEXT_PUBLIC_APP_SECRET,
-        "Origin": origin,
+        Origin: origin,
       };
 
       if (authToken) {
@@ -212,6 +212,9 @@ export async function DELETE(req) {
     }
 
     try {
+      // Get origin for Origin header (required for backend domain whitelist)
+      const origin = getOrigin(req);
+
       // Build URL - only add sessionId if user is NOT authenticated
       // If both authToken and sessionId are provided, prioritize authToken (authenticated user)
       let url = `${BASE_URL}/api/v1/cart/coupon`;
@@ -228,6 +231,7 @@ export async function DELETE(req) {
         accept: "application/json",
         "X-App-Key": process.env.NEXT_PUBLIC_APP_KEY,
         "X-App-Secret": process.env.NEXT_PUBLIC_APP_SECRET,
+        Origin: origin,
       };
 
       // Add Authorization header ONLY if user is authenticated
@@ -259,7 +263,7 @@ export async function DELETE(req) {
         accept: "application/json",
         "X-App-Key": process.env.NEXT_PUBLIC_APP_KEY,
         "X-App-Secret": process.env.NEXT_PUBLIC_APP_SECRET,
-        "Origin": origin,
+        Origin: origin,
       };
 
       if (authToken) {

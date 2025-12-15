@@ -2,10 +2,11 @@ import { NextResponse } from "next/server";
 import axios from "axios";
 import { logger } from "@/utils/devLogger";
 import { cookies } from "next/headers";
+import { getOrigin } from "@/lib/utils/getOrigin";
 
 const BASE_URL = process.env.BASE_URL;
 
-export async function GET() {
+export async function GET(request) {
   try {
     const cookieStore = await cookies();
     const authToken = cookieStore.get("authToken");
@@ -23,12 +24,18 @@ export async function GET() {
       );
     }
 
+    // Get origin for Origin header (required for backend domain whitelist)
+    const origin = getOrigin(request);
+
     // Call the custom endpoint in WordPress
     const response = await axios.get(
       `${BASE_URL}/wp-json/custom/v1/payment_tokens?customer_id=${userId.value}`,
       {
         headers: {
           Authorization: `${authToken.value}`,
+          "Origin": origin,
+          "X-App-Key": process.env.NEXT_PUBLIC_APP_KEY,
+          "X-App-Secret": process.env.NEXT_PUBLIC_APP_SECRET,
         },
       }
     );
@@ -86,12 +93,20 @@ export async function DELETE(req) {
       );
     }
 
+    // Get origin for Origin header (required for backend domain whitelist)
+    const origin = getOrigin(req);
+
     // Call the new backend endpoint to remove the card
     const response = await axios.delete(
       `${BASE_URL}/wp-json/custom/v1/payment_tokens/remove`,
       {
         data: { customer_id: userId.value, card_id: cardId },
-        headers: { Authorization: `${authToken.value}` },
+        headers: {
+          Authorization: `${authToken.value}`,
+          "Origin": origin,
+          "X-App-Key": process.env.NEXT_PUBLIC_APP_KEY,
+          "X-App-Secret": process.env.NEXT_PUBLIC_APP_SECRET,
+        },
       }
     );
 
@@ -131,11 +146,21 @@ export async function PATCH(req) {
     }
 
     if (makeDefault) {
+      // Get origin for Origin header (required for backend domain whitelist)
+      const origin = getOrigin(req);
+
       // Call the new backend endpoint to set default card
       const response = await axios.post(
         `${BASE_URL}/wp-json/custom/v1/payment_tokens/default`,
         { customer_id: userId.value, card_id: cardId },
-        { headers: { Authorization: `${authToken.value}` } }
+        {
+          headers: {
+            Authorization: `${authToken.value}`,
+            "Origin": origin,
+            "X-App-Key": process.env.NEXT_PUBLIC_APP_KEY,
+            "X-App-Secret": process.env.NEXT_PUBLIC_APP_SECRET,
+          }
+        }
       );
       return NextResponse.json({
         success: true,
@@ -178,6 +203,9 @@ export async function POST(req) {
       );
     }
 
+    // Get origin for Origin header (required for backend domain whitelist)
+    const origin = getOrigin(req);
+
     // Call the new backend endpoint to edit card expiry
     const response = await axios.post(
       `${BASE_URL}/wp-json/custom/v1/payment_tokens/edit`,
@@ -187,7 +215,14 @@ export async function POST(req) {
         expiry_month,
         expiry_year,
       },
-      { headers: { Authorization: `${authToken.value}` } }
+      {
+        headers: {
+          Authorization: `${authToken.value}`,
+          "Origin": origin,
+          "X-App-Key": process.env.NEXT_PUBLIC_APP_KEY,
+          "X-App-Secret": process.env.NEXT_PUBLIC_APP_SECRET,
+        }
+      }
     );
     return NextResponse.json({
       success: true,
