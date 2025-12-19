@@ -13,10 +13,10 @@ import { formatPrice } from "@/utils/priceFormatter";
 import { getCurrency } from "@/lib/constants/currency";
 
 // AWIN API configuration
-const AWIN_CONFIG = {
-  endpoint: "/api/awin/track-order", // Proxy to WP BASE_URL
-  timeout: 5000, // 5 second timeout for non-critical tracking
-};
+// const AWIN_CONFIG = {
+//   endpoint: "/api/awin/track-order", // Proxy to WP BASE_URL
+//   timeout: 5000, // 5 second timeout for non-critical tracking
+// };
 
 // Helper: read cookie by name (client-only)
 const readCookie = (name) => {
@@ -28,142 +28,142 @@ const readCookie = (name) => {
 };
 
 // Configure AWIN.Tracking.Sale and explicitly fire the AWIN JS conversion (sread.js)
-const fireAwinClientPixel = (orderData, s2sOrderData = null) => {
-  try {
-    if (!orderData || !orderData.id) return;
-    const merchantId = process.env.NEXT_PUBLIC_AWIN_MERCHANT_ID || "101159";
-    const subtotal = s2sOrderData
-      ? Number.parseFloat(s2sOrderData.subtotal_amount || 0) || 0
-      : Math.max(
-          0,
-          (Number.parseFloat(orderData.total || 0) || 0) -
-            (Number.parseFloat(orderData.total_tax || 0) || 0) -
-            (Number.parseFloat(orderData.shipping_total || 0) || 0)
-        );
-    const currency = s2sOrderData?.currency || orderData.currency || getCurrency();
-    const orderRef =
-      s2sOrderData?.order_reference || orderData.number || String(orderData.id);
-    const commissionGroup = s2sOrderData?.commission_group || "DEFAULT";
-    const vouchers =
-      s2sOrderData?.voucher ??
-      (Array.isArray(orderData.coupon_lines)
-        ? orderData.coupon_lines.map((c) => c.code).filter(Boolean).join(",")
-        : "");
-    const awc = readCookie("_awin_awc") || readCookie("awc");
-    const channel = awc ? "aw" : "other";
-    const loc = typeof window !== "undefined" ? window.location.href : "";
+// const fireAwinClientPixel = (orderData, s2sOrderData = null) => {
+//   try {
+//     if (!orderData || !orderData.id) return;
+//     const merchantId = process.env.NEXT_PUBLIC_AWIN_MERCHANT_ID || "101159";
+//     const subtotal = s2sOrderData
+//       ? Number.parseFloat(s2sOrderData.subtotal_amount || 0) || 0
+//       : Math.max(
+//           0,
+//           (Number.parseFloat(orderData.total || 0) || 0) -
+//             (Number.parseFloat(orderData.total_tax || 0) || 0) -
+//             (Number.parseFloat(orderData.shipping_total || 0) || 0)
+//         );
+//     const currency = s2sOrderData?.currency || orderData.currency || getCurrency();
+//     const orderRef =
+//       s2sOrderData?.order_reference || orderData.number || String(orderData.id);
+//     const commissionGroup = s2sOrderData?.commission_group || "DEFAULT";
+//     const vouchers =
+//       s2sOrderData?.voucher ??
+//       (Array.isArray(orderData.coupon_lines)
+//         ? orderData.coupon_lines.map((c) => c.code).filter(Boolean).join(",")
+//         : "");
+//     const awc = readCookie("_awin_awc") || readCookie("awc");
+//     const channel = awc ? "aw" : "other";
+//     const loc = typeof window !== "undefined" ? window.location.href : "";
 
-    // Map products to AWIN format
-    const products = Array.isArray(orderData.line_items)
-      ? orderData.line_items.map((it) => {
-          const qty = parseInt(it.quantity || 1, 10) || 1;
-          const lineTotal = Number.parseFloat(it.total || 0) || 0;
-          const unit = qty > 0 ? lineTotal / qty : 0;
-          return {
-            sku: String(it.sku || it.id || it.product_id || it.variation_id || ""),
-            quantity: String(qty),
-            unitPrice: formatPrice(unit),
-          };
-        })
-      : [];
+//     // Map products to AWIN format
+//     const products = Array.isArray(orderData.line_items)
+//       ? orderData.line_items.map((it) => {
+//           const qty = parseInt(it.quantity || 1, 10) || 1;
+//           const lineTotal = Number.parseFloat(it.total || 0) || 0;
+//           const unit = qty > 0 ? lineTotal / qty : 0;
+//           return {
+//             sku: String(it.sku || it.id || it.product_id || it.variation_id || ""),
+//             quantity: String(qty),
+//             unitPrice: formatPrice(unit),
+//           };
+//         })
+//       : [];
 
-    window.AWIN = window.AWIN || {};
-    window.AWIN.Tracking = window.AWIN.Tracking || {};
-    window.AWIN.Tracking.Sale = {
-      amount: formatPrice(subtotal),
-      orderRef: String(orderRef),
-      currency,
-      test: String(parseInt(process.env.NEXT_PUBLIC_AWIN_TESTMODE || "0", 10) === 1 ? 1 : 0),
-      parts: `${commissionGroup}:${formatPrice(subtotal)}`,
-      voucher: vouchers,
-      channel,
-      products,
-    };
+//     window.AWIN = window.AWIN || {};
+//     window.AWIN.Tracking = window.AWIN.Tracking || {};
+//     window.AWIN.Tracking.Sale = {
+//       amount: formatPrice(subtotal),
+//       orderRef: String(orderRef),
+//       currency,
+//       test: String(parseInt(process.env.NEXT_PUBLIC_AWIN_TESTMODE || "0", 10) === 1 ? 1 : 0),
+//       parts: `${commissionGroup}:${formatPrice(subtotal)}`,
+//       voucher: vouchers,
+//       channel,
+//       products,
+//     };
 
-    // Fire the official AWIN JS conversion pixel (sread.js)
-    const params = new URLSearchParams();
-    params.set("a", merchantId);
-    params.set("b", formatPrice(subtotal));
-    params.set("cr", currency);
-    params.set("c", String(orderRef));
-    params.set("d", `${commissionGroup}:${formatPrice(subtotal)}`);
-    params.set("ch", channel);
-    if (vouchers) params.set("vc", vouchers);
-    if (awc) params.set("cks", awc);
-    params.set("tv", "2");
-    params.set("tt", "js");
-    if (loc) params.set("l", loc);
+//     // Fire the official AWIN JS conversion pixel (sread.js)
+//     const params = new URLSearchParams();
+//     params.set("a", merchantId);
+//     params.set("b", formatPrice(subtotal));
+//     params.set("cr", currency);
+//     params.set("c", String(orderRef));
+//     params.set("d", `${commissionGroup}:${formatPrice(subtotal)}`);
+//     params.set("ch", channel);
+//     if (vouchers) params.set("vc", vouchers);
+//     if (awc) params.set("cks", awc);
+//     params.set("tv", "2");
+//     params.set("tt", "js");
+//     if (loc) params.set("l", loc);
 
-    const src = `https://www.awin1.com/sread.js?${params.toString()}`;
-    const s = document.createElement("script");
-    s.async = true;
-    s.defer = true;
-    s.src = src;
-    (document.head || document.body).appendChild(s);
-  } catch (e) {
-    logger?.warn?.("[AWIN] Failed to configure client conversion:", e);
-  }
-};
+//     const src = `https://www.awin1.com/sread.js?${params.toString()}`;
+//     const s = document.createElement("script");
+//     s.async = true;
+//     s.defer = true;
+//     s.src = src;
+//     (document.head || document.body).appendChild(s);
+//   } catch (e) {
+//     logger?.warn?.("[AWIN] Failed to configure client conversion:", e);
+//   }
+// };
 
 // Function to send AWIN tracking
-const sendAwinTracking = async (orderData) => {
-  if (!orderData || !orderData.id) {
-    logger.warn("[AWIN] No order data provided for tracking");
-    return null;
-  }
+// const sendAwinTracking = async (orderData) => {
+//   if (!orderData || !orderData.id) {
+//     logger.warn("[AWIN] No order data provided for tracking");
+//     return null;
+//   }
 
-  try {
-    logger.log(`[AWIN] Sending tracking for order ${orderData.id}...`);
+//   try {
+//     logger.log(`[AWIN] Sending tracking for order ${orderData.id}...`);
 
-    const trackingData = {
-      order_id: parseInt(orderData.id, 10),
-      order_data: orderData,
-    };
+//     const trackingData = {
+//       order_id: parseInt(orderData.id, 10),
+//       order_data: orderData,
+//     };
 
-    // Create AbortController for timeout handling
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), AWIN_CONFIG.timeout);
+//     // Create AbortController for timeout handling
+//     const controller = new AbortController();
+//     const timeoutId = setTimeout(() => controller.abort(), AWIN_CONFIG.timeout);
 
-    const response = await fetch(AWIN_CONFIG.endpoint, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(trackingData),
-      signal: controller.signal,
-    });
+//     const response = await fetch(AWIN_CONFIG.endpoint, {
+//       method: "POST",
+//       headers: {
+//         "Content-Type": "application/json",
+//       },
+//       body: JSON.stringify(trackingData),
+//       signal: controller.signal,
+//     });
 
-    clearTimeout(timeoutId);
+//     clearTimeout(timeoutId);
 
-    if (response.ok) {
-      const responseData = await response.json();
-      logger.log("[AWIN] ✅ Order tracking successful", {
-        order_id: orderData.id,
-        order_total: orderData.total,
-        currency: orderData.currency,
-        order_number: orderData.number,
-        awc_sent: !!trackingData.order_data?.meta_data?.find(
-          (m) => m.key === "_awin_awc"
-        )?.value,
-        awin_response: responseData,
-      });
-      return responseData?.order_data || null;
-    } else {
-      logger.warn(
-        `[AWIN] Tracking response not OK: ${response.status} ${response.statusText}`
-      );
-      return null;
-    }
-  } catch (error) {
-    // Silently log error since this shouldn't affect user experience
-    if (error.name === "AbortError") {
-      logger.warn("[AWIN] Tracking request timed out (non-critical)");
-    } else {
-      logger.error("[AWIN] Error sending tracking (non-critical):", error);
-    }
-    return null;
-  }
-};
+//     if (response.ok) {
+//       const responseData = await response.json();
+//       logger.log("[AWIN] ✅ Order tracking successful", {
+//         order_id: orderData.id,
+//         order_total: orderData.total,
+//         currency: orderData.currency,
+//         order_number: orderData.number,
+//         awc_sent: !!trackingData.order_data?.meta_data?.find(
+//           (m) => m.key === "_awin_awc"
+//         )?.value,
+//         awin_response: responseData,
+//       });
+//       return responseData?.order_data || null;
+//     } else {
+//       logger.warn(
+//         `[AWIN] Tracking response not OK: ${response.status} ${response.statusText}`
+//       );
+//       return null;
+//     }
+//   } catch (error) {
+//     // Silently log error since this shouldn't affect user experience
+//     if (error.name === "AbortError") {
+//       logger.warn("[AWIN] Tracking request timed out (non-critical)");
+//     } else {
+//       logger.error("[AWIN] Error sending tracking (non-critical):", error);
+//     }
+//     return null;
+//   }
+// };
 
 // sendGA4PurchaseEvent replaced by analyticsService.trackPurchase
 
@@ -209,6 +209,20 @@ const OrderReceivedContent = ({ userId }) => {
   const wlFlow = searchParams.get("wl-flow");
   const hairFlow = searchParams.get("hair-flow");
   const smokingFlow = searchParams.get("smoking-flow");
+  
+  // State for mainQuiz redirect (from pre-quiz purchases via sessionStorage)
+  const [mainQuizId, setMainQuizId] = useState(null);
+
+  // Check for mainQuiz redirect on mount
+  useEffect(() => {
+    const storedMainQuizId = sessionStorage.getItem("_rocky_main_quiz_redirect");
+    if (storedMainQuizId) {
+      logger.log("[SessionStorage] Found mainQuizId for redirect:", storedMainQuizId);
+      setMainQuizId(storedMainQuizId);
+    } else {
+      logger.log("[SessionStorage] No mainQuizId found - regular order");
+    }
+  }, []);
 
   // Determine if we should redirect and where to
   const shouldRedirect =
@@ -216,7 +230,15 @@ const OrderReceivedContent = ({ userId }) => {
     edFlow === "1" ||
     wlFlow === "1" ||
     hairFlow === "1" ||
-    smokingFlow === "1";
+    smokingFlow === "1" ||
+    !!mainQuizId; // Also redirect if mainQuiz ID is found
+  
+  // Log redirect state for debugging
+  useEffect(() => {
+    logger.log("[Redirect Logic] Should redirect:", shouldRedirect);
+    logger.log("[Redirect Logic] mainQuizId:", mainQuizId);
+    logger.log("[Redirect Logic] Flow params:", { mhFlow, edFlow, wlFlow, hairFlow, smokingFlow });
+  }, [shouldRedirect, mainQuizId, mhFlow, edFlow, wlFlow, hairFlow, smokingFlow]);
 
   // Function to generate the seskey
   const generateSeskey = (userId) => {
@@ -229,7 +251,14 @@ const OrderReceivedContent = ({ userId }) => {
   };
   // Determine the redirect destination
   const getRedirectPath = () => {
-    // Build the base path based on flow type
+    // If mainQuiz ID is present (from pre-quiz purchase), redirect to main consultation quiz
+    if (mainQuizId) {
+      logger.log("[Debug] Redirecting to main quiz from pre-quiz purchase:", mainQuizId);
+      // For main quiz, we just need the quiz slug
+      return `/quiz/${mainQuizId}`;
+    }
+    
+    // Build the base path based on flow type (legacy flows)
     let basePath = "";
     if (mhFlow === "1") basePath = "/mh-quiz";
     if (edFlow === "1") basePath = "/ed-consultation-quiz";
@@ -310,6 +339,7 @@ const OrderReceivedContent = ({ userId }) => {
     questionnaireCheckComplete,
     edFlow,
     hairFlow,
+    mainQuizId,
   ]);
 
   // Handle the countdown timer
@@ -347,6 +377,9 @@ const OrderReceivedContent = ({ userId }) => {
         const data = await res.json();
         setOrder(data);
         logger.log("Order loaded successfully");
+        
+        // Note: mainQuizId is read from sessionStorage on component mount
+        // No need to extract from order metadata
 
         // Send GA4 event after successfully fetching the order
         if (data && data.id) {
@@ -374,15 +407,27 @@ const OrderReceivedContent = ({ userId }) => {
             }
 
             // Send AWIN tracking (await for parity values), then fire client pixel matching S2S
-            (async () => {
-              const s2s = await sendAwinTracking(data);
-              fireAwinClientPixel(data, s2s);
-            })();
+            // (async () => {
+            //   const s2s = await sendAwinTracking(data);
+            //   fireAwinClientPixel(data, s2s);
+            // })();
           }, 1000);
         }
 
         // Check if we need to redirect to a questionnaire
-        if (shouldRedirect) {
+        // Check sessionStorage for mainQuiz redirect
+        const storedMainQuizId = sessionStorage.getItem("_rocky_main_quiz_redirect");
+        if (storedMainQuizId) {
+          logger.log("[MainQuiz Redirect] Setting up redirect to main consultation:", storedMainQuizId);
+          setIsQuestionnaireCompleted(false);
+          setQuestionnaireCheckComplete(true);
+          // Clear from sessionStorage after setting up redirect
+          sessionStorage.removeItem("_rocky_main_quiz_redirect");
+          logger.log("[SessionStorage] Cleared mainQuizId after redirect setup");
+          // Countdown will start automatically
+        }
+        // Then check other flow redirects
+        else if (shouldRedirect) {
           // Only perform questionnaire completion check for ED and Hair flows
           if (edFlow === "1" || hairFlow === "1") {
             // Determine which questionnaire ID to check based on flow type
@@ -416,10 +461,11 @@ const OrderReceivedContent = ({ userId }) => {
             // For other flows (mental health, weight loss), start redirect countdown without checking
             logger.log("Starting redirect countdown for non-ED/Hair flow");
             setIsQuestionnaireCompleted(false); // Ensure state is false
-            // Don't set questionnaireCheckComplete to true here - let the useEffect handle the countdown
-            // The countdown will start automatically via useEffect when all conditions are met
+            setQuestionnaireCheckComplete(true); // Mark check as complete for non-ED/Hair flows
           }
-        } else {
+        }
+        // No redirect needed
+        else if (!foundMainQuizId && !shouldRedirect) {
           // No redirect needed, mark check as complete
           setQuestionnaireCheckComplete(true);
         }

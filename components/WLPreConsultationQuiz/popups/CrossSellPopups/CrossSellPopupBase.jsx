@@ -7,7 +7,7 @@ import { FaChevronLeft, FaChevronRight, FaSpinner } from "react-icons/fa6";
 import { FaInfoCircle } from "react-icons/fa";
 import { RiDeleteBin6Line } from "react-icons/ri";
 import { IoIosCloseCircleOutline } from "react-icons/io";
-import CrossSellCartDisplay from "../../../shared/CrossSellCartDisplay";
+import CrossSellCartDisplay from "../../../Quiz/CrossSellPopup/CrossSellCartDisplay";
 import { useCrossSellCart } from "@/lib/hooks/useCrossSellCart";
 
 // Weight loss product IDs that require consultation
