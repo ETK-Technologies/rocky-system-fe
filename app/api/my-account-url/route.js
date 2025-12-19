@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
+import { randomBytes } from "crypto";
 import { logger } from "@/utils/devLogger";
+import { getOrigin } from "@/lib/utils/getOrigin";
 
 export async function GET(req) {
   try {
@@ -8,10 +10,13 @@ export async function GET(req) {
 
     // Check if user is logged in
     const cookieStore = await cookies();
+    const authToken = cookieStore.get("authToken")?.value;
     const userId = cookieStore.get("userId")?.value;
 
-    if (!userId) {
-      logger.log("API: User not logged in, no userId found in cookies");
+    if (!authToken || !userId) {
+      logger.log(
+        "API: User not logged in, no auth token or userId found in cookies"
+      );
       return NextResponse.json(
         { success: false, error: "User not logged in" },
         { status: 401 }
@@ -20,27 +25,21 @@ export async function GET(req) {
 
     logger.log("API: User is logged in with ID:", userId);
 
-    // CRM and Portal URLs from environment variables
-    const crmHostUrl = process.env.CRM_HOST;
-    const portalHostUrl = process.env.PORTAL_HOST;
-    const apiUsername = process.env.CRM_API_USERNAME;
-    const apiPasswordEncoded = process.env.CRM_API_PASSWORD;
+    // Backend API and Patient Portal URLs from environment variables
+    const backendUrl = process.env.BASE_URL;
+    const patientPortalUrl = process.env.NEXT_PUBLIC_PATIENT_PORTAL_URL;
 
-    // Debug: Print environment variables (without exposing the full password)
+    // Debug: Print environment variables
     logger.log("API: Environment variables check:", {
-      crmHostUrl: crmHostUrl ? "✓ Set" : "✗ Missing",
-      portalHostUrl: portalHostUrl ? "✓ Set" : "✗ Missing",
-      apiUsername: apiUsername ? "✓ Set" : "✗ Missing",
-      apiPasswordEncoded: apiPasswordEncoded ? "✓ Set" : "✗ Missing",
+      backendUrl: backendUrl ? "✓ Set" : "✗ Missing",
+      patientPortalUrl: patientPortalUrl ? "✓ Set" : "✗ Missing",
     });
 
     // If environment variables are not set, return an error
-    if (!crmHostUrl || !portalHostUrl || !apiUsername || !apiPasswordEncoded) {
+    if (!backendUrl || !patientPortalUrl) {
       const missingVars = [];
-      if (!crmHostUrl) missingVars.push("CRM_HOST");
-      if (!portalHostUrl) missingVars.push("PORTAL_HOST");
-      if (!apiUsername) missingVars.push("CRM_API_USERNAME");
-      if (!apiPasswordEncoded) missingVars.push("CRM_API_PASSWORD");
+      if (!backendUrl) missingVars.push("BASE_URL");
+      if (!patientPortalUrl) missingVars.push("NEXT_PUBLIC_PATIENT_PORTAL_URL");
 
       const errorMsg = `Missing required environment variables: ${missingVars.join(
         ", "
@@ -52,209 +51,128 @@ export async function GET(req) {
       );
     }
 
-    // Decode the base64 encoded password
-    let apiPassword;
-    try {
-      apiPassword = Buffer.from(apiPasswordEncoded, "base64").toString();
-      logger.log("API: Successfully decoded the base64 password");
-    } catch (decodeError) {
-      logger.error("API: Failed to decode base64 password:", decodeError);
-      return NextResponse.json(
-        { success: false, error: "Failed to decode API password" },
-        { status: 500 }
-      );
-    }
-
     // Extract query parameters
     const url = new URL(req.url);
     const redirectPage = url.searchParams.get("redirectPage") || "dashboard";
     logger.log("API: Redirect page set to:", redirectPage);
 
-    logger.log("API: Attempting CRM authentication");
-    logger.log(`API: CRM endpoint: ${crmHostUrl}/api/login`);
+    // Extract the actual JWT token (remove "Bearer " prefix if present)
+    let jwtToken = authToken;
+    if (authToken.startsWith("Bearer ")) {
+      jwtToken = authToken.substring(7);
+    }
 
-    // Step 1: Authenticate with CRM API
-    let loginResponse;
+    // Generate state for CSRF protection
+    const state = randomBytes(32).toString("hex");
+    logger.log("API: Generated state parameter for CSRF protection:", state);
+
+    // Build the redirect URI for the patient portal callback
+    const redirectUri = `${patientPortalUrl}/auth/callback`;
+
+    // Build the authorization URL
+    const authorizeUrl =
+      `${backendUrl}/api/v1/auth/authorize?` +
+      `app=patient-portal&` +
+      `redirect_uri=${encodeURIComponent(redirectUri)}&` +
+      `state=${encodeURIComponent(state)}`;
+
+    logger.log("API: Built authorization URL:", authorizeUrl);
+
+    // Get origin for Origin header (required for backend domain whitelist)
+    const origin = getOrigin(req);
+
+    // Make a server-side request to the backend authorization endpoint
+    // The backend will validate the JWT and redirect to the portal with a code
+    // We use redirect: 'manual' to capture the redirect location
+    let authResponse;
     try {
-      loginResponse = await fetch(`${crmHostUrl}/api/login`, {
-        method: "POST",
+      logger.log("API: Requesting authorization from backend");
+      authResponse = await fetch(authorizeUrl, {
+        method: "GET",
         headers: {
           "Content-Type": "application/json",
+          accept: "application/json",
+          Authorization: `Bearer ${jwtToken}`,
+          "X-App-Key": process.env.NEXT_PUBLIC_APP_KEY,
+          "X-App-Secret": process.env.NEXT_PUBLIC_APP_SECRET,
+          Origin: origin,
         },
-        body: JSON.stringify({
-          email: apiUsername,
-          password: apiPassword,
-        }),
+        redirect: "manual", // Don't follow redirects automatically
       });
 
-      logger.log("API: CRM auth response status:", loginResponse.status);
+      logger.log("API: Backend auth response status:", authResponse.status);
 
-      if (!loginResponse.ok) {
-        const errorText = await loginResponse.text();
-        logger.error("API: CRM authentication failed:", errorText);
-        return NextResponse.json(
-          {
-            success: false,
-            error: `Failed to authenticate with CRM: ${loginResponse.status} ${loginResponse.statusText}`,
-            details: errorText,
-          },
-          { status: 500 }
-        );
-      }
-    } catch (fetchError) {
-      logger.error("API: CRM fetch error:", fetchError.message);
-      return NextResponse.json(
-        {
-          success: false,
-          error: `Error connecting to CRM: ${fetchError.message}`,
-        },
-        { status: 500 }
-      );
-    }
+      // Check if we got a redirect (302/301) or an error
+      if (authResponse.status === 302 || authResponse.status === 301) {
+        // Get the redirect location from the Location header
+        const redirectLocation = authResponse.headers.get("Location");
 
-    let loginData;
-    try {
-      loginData = await loginResponse.json();
-      logger.log(
-        "API: CRM authentication response received",
-        loginData.success ? "successfully" : "with errors"
-      );
-    } catch (jsonError) {
-      logger.error("API: Failed to parse CRM response:", jsonError);
-      return NextResponse.json(
-        {
-          success: false,
-          error: `Failed to parse CRM response: ${jsonError.message}`,
-        },
-        { status: 500 }
-      );
-    }
+        if (redirectLocation) {
+          logger.log(
+            "API: Successfully obtained redirect location from backend"
+          );
+          logger.log("API: Redirect URL:", redirectLocation);
 
-    if (!loginData.success || !loginData.data?.token) {
-      logger.error("API: CRM authentication token not found", loginData);
-      return NextResponse.json(
-        {
-          success: false,
-          error: "CRM authentication token not found",
-          details: loginData,
-        },
-        { status: 500 }
-      );
-    }
-
-    const token = loginData.data.token;
-    logger.log("API: Successfully obtained CRM auth token");
-
-    // Step 2: Get auto-login link for the portal
-    logger.log("API: Requesting portal auto-login link");
-    logger.log(
-      `API: Portal endpoint: ${portalHostUrl}/api/user/auto-login-link`
-    );
-
-    let portalResponse;
-    try {
-      // Construct query parameters for GET request
-      const queryParams = new URLSearchParams({
-        wp_user_id: userId,
-        expiration_hour: 1,
-        redirect: redirectPage,
-      });
-
-      portalResponse = await fetch(
-        `${portalHostUrl}/api/user/auto-login-link?${queryParams.toString()}`,
-        {
-          method: "GET",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
+          // Return the redirect URL to the frontend
+          return NextResponse.json({
+            success: true,
+            url: redirectLocation,
+          });
+        } else {
+          logger.error("API: Redirect response but no Location header");
+          return NextResponse.json(
+            {
+              success: false,
+              error: "Backend returned redirect but no location header",
+            },
+            { status: 500 }
+          );
         }
-      );
+      } else if (!authResponse.ok) {
+        // Handle error responses
+        const errorText = await authResponse.text();
+        logger.error("API: Backend authorization failed:", errorText);
 
-      logger.log("API: Portal auth response status:", portalResponse.status);
+        let errorMessage = `Failed to authorize: ${authResponse.status} ${authResponse.statusText}`;
+        try {
+          const errorData = JSON.parse(errorText);
+          errorMessage = errorData.message || errorMessage;
+        } catch (e) {
+          // If parsing fails, use the text as is
+        }
 
-      if (!portalResponse.ok) {
-        const errorText = await portalResponse.text();
-        logger.error("API: Portal auto-login failed:", errorText);
         return NextResponse.json(
           {
             success: false,
-            error: `Failed to get portal auto-login link: ${portalResponse.status} ${portalResponse.statusText}`,
+            error: errorMessage,
             details: errorText,
+          },
+          { status: authResponse.status }
+        );
+      } else {
+        // Unexpected response (not a redirect and not an error)
+        logger.error(
+          "API: Unexpected response from backend:",
+          authResponse.status
+        );
+        return NextResponse.json(
+          {
+            success: false,
+            error: "Unexpected response from authorization endpoint",
           },
           { status: 500 }
         );
       }
     } catch (fetchError) {
-      logger.error("API: Portal fetch error:", fetchError.message);
+      logger.error("API: Backend fetch error:", fetchError.message);
       return NextResponse.json(
         {
           success: false,
-          error: `Error connecting to portal: ${fetchError.message}`,
+          error: `Error connecting to backend: ${fetchError.message}`,
         },
         { status: 500 }
       );
     }
-
-    let portalData;
-    try {
-      portalData = await portalResponse.json();
-      logger.log(
-        "API: Portal auto-login response received",
-        portalData.success ? "successfully" : "with errors"
-      );
-    } catch (jsonError) {
-      logger.error("API: Failed to parse portal response:", jsonError);
-      return NextResponse.json(
-        {
-          success: false,
-          error: `Failed to parse portal response: ${jsonError.message}`,
-        },
-        { status: 500 }
-      );
-    }
-
-    if (!portalData.success || !portalData.data?.link) {
-      logger.error("API: Portal auto-login link not found", portalData);
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Portal auto-login link not found",
-          details: portalData,
-        },
-        { status: 500 }
-      );
-    }
-
-    // Verify that the returned user ID matches the current user
-    if (
-      portalData.data.wp_user_id &&
-      portalData.data.wp_user_id.toString() !== userId
-    ) {
-      logger.error("API: User ID mismatch", {
-        expected: userId,
-        received: portalData.data.wp_user_id,
-      });
-      return NextResponse.json(
-        {
-          success: false,
-          error: "User ID mismatch",
-          details: {
-            expected: userId,
-            received: portalData.data.wp_user_id,
-          },
-        },
-        { status: 500 }
-      );
-    }
-
-    logger.log("API: Successfully obtained portal auto-login URL");
-
-    // Return the auto-login URL
-    return NextResponse.json({
-      success: true,
-      url: portalData.data.link,
-    });
   } catch (error) {
     logger.error("API: Error in portal login API:", error);
     return NextResponse.json(
