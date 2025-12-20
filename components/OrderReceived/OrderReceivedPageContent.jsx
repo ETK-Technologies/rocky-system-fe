@@ -40,14 +40,18 @@ const fireAwinClientPixel = (orderData, s2sOrderData = null) => {
             (Number.parseFloat(orderData.total_tax || 0) || 0) -
             (Number.parseFloat(orderData.shipping_total || 0) || 0)
         );
-    const currency = s2sOrderData?.currency || orderData.currency || getCurrency();
+    const currency =
+      s2sOrderData?.currency || orderData.currency || getCurrency();
     const orderRef =
       s2sOrderData?.order_reference || orderData.number || String(orderData.id);
     const commissionGroup = s2sOrderData?.commission_group || "DEFAULT";
     const vouchers =
       s2sOrderData?.voucher ??
       (Array.isArray(orderData.coupon_lines)
-        ? orderData.coupon_lines.map((c) => c.code).filter(Boolean).join(",")
+        ? orderData.coupon_lines
+            .map((c) => c.code)
+            .filter(Boolean)
+            .join(",")
         : "");
     const awc = readCookie("_awin_awc") || readCookie("awc");
     const channel = awc ? "aw" : "other";
@@ -60,7 +64,9 @@ const fireAwinClientPixel = (orderData, s2sOrderData = null) => {
           const lineTotal = Number.parseFloat(it.total || 0) || 0;
           const unit = qty > 0 ? lineTotal / qty : 0;
           return {
-            sku: String(it.sku || it.id || it.product_id || it.variation_id || ""),
+            sku: String(
+              it.sku || it.id || it.product_id || it.variation_id || ""
+            ),
             quantity: String(qty),
             unitPrice: formatPrice(unit),
           };
@@ -73,7 +79,9 @@ const fireAwinClientPixel = (orderData, s2sOrderData = null) => {
       amount: formatPrice(subtotal),
       orderRef: String(orderRef),
       currency,
-      test: String(parseInt(process.env.NEXT_PUBLIC_AWIN_TESTMODE || "0", 10) === 1 ? 1 : 0),
+      test: String(
+        parseInt(process.env.NEXT_PUBLIC_AWIN_TESTMODE || "0", 10) === 1 ? 1 : 0
+      ),
       parts: `${commissionGroup}:${formatPrice(subtotal)}`,
       voucher: vouchers,
       channel,
@@ -261,7 +269,8 @@ const OrderReceivedContent = ({ userId }) => {
     // Add purchased_product parameter (use first product name from order if available)
     if (order && order.items && order.items.length > 0) {
       const firstItem = order.items[0];
-      const productName = firstItem.product?.name || firstItem.variant?.name || "";
+      const productName =
+        firstItem.product?.name || firstItem.variant?.name || "";
       if (productName) {
         queryParams.append("purchased_product", productName);
       }
@@ -463,7 +472,9 @@ const OrderReceivedContent = ({ userId }) => {
     <section className="px-5 sectionWidth:px-0 py-4 md:py-8 undefined">
       <div className="flex justify-center">
         <div className="border rounded-xl w-full max-w-[480px] p-6">
-          <ThankYouMessage userEmail={order.user?.email || order.guestEmail || ""} />
+          <ThankYouMessage
+            userEmail={order.user?.email || order.guestEmail || ""}
+          />
           {countdown !== null && countdown > 0 && !isQuestionnaireCompleted && (
             <div className="mt-2 mb-2 py-4 px-6 bg-[#03A670] rounded-lg text-center rounded-lg">
               <p className="text-[16px] font-[600] text-white">
@@ -579,8 +590,13 @@ const OrderItems = ({ order }) => {
     <>
       <h3 className="text-[14px] font-[500] pt-3">Your Order</h3>
       {order.items?.map((item) => {
-        const productName = item.product?.name || item.variant?.name || "Product";
-        const imageUrl = item.product?.primaryImage?.url || item.product?.images?.[0]?.url || item.variant?.imageUrl || "";
+        const productName =
+          item.product?.name || item.variant?.name || "Product";
+        const imageUrl =
+          item.product?.primaryImage?.url ||
+          item.product?.images?.[0]?.url ||
+          item.variant?.imageUrl ||
+          "";
         return (
           <div key={item.id} className="flex items-start gap-3 py-3 border-b">
             <div className="min-w-[70px] w-[70px] min-h-[70px] h-[70px] rounded-[12px] overflow-hidden relative">
@@ -630,18 +646,36 @@ const ThankYouMessage = ({ userEmail }) => {
 };
 
 const BasicOrderInfo = ({ order }) => {
+  // Format payment method display
+  const formatPaymentMethod = () => {
+    const method = order.payment?.method;
+    if (!method) return "Credit Card";
+
+    if (method.type === "CARD" && method.brand && method.last4) {
+      const brandName =
+        method.brand.charAt(0).toUpperCase() + method.brand.slice(1);
+      return `${brandName} ending in ${method.last4}`;
+    }
+
+    if (method.type === "CARD") {
+      return "Credit Card";
+    }
+
+    return method.type || "Credit Card";
+  };
+
   return (
     <div className="border-y border-[#E2E2E1] mt-3">
       <div className="text-[#212121]">
         <div className="py-3 border-b border-[#E2E2E1]">
           <p className="text-[14px] font-[500] mb-3">Transaction Date</p>
           <p className="text-[12px] font-[400]">
-            {formatDate(order.date_created)}
+            {formatDate(order.createdAt || order.date_created)}
           </p>
         </div>
         <div className="py-3 border-b border-[#E2E2E1]">
           <p className="text-[14px] font-[500] mb-3">Payment Method</p>
-          <p className="text-[12px] font-[400]">{order.payment?.method || "Credit Card"}</p>
+          <p className="text-[12px] font-[400]">{formatPaymentMethod()}</p>
         </div>
       </div>
     </div>
