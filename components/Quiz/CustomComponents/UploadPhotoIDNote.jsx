@@ -48,7 +48,7 @@ export default function UploadPhotoIDNote({ step, answer, onAnswerChange }) {
         </label>
       </div>
 
-      <button
+      {/* <button
         onClick={() => {
           if (isChecked) {
             onAnswerChange("acknowledged");
@@ -60,7 +60,7 @@ export default function UploadPhotoIDNote({ step, answer, onAnswerChange }) {
         }`}
       >
         I acknowledge
-      </button>
+      </button> */}
     </div>
   );
 }

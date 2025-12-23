@@ -1,12 +1,18 @@
 "use client";
 
+import Logo from "@/components/Navbar/Logo";
 import { useState, useEffect } from "react";
 
-export default function NoCallAcknowledgement({ step, answer, onAnswerChange, onBack }) {
+export default function NoCallAcknowledgement({
+  step,
+  answer,
+  onAnswerChange,
+  onBack,
+}) {
   const [isChecked, setIsChecked] = useState(false);
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
+    if (typeof window !== "undefined") {
       document.body.style.overflow = "hidden";
       return () => {
         document.body.style.overflow = "auto";
@@ -40,15 +46,35 @@ export default function NoCallAcknowledgement({ step, answer, onAnswerChange, on
 
       <div className="flex-1 flex flex-col overflow-y-auto pb-[80px] md:pb-[100px]">
         <div className="w-full md:w-[520px] max-w-xl mx-auto px-5 md:px-0 py-4 relative flex flex-col">
-          <h3 className="text-[26px] md:text-[32px] text-black font-semibold mb-8">
+          <div className="relative flex items-center justify-center py-4 px-4">
+            <button
+              onClick={onBack}
+              className="absolute left-4 text-2xl text-black"
+              aria-label="Go back"
+            >
+              ‹
+            </button>
+            <Logo />
+          </div>
+
+          <h3 className="text-[18px] md:text-[20px] text-black mb-8">
             No Call Acknowledgement
           </h3>
 
           <p
-            className="text-[20px] md:text-[24px] mb-8 text-[#000000] text-left"
+            className="text-[16px] md:text-[18px] mb-8 text-[#000000] text-left"
             style={{ fontFamily: "Fellix" }}
           >
-            I hereby acknowledge that by foregoing an appointment with a licensed physician or pharmacist, it is my sole responsibility to ensure I am aware of how to appropriately use the medication requested, furthermore I hereby confirm that I am aware of any potential side effects that may occur through the use of the aforementioned medication and hereby confirm that I do not have any medical questions to ask. I will ensure I have read the relevant product page and FAQ prior to use of the prescribed medication. Should I have any questions to ask, I am aware of how to contact the clinical team at Rocky or get a hold of my primary care provider.
+            I hereby acknowledge that by foregoing an appointment with a
+            licensed physician or pharmacist, it is my sole responsibility to
+            ensure I am aware of how to appropriately use the medication
+            requested, furthermore I hereby confirm that I am aware of any
+            potential side effects that may occur through the use of the
+            aforementioned medication and hereby confirm that I do not have any
+            medical questions to ask. I will ensure I have read the relevant
+            product page and FAQ prior to use of the prescribed medication.
+            Should I have any questions to ask, I am aware of how to contact the
+            clinical team at Rocky or get a hold of my primary care provider.
           </p>
 
           <div className="mb-8">
@@ -88,7 +114,7 @@ export default function NoCallAcknowledgement({ step, answer, onAnswerChange, on
                 checked={isChecked}
                 onChange={(e) => setIsChecked(e.target.checked)}
               />
-              <span className="text-xl subheaders-font pb-4">
+              <span className="text-[16px] md:text-[18px]  subheaders-font pb-4">
                 I hereby understand and consent to the above waiver
               </span>
             </label>
@@ -102,6 +128,7 @@ export default function NoCallAcknowledgement({ step, answer, onAnswerChange, on
             onClick={() => {
               if (isChecked) {
                 onAnswerChange("acknowledged");
+                onBack();
               }
             }}
             disabled={!isChecked}

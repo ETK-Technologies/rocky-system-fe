@@ -251,8 +251,7 @@ const extractProductId = (product) => {
 const getAuthToken = () => {
   try {
     return (
-      localStorage.getItem(STORAGE_KEYS.AUTH_TOKEN) ||
-      localStorage.getItem(STORAGE_KEYS.TOKEN)
+      localStorage.getItem(STORAGE_KEYS.AUTH_TOKEN)
     );
   } catch (error) {
     logger.error("Error getting auth token:", error);
@@ -794,6 +793,7 @@ const addSingleItem = async (item) => {
   // Add authentication or session
   if (isAuthenticated) {
     const token = getAuthToken();
+    logger.log("is User Authenticated: true", token );
     if (token) {
       headers.Authorization = `Bearer ${token}`;
       logger.log("🔐 Using Authorization header (authenticated)");
@@ -809,7 +809,9 @@ const addSingleItem = async (item) => {
     }
   }
 
-  logger.log("📦 Single item request payload:", JSON.stringify(requestBody, null, 2));
+  logger.log("is USer Authenticated:", headers);
+
+  logger.log("📦 Single item request payload:", requestBody);
 
   try {
     const response = await fetch(API_ENDPOINTS.ADD_ITEM, {

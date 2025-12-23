@@ -7,6 +7,7 @@ import {
   MHProductCard,
   DefaultProductCard,
 } from "./ProductCards";
+import { logger } from "@/utils/devLogger";
 
 /**
  * Smart Product Card Router
@@ -24,7 +25,7 @@ const ProductCard = ({ product, onSelect, isSelected, flowType, isRecommended, .
   const slug = params?.slug || flowType;
 
   // Debug logging
-  console.log("🔍 ProductCard Debug:", {
+  logger.log("🔍 ProductCard Debug:", {
     flowTypeProp: flowType,
     params: params,
     slug: slug,
@@ -69,12 +70,14 @@ const ProductCard = ({ product, onSelect, isSelected, flowType, isRecommended, .
   const detectedFlowType = getFlowType();
 
   // Debug logging for detected flow type
-  console.log("🎯 Detected Flow Type:", detectedFlowType, "from slug:", slug);
+  logger.log("🎯 Detected Flow Type:", detectedFlowType, "from slug:", slug);
+
+  logger.log("Rendering ProductCard with flowType:", detectedFlowType, "and product:", product);
 
   // Route to the appropriate product card based on flow type
   switch (detectedFlowType) {
     case "wl":
-      console.log("📦 Rendering WLProductCard");
+      logger.log("📦 Rendering WLProductCard");
       return (
         <WLProductCard
           product={product}
@@ -84,7 +87,7 @@ const ProductCard = ({ product, onSelect, isSelected, flowType, isRecommended, .
       );
     
     case "ed":
-      console.log("📦 Rendering EDProductCard for product:", product.name);
+      logger.log("📦 Rendering EDProductCard for product:", product.name);
       return (
         <EDProductCard
           product={product}
@@ -96,7 +99,7 @@ const ProductCard = ({ product, onSelect, isSelected, flowType, isRecommended, .
       );
     
     case "hair":
-      console.log("📦 Rendering HairProductCard");
+      logger.log("📦 Rendering HairProductCard");
       return (
         <HairProductCard
           product={product}
@@ -107,7 +110,7 @@ const ProductCard = ({ product, onSelect, isSelected, flowType, isRecommended, .
       );
     
     case "mh":
-      console.log("📦 Rendering MHProductCard");
+      logger.log("📦 Rendering MHProductCard");
       return (
         <MHProductCard
           product={product}
@@ -118,7 +121,7 @@ const ProductCard = ({ product, onSelect, isSelected, flowType, isRecommended, .
       );
     
     default:
-      console.log("📦 Rendering DefaultProductCard (fallback)");
+      logger.log("📦 Rendering DefaultProductCard (fallback)");
       return (
         <DefaultProductCard
           product={product}

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import CustomImage from "../../utils/CustomImage";
+import Logo from "@/components/Navbar/Logo";
 
 export default function FinasterideWarnning({ step, answer, onAnswerChange, onBack }) {
   const [isChecked, setIsChecked] = useState(false);
@@ -15,7 +16,7 @@ export default function FinasterideWarnning({ step, answer, onAnswerChange, onBa
 
   return (
     <div className="fixed inset-0 bg-[#F5F0E8] z-50 overflow-y-auto">
-      <div className="min-h-screen flex flex-col">
+      <div className="min-h-screen flex flex-col max-w-[520px] mx-auto">
         {/* Header */}
         <div className="relative flex items-center justify-center py-4 px-4">
           <button
@@ -25,33 +26,23 @@ export default function FinasterideWarnning({ step, answer, onAnswerChange, onBa
           >
             ‹
           </button>
-          <CustomImage
-            src="https://myrocky.b-cdn.net/rocky-assets/logo-dark.svg"
-            alt="myrocky"
-            width={120}
-            height={40}
-            className="h-8 w-auto"
-          />
+          <Logo />
         </div>
 
         {/* Content */}
         <div className="flex-1 flex flex-col px-6 py-8">
           {/* Title */}
           <h1 className="text-3xl md:text-4xl font-medium text-[#B89968] mb-8">
-            {step?.title || "Warning"}
+            { "Warning"}
           </h1>
 
           {/* Description */}
           <div className="text-lg md:text-xl text-black leading-relaxed mb-8 flex-1">
-            {step?.description ? (
-              <p>{step.description}</p>
-            ) : (
-              <p>
+            <p>
                 Finasteride requires a healthy liver to be safely metabolized and removed from the body. We are
                 therefore unable to provide you with a prescription at this time. Please speak to your health care provider to
                 see if Finasteride may be safe for you.
               </p>
-            )}
           </div>
 
           {/* Checkbox */}
@@ -69,11 +60,11 @@ export default function FinasterideWarnning({ step, answer, onAnswerChange, onBa
 
           {/* OK Button */}
           <button
-            onClick={handleContinue}
+            onClick={onBack}
             disabled={!isChecked}
             className={`w-full py-4 rounded-full text-white text-lg font-medium transition-all ${
               isChecked
-                ? "bg-[#8B9AA3] hover:bg-[#7A8891]"
+                ? "bg-black "
                 : "bg-[#C5CDD2] cursor-not-allowed"
             }`}
           >

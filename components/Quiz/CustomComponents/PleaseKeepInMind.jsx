@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
+import Logo from "@/components/Navbar/Logo";
 
 export default function PleaseKeepInMind({
   step,
@@ -10,15 +11,6 @@ export default function PleaseKeepInMind({
 }) {
   const [isChecked, setIsChecked] = useState(false);
 
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      document.body.style.overflow = "hidden";
-      return () => {
-        document.body.style.overflow = "auto";
-      };
-    }
-  }, []);
-
   const handleContinue = () => {
     if (!isChecked) return;
     if (onBack) {
@@ -27,35 +19,29 @@ export default function PleaseKeepInMind({
   };
 
   return (
-    <div
-      className="fixed inset-0 bg-[#F5F4EF] !z-[999999] flex flex-col"
-      style={{
-        animation: "fadeIn 0.3s ease-in-out",
-      }}
-    >
-      <style jsx>{`
-        @keyframes fadeIn {
-          from {
-            opacity: 0;
-          }
-          to {
-            opacity: 1;
-          }
-        }
-      `}</style>
-
-      <div className="flex-1 flex flex-col overflow-y-auto pb-[80px] md:pb-[100px]">
-        <div className="w-full md:w-[520px] max-w-xl mx-auto px-5 md:px-0 py-4">
-          {/* Title */}
-          <h1
-            className="text-[20px] md:text-[24px] text-[#C19A6B] font-medium mb-6"
-            style={{ fontFamily: "Fellix" }}
+    <div className="fixed inset-0 bg-[#F5F0E8] z-50 overflow-y-auto">
+      <div className="min-h-screen flex flex-col max-w-[520px] mx-auto">
+        {/* Header */}
+        <div className="relative flex items-center justify-center py-4 px-4">
+          <button
+            onClick={onBack}
+            className="absolute left-4 text-2xl text-black"
+            aria-label="Go back"
           >
+            ‹
+          </button>
+          <Logo />
+        </div>
+
+        {/* Content */}
+        <div className="flex-1 flex flex-col px-6 py-8">
+          {/* Title */}
+          <h1 className="text-3xl md:text-4xl font-medium text-[#B89968] mb-8">
             {"Please keep in mind that..."}
           </h1>
 
           {/* Description */}
-          <div className="text-[16px] md:text-[18px] text-black leading-relaxed mb-6">
+          <div className="text-lg md:text-xl text-black leading-relaxed mb-8 flex-1">
             <p>
               We care about your health here at Rocky. This medication may not
               be safe for use with breast cancer and we are therefore unable to
@@ -65,60 +51,26 @@ export default function PleaseKeepInMind({
           </div>
 
           {/* Checkbox */}
-          <label className="flex items-start cursor-pointer mb-6">
-            <div
-              className={`rounded-md flex items-center justify-center w-6 h-6 mr-3 mt-1 flex-shrink-0 ${
-                isChecked ? "bg-[#C19A6B]" : "bg-gray-400"
-              }`}
-            >
-              <svg
-                width="20"
-                height="20"
-                viewBox="0 0 20 20"
-                fill="none"
-                xmlns="http://www.w3.org/2000/svg"
-              >
-                <rect
-                  width="20"
-                  height="20"
-                  rx="4"
-                  fill={isChecked ? "#C19A6B" : "#9CA3AF"}
-                />
-                {isChecked && (
-                  <path
-                    d="M5 10L8.5 13.5L15 7"
-                    stroke="white"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                )}
-              </svg>
-            </div>
+          <label className="flex items-start gap-3 mb-8 cursor-pointer">
             <input
               type="checkbox"
-              className="hidden"
               checked={isChecked}
               onChange={(e) => setIsChecked(e.target.checked)}
+              className="mt-1 w-5 h-5 rounded border-2 border-gray-400 text-gray-600 focus:ring-0"
             />
-            <span
-              className="text-[16px] md:text-[18px]"
-              style={{ fontFamily: "Fellix" }}
-            >
+            <span className="text-base md:text-lg text-black">
               I hereby understand and consent to the above waiver
             </span>
           </label>
-        </div>
-      </div>
 
-      {/* Fixed Bottom Button */}
-      <div className="fixed bottom-0 left-0 w-full py-4 px-4 shadow-lg z-50">
-        <div className="flex flex-col items-center justify-center max-w-md mx-auto">
+          {/* OK Button */}
           <button
             onClick={handleContinue}
             disabled={!isChecked}
-            className={`w-full py-4 px-4 rounded-full text-white font-medium text-lg ${
-              isChecked ? "bg-black" : "bg-gray-400"
+            className={`w-full py-4 rounded-full text-white text-lg font-medium transition-all ${
+              isChecked
+                ? "bg-black "
+                : "bg-[#C5CDD2] cursor-not-allowed"
             }`}
           >
             OK

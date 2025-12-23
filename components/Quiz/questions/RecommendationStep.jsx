@@ -4,6 +4,7 @@ import CustomImage from "@/components/utils/CustomImage";
 import Loader from "@/components/Loader";
 import Variations from "@/components/SkincareConsultation/components/Variations";
 import Logo from "@/components/Navbar/Logo";
+import { logger } from "@/utils/devLogger";
  
 const RecommendationStep = ({
   step,
@@ -23,6 +24,9 @@ const RecommendationStep = ({
   const containerRef = useRef(null);
   const [hasSelectedAlternative, setHasSelectedAlternative] = useState(false);
 
+  logger.log("RecommendationStep Render:",
+    step,
+    selectedProduct);
   // Privacy text component
   const PrivacyText = () => (
     <p className="text-xs text-[#353535] my-1 md:my-4">

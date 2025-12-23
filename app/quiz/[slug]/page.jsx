@@ -133,15 +133,12 @@ export default function QuizPage({ params }) {
 
       // Check if this is a main quiz (requireLogin = true and preQuiz = false)
       // Default to pre-quiz (recommendations) if not explicitly marked as main quiz
-      const isMainQuiz = quizData.requireLogin === true && quizData.preQuiz === false;
-      const isPreQuiz = quizData.preQuiz === true || !isMainQuiz;
+      const isMainQuiz = quizData.quizDetails.requireLogin === true && quizData.quizDetails.preQuiz === false;
+      const isPreQuiz = quizData.quizDetails.preQuiz === true || !isMainQuiz;
 
-      logger.log("Quiz type detection:", {
-        requireLogin: quizData.requireLogin,
-        preQuiz: quizData.preQuiz,
-        isMainQuiz,
-        isPreQuiz,
-      });
+      
+
+      
 
       // Different flow for pre-quiz vs main quiz
       if (isPreQuiz) {
@@ -257,7 +254,7 @@ export default function QuizPage({ params }) {
         );
 
         // Navigate to results page with product recommendations
-        router.push(`/quiz/${slug}/results`);
+         router.push(`/quiz/${slug}/results`);
       } else {
         // MAIN QUIZ: Show thank you page (consultation completed)
         logger.log("Main quiz completed - showing thank you page");

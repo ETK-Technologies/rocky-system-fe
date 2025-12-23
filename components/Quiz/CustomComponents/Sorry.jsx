@@ -1,12 +1,13 @@
 "use client";
 
+import Logo from "@/components/Navbar/Logo";
 import { useState, useEffect } from "react";
 
 export default function Sorry({ step, answer, onAnswerChange, onBack }) {
   const [isChecked, setIsChecked] = useState(false);
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
+    if (typeof window !== "undefined") {
       document.body.style.overflow = "hidden";
       return () => {
         document.body.style.overflow = "auto";
@@ -34,6 +35,17 @@ export default function Sorry({ step, answer, onAnswerChange, onBack }) {
 
       <div className="flex-1 flex flex-col overflow-y-auto pb-[80px] md:pb-[100px]">
         <div className="w-full md:w-[520px] max-w-xl mx-auto px-5 md:px-0 py-4 relative flex flex-col">
+          <div className="relative flex items-center justify-center py-4 px-4">
+            <button
+              onClick={onBack}
+              className="absolute left-4 text-2xl text-black"
+              aria-label="Go back"
+            >
+              ‹
+            </button>
+            <Logo />
+          </div>
+
           <h3 className="text-[26px] md:text-[32px] text-[#C19A6B] font-semibold mb-8">
             Sorry...
           </h3>
@@ -42,7 +54,10 @@ export default function Sorry({ step, answer, onAnswerChange, onBack }) {
             className="text-[20px] md:text-[24px] mb-8 text-[#000000] text-left"
             style={{ fontFamily: "Fellix" }}
           >
-            This may be the cause of your hair loss and will require direct treatment of the underlying condition. We are therefore unable to provide you with assistance at this time. Please speak to your doctor to determine the care you need.
+            This may be the cause of your hair loss and will require direct
+            treatment of the underlying condition. We are therefore unable to
+            provide you with assistance at this time. Please speak to your
+            doctor to determine the care you need.
           </p>
 
           <div className="mb-8">

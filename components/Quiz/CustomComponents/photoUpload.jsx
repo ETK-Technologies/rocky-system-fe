@@ -3,28 +3,46 @@
 import { useState } from "react";
 
 export default function PhotoUpload({ step, answer, onAnswerChange }) {
-  const [frontPhoto, setFrontPhoto] = useState(null);
-  const [topPhoto, setTopPhoto] = useState(null);
+  const [frontPhoto, setFrontPhoto] = useState(answer?.frontPhoto || null);
+  const [topPhoto, setTopPhoto] = useState(answer?.topPhoto || null);
+  const [frontPhotoFile, setFrontPhotoFile] = useState(answer?.frontPhotoFile || null);
+  const [topPhotoFile, setTopPhotoFile] = useState(answer?.topPhotoFile || null);
 
   const handleFrontPhotoSelect = (e) => {
     const file = e.target.files[0];
     if (file) {
-      setFrontPhoto(URL.createObjectURL(file));
-      checkBothPhotos(file, topPhoto);
+      const previewUrl = URL.createObjectURL(file);
+      setFrontPhoto(previewUrl);
+      setFrontPhotoFile(file);
+      
+      // Save photo data with answer
+      const updatedAnswer = {
+        frontPhoto: previewUrl,
+        frontPhotoFile: file,
+        topPhoto: topPhoto,
+        topPhotoFile: topPhotoFile,
+        status: (file && topPhotoFile) ? "uploaded" : "partial"
+      };
+      onAnswerChange(updatedAnswer);
     }
   };
 
   const handleTopPhotoSelect = (e) => {
     const file = e.target.files[0];
     if (file) {
-      setTopPhoto(URL.createObjectURL(file));
-      checkBothPhotos(frontPhoto, file);
-    }
-  };
-
-  const checkBothPhotos = (front, top) => {
-    if (front && top) {
-      onAnswerChange("uploaded");
+      const previewUrl = URL.createObjectURL(file);
+      setTopPhoto(previewUrl);
+      setTopPhotoFile(file);
+      
+      // Save photo data with answer
+      const updatedAnswer = {
+        frontPhoto: frontPhoto,
+        frontPhotoFile: frontPhotoFile,
+        topPhoto: previewUrl,
+        topPhotoFile: file,
+        status: (frontPhotoFile && file) ? "uploaded" : "partial"
+      };
+      onAnswerChange(updatedAnswer);
     }
   };
 

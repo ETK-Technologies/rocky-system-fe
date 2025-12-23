@@ -31,14 +31,8 @@ export default function SingleChoiceQuestion({ step, answer, onAnswerChange }) {
       [optionText]: value
     }));
     
-    // Optionally send textarea data with the answer
-    onAnswerChange({
-      answer: answer,
-      textareaData: {
-        ...textareaValues,
-        [optionText]: value
-      }
-    });
+    // Don't update answer, just update local textarea state
+    // The textarea data will be included in form submission
   };
 
   // Extract answer text if answer is an object
