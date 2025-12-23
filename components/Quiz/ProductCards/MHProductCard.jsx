@@ -16,6 +16,31 @@ const MHProductCard = ({ product, onSelect, isSelected, isRecommended = false })
 
   if (!product) return null;
 
+  // Extract data from productData if available
+  const productData = product.productData || product;
+  const variant = product.variant || productData.variants?.[0];
+  
+  // Get image from various possible sources
+  const imageUrl = variant?.imageUrl || 
+                   productData.images?.[0]?.url || 
+                   product.image ||
+                   '';
+  
+  // Get product name
+  const productName = product.title || product.name || productData.name || '';
+  
+  // Get description/tagline
+  const description = product.description || 
+                     product.product_tagline ||
+                     productData.shortDescription ||
+                     '';
+  
+  // Get price
+  const price = variant?.price || 
+               productData.basePrice ||
+               product.price ||
+               null;
+  
   // Check if product is available (default to true if not specified)
   const isAvailable = product.supplyAvailable !== false && product.available !== false;
 
@@ -63,18 +88,24 @@ const MHProductCard = ({ product, onSelect, isSelected, isRecommended = false })
         </div>
         
         <h2 className="text-xl md:text-2xl text-[#000000] font-medium">
-          {product.title || product.name}
+          {productName}
         </h2>
         
         <p className="text-sm md:text-base text-[#212121]">
-          {product.description || product.product_tagline}
+          {description}
         </p>
+        
+        {price && (
+          <p className="text-lg font-semibold text-[#000000] mt-2">
+            ${price}
+          </p>
+        )}
 
-        {product.image && product.image.trim() && (
+        {imageUrl && imageUrl.trim() && (
           <div className="w-full mt-2 relative">
             <img
-              src={product.image}
-              alt={product.title || product.name || "Product"}
+              src={imageUrl}
+              alt={productName || "Product"}
               className="w-full h-auto max-h-64 object-contain rounded-2xl"
               onError={(e) => {
                 e.target.style.display = "none";

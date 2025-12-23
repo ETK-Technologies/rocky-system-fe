@@ -19,9 +19,18 @@ import {
  * - mh, mhprecons: Mental Health (MHProductCard)
  * - default: Generic product card (DefaultProductCard)
  */
-const ProductCard = ({ product, onSelect, isSelected, flowType, isRecommended }) => {
+const ProductCard = ({ product, onSelect, isSelected, flowType, isRecommended, ...rest }) => {
   const params = useParams();
   const slug = params?.slug || flowType;
+
+  // Debug logging
+  console.log("🔍 ProductCard Debug:", {
+    flowTypeProp: flowType,
+    params: params,
+    slug: slug,
+    productId: product?.id,
+    productName: product?.name
+  });
 
   if (!product) return null;
 
@@ -59,9 +68,13 @@ const ProductCard = ({ product, onSelect, isSelected, flowType, isRecommended })
 
   const detectedFlowType = getFlowType();
 
+  // Debug logging for detected flow type
+  console.log("🎯 Detected Flow Type:", detectedFlowType, "from slug:", slug);
+
   // Route to the appropriate product card based on flow type
   switch (detectedFlowType) {
     case "wl":
+      console.log("📦 Rendering WLProductCard");
       return (
         <WLProductCard
           product={product}
@@ -71,16 +84,19 @@ const ProductCard = ({ product, onSelect, isSelected, flowType, isRecommended })
       );
     
     case "ed":
+      console.log("📦 Rendering EDProductCard for product:", product.name);
       return (
         <EDProductCard
           product={product}
           onSelect={onSelect}
           isSelected={isSelected}
           isRecommended={isRecommended}
+          {...rest}
         />
       );
     
     case "hair":
+      console.log("📦 Rendering HairProductCard");
       return (
         <HairProductCard
           product={product}
@@ -91,6 +107,7 @@ const ProductCard = ({ product, onSelect, isSelected, flowType, isRecommended })
       );
     
     case "mh":
+      console.log("📦 Rendering MHProductCard");
       return (
         <MHProductCard
           product={product}
@@ -101,6 +118,7 @@ const ProductCard = ({ product, onSelect, isSelected, flowType, isRecommended })
       );
     
     default:
+      console.log("📦 Rendering DefaultProductCard (fallback)");
       return (
         <DefaultProductCard
           product={product}

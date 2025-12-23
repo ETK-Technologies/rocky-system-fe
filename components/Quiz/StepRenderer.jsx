@@ -5,7 +5,7 @@ import FormStep from "./questions/FormStep";
 import ComponentStep from "./questions/ComponentStep";
 import PrivacyText from "./PrivacyText";
 
-export default function StepRenderer({ step, answer, onAnswerChange }) {
+export default function StepRenderer({ step, answer, onAnswerChange, onBack }) {
   if (!step) return null;
 
   const { stepType, questionType, title, description } = step;
@@ -78,6 +78,7 @@ export default function StepRenderer({ step, answer, onAnswerChange }) {
           step={step}
           answer={answer}
           onAnswerChange={onAnswerChange}
+          onBack={onBack}
         />
         <PrivacyText />
       </>

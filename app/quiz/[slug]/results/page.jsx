@@ -8,6 +8,7 @@ import RecommendationStep from "@/components/Quiz/questions/RecommendationStep";
 import ProductCard from "@/components/Quiz/ProductCard";
 import CrossSellModal from "@/components/Quiz/CrossSellPopup/CrossSellModal";
 import { addToCartDirectly } from "@/utils/flowCartHandler";
+import { transformEDProducts } from "@/components/Quiz/functions/transformEdProducts";
 
 export default function QuizResultsPage({ params }) {
   const router = useRouter();
@@ -98,13 +99,31 @@ export default function QuizResultsPage({ params }) {
   // Auto-select first product by default
   useEffect(() => {
     if (results?.recommendations?.[0] && !selectedProduct) {
-      const transformedProduct = transformProductData(results.recommendations[0]);
-      if (transformedProduct) {
-        setSelectedProduct(transformedProduct);
+      let transformedProduct;
+      
+      // For ED flow, use ED transformer for auto-selection
+      if (flowType === FLOW_TYPES.ED) {
+        // Use ALL products for transformation
+        const allProducts = results.allProducts || results.recommendations;
+        const transformedProducts = transformEDProducts(allProducts);
+        
+        logger.log("🔍 Auto-select: All transformed ED products:", transformedProducts.length);
+        
+        // For ED, show all transformed products - just auto-select the first one
+        transformedProduct = transformedProducts[0];
+        logger.log("Auto-selected first ED product (transformed):", transformedProduct);
+      } else {
+        transformedProduct = transformProductData(results.recommendations[0]);
         logger.log("Auto-selected first product:", transformedProduct);
       }
+      
+      if (transformedProduct) {
+        setSelectedProduct(transformedProduct);
+      } else {
+        logger.error("⚠️ No transformed product available for auto-selection");
+      }
     }
-  }, [results, selectedProduct]);
+  }, [results, selectedProduct, flowType]);
 
   const handleContinue = async () => {
     if (!selectedProduct) {
@@ -135,11 +154,10 @@ export default function QuizResultsPage({ params }) {
       );
       
       // Prepare product data for cart addition
-      // Send both productId (parent) and variantId (variation) to cart API
       const productForCart = {
-        id: selectedProduct.id,
-        productId: selectedProduct.productId, // Parent product ID
-        variantId: selectedProduct.variationId, // Variant ID
+        id: selectedProduct.productId,
+        productId: selectedProduct.productId,
+        variationId: selectedProduct.variationId,
         quantity: 1,
         name: selectedProduct.name || selectedProduct.title,
         price: selectedProduct.price,
@@ -149,25 +167,24 @@ export default function QuizResultsPage({ params }) {
         requireConsultation: selectedProduct.requireConsultation,
       };
 
+      logger.log(`🛒 Quiz Results (${slug}) - Preparing to add to cart`, productForCart);
+
       logger.log(
-        `🛒 Quiz Results (${slug}) - Product for cart (using variant ID):`,
+        `🛒 Quiz Results (${slug}) - Product for cart:`,
         productForCart
       );
       
       logger.log("Detected flow type from slug:", flowType);
       
-      // Note: mainQuizId is already stored in sessionStorage from quiz completion
-      // No need to pass it to cart handler
-      
       // Add product to cart using the universal flow handler
       const result = await addToCartDirectly(
         productForCart,
-        [], // No addons for now
-        flowType || slug, // Use detected flow type (ed, wl, hair, mh, skincare) or fallback to slug
+        [],
+        flowType,
         {
           requireConsultation: selectedProduct.requireConsultation || false,
           subscriptionPeriod: selectedProduct.subscriptionPeriod || null,
-          preserveExistingCart: flowType === FLOW_TYPES.WL ? false : true, // Only clear cart for WL flow
+          preserveExistingCart: flowType === FLOW_TYPES.WL ? false : true,
         }
       );
 
@@ -175,15 +192,9 @@ export default function QuizResultsPage({ params }) {
         logger.log(`🎉 Quiz Results (${slug}) - SUCCESS! Result:`, result);
         toast.success(`${selectedProduct.name || selectedProduct.title} added to cart`);
         
-        // Store cart data for cross-sell modal
-        // if (result.cartData) {
-        //   setInitialCartData(result.cartData);
-        // }
-        
         // Check if we should show cross-sell modal
         if (false) {
           logger.log(`🎁 Showing cross-sell modal with ${currentResult.productsData.length} addons`);
-          // Wait for cart data to be set, then open modal
           setTimeout(() => {
             setIsAddingToCart(false);
             setShowCrossSellModal(true);
@@ -299,6 +310,95 @@ export default function QuizResultsPage({ params }) {
       return periodMap[period] || '1_month';
     };
 
+    // Transform ED-specific data from globalAttributes to ED card format
+    const buildEDSpecificData = () => {
+      if (flowType !== 'ed' || !productData.globalAttributes) {
+        return {};
+      }
+
+      // Find Tabs frequency and Subscription Type attributes
+      const tabsAttr = productData.globalAttributes.find(attr => 
+        attr.slug === 'tabs-frequency' || attr.name === 'Tabs frequency'
+      );
+      
+      const subscriptionAttr = productData.globalAttributes.find(attr => 
+        attr.slug === 'subscription-type' || attr.name === 'Subscription Type'
+      );
+
+      if (!tabsAttr || !subscriptionAttr) {
+        return {};
+      }
+
+      // Build frequencies map
+      const frequencies = {};
+      subscriptionAttr.options?.forEach(option => {
+        const key = option.value; // e.g., "monthly-supply", "quarterly-supply"
+        frequencies[key] = key.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+      });
+
+      // Build pillOptions structure
+      const pillOptions = {};
+      subscriptionAttr.options?.forEach(freqOption => {
+        const frequencyKey = freqOption.value; // e.g., "monthly-supply"
+        pillOptions[frequencyKey] = [];
+
+        // For each tab count, find variants that match this frequency
+        tabsAttr.options?.forEach(tabOption => {
+          const tabCount = tabOption.value?.replace('-tabs', '').replace('-tab', '');
+          
+          // Find variants that match both this frequency and tab count
+          const matchingVariants = freqOption.variants?.filter(v => {
+            // Check if variant is published and matches this tab count
+            return v.status === "PUBLISHED" && 
+                   (v.sku?.includes(tabCount) || tabOption.variants?.some(tv => tv.id === v.id));
+          }) || [];
+
+          if (matchingVariants.length > 0) {
+            // Use the first matching variant for generic
+            const genericVariant = matchingVariants[0];
+            // Brand would typically be a different variant, for now use same
+            const brandVariant = matchingVariants[1] || genericVariant;
+
+            pillOptions[frequencyKey].push({
+              count: parseInt(tabCount) || tabCount,
+              genericPrice: genericVariant.price,
+              brandPrice: brandVariant.price,
+              genericVariationId: genericVariant.id,
+              brandVariationId: brandVariant.id,
+            });
+          }
+        });
+
+        // Sort by count
+        pillOptions[frequencyKey].sort((a, b) => {
+          const aNum = parseInt(a.count) || 0;
+          const bNum = parseInt(b.count) || 0;
+          return aNum - bNum;
+        });
+      });
+
+      // Extract active ingredient from metadata or attributes
+      const activeIngredient = productData.metadata?.find(meta => 
+        meta.key === 'active_ingredient'
+      )?.value || 'Sildenafil';
+
+      // Extract strengths from Dose/Strength attribute
+      const strengthsAttr = productData.globalAttributes.find(attr => 
+        attr.slug === 'dose-strength' || attr.name === 'Dose/ Strength'
+      );
+      const strengths = strengthsAttr?.value?.split(',').map(s => s.trim()) || [];
+
+      return {
+        activeIngredient,
+        strengths,
+        preferences: ['generic', 'brand'], // ED products typically have both
+        frequencies,
+        pillOptions,
+      };
+    };
+
+    const edData = buildEDSpecificData();
+
     return {
       id: variantId || productData.id || product.id,
       variationId: variantId, // Use variant ID from WordPress variants array
@@ -324,11 +424,34 @@ export default function QuizResultsPage({ params }) {
       strengthLevel: product.strengthLevel || 0,
       isPrescription: product.isPrescription || false,
       sku: variant?.sku || productData.sku || '',
+      // ED-specific fields
+      tagline: product.tagline || productTagline,
+      ...edData, // Spread the ED-specific data (activeIngredient, strengths, preferences, frequencies, pillOptions)
     };
   };
 
   // Transform recommendations to proper format
-  const transformedRecommendations = recommendations.map(transformProductData).filter(Boolean);
+  // For ED flow, use the special ED product transformer
+  let transformedRecommendations;
+  
+  if (flowType === FLOW_TYPES.ED) {
+    logger.log("🔄 Using ED product transformer for recommendations");
+    logger.log("📦 User's recommendation:", recommendations);
+    logger.log("📦 All products for merging:", results.allProducts?.length || 0);
+    
+    // Use ALL products for transformation (to enable brand/generic merging)
+    // ED products are grouped into brand/generic pairs, show all transformed cards
+    const allProducts = results.allProducts || recommendations;
+    
+    transformedRecommendations = transformEDProducts(allProducts);
+    
+    logger.log("✅ Transformed ED products:", transformedRecommendations.length);
+    logger.log("✅ ED products to display:", transformedRecommendations);
+  } else {
+    // Use standard transformation for other flows
+    transformedRecommendations = recommendations.map(transformProductData).filter(Boolean);
+  }
+  
   const recommended = transformedRecommendations[0]; // First recommendation as primary
   const alternatives = transformedRecommendations.slice(1); // Rest as alternatives
 
@@ -339,18 +462,44 @@ export default function QuizResultsPage({ params }) {
     alternatives: alternatives
   };
 
+  // Create a custom setSelectedProduct handler that works with ED product selections
+  const handleProductSelection = (product, options) => {
+    logger.log("📦 Product selection:", { product, options });
+    
+    // For ED products, options will contain { preference, frequency, pills, pillCount, price, variationId }
+    if (options && flowType === FLOW_TYPES.ED) {
+      // Merge the product with the selection options
+      const updatedProduct = {
+        ...product,
+        price: options.price,
+        variationId: options.variationId,
+        productId: product.id, // Original product ID
+        selectedPreference: options.preference,
+        selectedFrequency: options.frequency,
+        selectedPills: options.pills,
+        pillCount: options.pillCount,
+      };
+      logger.log("✅ Updated ED product with selections:", updatedProduct);
+      setSelectedProduct(updatedProduct);
+    } else {
+      // For non-ED products, just set the product as-is
+      setSelectedProduct(product);
+    }
+  };
+
   return (
     <>
       <RecommendationStep
         step={stepData}
         selectedProduct={selectedProduct}
-        setSelectedProduct={setSelectedProduct}
+        setSelectedProduct={handleProductSelection}
         onContinue={handleContinue}
         ProductCard={ProductCard}
         showAlternatives={alternatives.length > 0}
         variations={[]}
         showIncluded={true}
         isLoading={isAddingToCart}
+        flowType={flowType}
       />
 
       {/* Cross-Sell Modal */}

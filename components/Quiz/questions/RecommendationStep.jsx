@@ -3,7 +3,8 @@ import React, { useEffect, useState, useRef } from "react";
 import CustomImage from "@/components/utils/CustomImage";
 import Loader from "@/components/Loader";
 import Variations from "@/components/SkincareConsultation/components/Variations";
-
+import Logo from "@/components/Navbar/Logo";
+ 
 const RecommendationStep = ({
   step,
   selectedProduct,
@@ -14,6 +15,7 @@ const RecommendationStep = ({
   variations = [],
   showIncluded = true,
   isLoading = false,
+  flowType, // Flow type to pass to ProductCard
 }) => {
   const { title, description, recommended, alternatives = [] } = step;
   const [showMoreOptions, setShowMoreOptions] = useState(false);
@@ -168,6 +170,8 @@ const RecommendationStep = ({
       {/* Progress indicator */}
       <div className="mb-6">
         <div className="w-full md:w-[520px] mx-auto">
+          <Logo />
+          <br />
           <div className="progress-indicator mb-2 text-[#A7885A] font-medium">
             <span className="text-sm">Here's what we recommended</span>
           </div>
@@ -193,6 +197,9 @@ const RecommendationStep = ({
             variations={variations}
             onSelect={(product) => setSelectedProduct(product)}
             isSelected={selectedProduct?.id === recommended?.id}
+            flowType={flowType}
+            onContinue={onContinue}
+            isRecommended={true}
           />
         </div>
 
@@ -210,6 +217,7 @@ const RecommendationStep = ({
                   product={product}
                   onSelect={(product) => setSelectedProduct(product)}
                   isSelected={selectedProduct?.id === product.id}
+                  flowType={flowType}
                 />
               ))}
             </div>
@@ -218,34 +226,59 @@ const RecommendationStep = ({
         <PrivacyText />
       </div>
 
-      {/* Continue Button */}
-      <div className="sticky bottom-0 py-4 z-30 bg-white">
-        {/* Show more/less options button */}
-        {showAlternatives && alternatives && alternatives.length > 0 && (
-          <button
-            onClick={handleShowMoreOptions}
-            className="w-full py-3 px-8 rounded-full border border-gray-300 text-black font-medium bg-transparent mb-4"
-          >
-            {showMoreOptions ? "Show less options" : "Show more options"}
-          </button>
-        )}
-        <button
-          className={`w-full py-3 rounded-full font-medium flex items-center justify-center gap-2 ${
-            isContinueEnabled
-              ? "bg-black text-white"
-              : "bg-gray-300 text-gray-500 cursor-not-allowed"
-          }`}
-          onClick={isContinueEnabled ? onContinue : null}
-          disabled={!isContinueEnabled || isLoading}
-        >
-          {isLoading && (
-            <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+      {/* Continue Button - Hidden for ED flow since EDProductCard has its own button */}
+      {flowType !== "ed" && (
+        <div className="sticky bottom-0 py-4 z-30 bg-white">
+          {/* Show more/less options button */}
+          {showAlternatives && alternatives && alternatives.length > 0 && (
+            <button
+              onClick={handleShowMoreOptions}
+              className="w-full py-3 px-8 rounded-full border border-gray-300 text-black font-medium bg-transparent mb-4"
+            >
+              {showMoreOptions ? "Show less options" : "Show more options"}
+            </button>
           )}
-          {isLoading
-            ? "Adding to cart..."
-            : `Proceed -  ${ `$` + (selectedProduct?.price || "")} →`}
-        </button>
-      </div>
+          <button
+            className={`w-full py-3 rounded-full font-medium flex items-center justify-center gap-2 ${
+              isContinueEnabled
+                ? "bg-black text-white"
+                : "bg-gray-300 text-gray-500 cursor-not-allowed"
+            }`}
+            onClick={isContinueEnabled ? onContinue : null}
+            disabled={!isContinueEnabled || isLoading}
+          >
+            {isLoading && (
+              <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+            )}
+            {isLoading
+              ? "Adding to cart..."
+              : `Proceed -  ${ `$` + (selectedProduct?.price || "")} →`}
+          </button>
+        </div>
+      )}
+      
+      {/* For ED flow, show more options button and loading state */}
+      {flowType === "ed" && (
+        <div className="sticky bottom-0 py-4 z-30 bg-white">
+          {/* Show more/less options button for ED */}
+          {showAlternatives && alternatives && alternatives.length > 0 && (
+            <button
+              onClick={handleShowMoreOptions}
+              className="w-full py-3 px-8 rounded-full border border-gray-300 text-black font-medium bg-transparent"
+            >
+              {showMoreOptions ? "Show less options" : "Show more options"}
+            </button>
+          )}
+          
+          {/* Show loading overlay when adding to cart */}
+          {isLoading && (
+            <div className="w-full py-3 rounded-full bg-black text-white font-medium flex items-center justify-center gap-2 mt-4">
+              <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+              Adding to cart...
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 };

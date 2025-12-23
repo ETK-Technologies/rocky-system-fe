@@ -7,6 +7,7 @@ import QuizNavigation from "./QuizNavigation";
 import StepRenderer from "./StepRenderer";
 import { getBranchingLogic } from "@/utils/quizLogic";
 import { logger } from "@/utils/devLogger";
+import Logo from "../Navbar/Logo";
 
 export default function QuizRenderer({ quizData, sessionData, onComplete }) {
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
@@ -34,9 +35,9 @@ export default function QuizRenderer({ quizData, sessionData, onComplete }) {
   const saveAnswer = useCallback(async (questionId, answer) => {
     // TODO: Re-enable when backend is ready
     logger.log("Answer saved (skipped):", { questionId, answer, responseId });
-    return true;
+    //return true;
     
-    /* COMMENTED OUT - RE-ENABLE LATER
+    /* COMMENTED OUT - RE-ENABLE LATER */
     if (!responseId) {
       console.error("No response ID available");
       logger.log("Session data:", sessionData);
@@ -68,7 +69,7 @@ export default function QuizRenderer({ quizData, sessionData, onComplete }) {
       toast.error(`Failed to save answer: ${error.message}`);
       return false;
     }
-    */
+    
   }, [responseId, sessionData]);
 
   // Handle answer change
@@ -86,7 +87,7 @@ export default function QuizRenderer({ quizData, sessionData, onComplete }) {
     setIsSubmitting(true);
 
     // Save current answer
-    const questionId = `question-${currentStep.id}`;
+    const questionId = String(currentStep.id);
     logger.log("=== Saving Answer ===");
     logger.log("Question:", currentStep.title || currentStep.text);
     logger.log("Question ID:", currentStep.id);
@@ -140,7 +141,7 @@ export default function QuizRenderer({ quizData, sessionData, onComplete }) {
       setVisitedSteps(visitedSteps.slice(0, -1));
       
       // Load previous answer if exists
-      const prevQuestionId = `question-${steps[prevIndex].id}`;
+      const prevQuestionId = steps[prevIndex].id;
       if (answers[prevQuestionId]) {
         setCurrentAnswer(answers[prevQuestionId].value);
       } else {
@@ -177,13 +178,32 @@ export default function QuizRenderer({ quizData, sessionData, onComplete }) {
         throw new Error(result.error || "Failed to complete quiz");
       }
 
-      onComplete(result.data);
+      // For ED quiz, attach all products separately for brand/generic merging
+      const isEdQuiz = quizData?.slug?.toLowerCase().includes("ed") && quizData?.quizDetails?.preQuiz;
+      
+      if (isEdQuiz && quizData.results && quizData.results.length > 0) {
+        logger.log("🔵 ED Quiz detected - Attaching all products for transformation");
+        logger.log("📦 Filtered recommendations:", result.data.recommendations?.length || 0);
+        logger.log("📦 All products for merging:", quizData.results.length);
+        
+        const resultWithAllProducts = {
+          ...result.data,
+          allProducts: quizData.results, // All products for brand/generic merging
+          preQuiz: true,
+          mainQuizId: quizData.quizDetails.mainQuiz,
+        };
+        
+        logger.log("✅ Result with all products attached:", resultWithAllProducts);
+        onComplete(resultWithAllProducts, finalAnswers);
+      } else {
+        onComplete(result.data, finalAnswers);
+      }
     } catch (error) {
       console.error("Error completing quiz:", error);
       toast.error("Failed to complete quiz");
       setIsSubmitting(false);
     }
-  }, [responseId, onComplete]);
+  }, [responseId, onComplete, quizData]);
 
   const progress = ((currentStepIndex + 1) / steps.length) * 100;
 
@@ -209,7 +229,7 @@ export default function QuizRenderer({ quizData, sessionData, onComplete }) {
     <div className="min-h-screen">
       {/* Header */}
       <div className="bg-white border-b border-gray-200">
-        <div className="max-w-3xl mx-auto px-4 py-4 flex items-center justify-between">
+        <div className="max-w-3xl mx-auto px-4 flex items-center justify-between">
           <button
             onClick={handleBack}
             disabled={currentStepIndex === 0}
@@ -224,17 +244,14 @@ export default function QuizRenderer({ quizData, sessionData, onComplete }) {
             </svg>
           </button>
           
-          <div className="text-2xl font-bold">
-            <span style={{ color: '#1a1a1a' }}>my</span>
-            <span style={{ color: '#A7885A' }}>rocky</span>
-          </div>
+         <Logo />
           
           <div className="w-10"></div> {/* Spacer for centering */}
         </div>
       </div>
 
       {/* Quiz Content */}
-      <div className="max-w-2xl mx-auto px-6 py-8 pb-28">
+      <div className="max-w-2xl mx-auto px-6 py-4">
         {/* Progress Bar */}
         <QuizProgress
           current={currentStepIndex + 1}
@@ -249,6 +266,7 @@ export default function QuizRenderer({ quizData, sessionData, onComplete }) {
               step={currentStep}
               answer={currentAnswer}
               onAnswerChange={handleAnswerChange}
+              onBack={handleBack}
             />
           ) : (
             <div className="text-center text-gray-500">

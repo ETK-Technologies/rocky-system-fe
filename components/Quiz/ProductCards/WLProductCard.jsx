@@ -16,12 +16,34 @@ const WLProductCard = ({ product, onSelect, isSelected }) => {
 
   if (!product) return null;
 
+  // Extract data from productData if available
+  const productData = product.productData || product;
+  const variant = product.variant || productData.variants?.[0];
+  
+  // Get image from various possible sources
+  const imageUrl = variant?.imageUrl || 
+                   productData.images?.[0]?.url || 
+                   product.image ||
+                   '';
+  
+  // Get product name - handle both formats
+  const productName = product.title || product.name || productData.name || '';
+  const showRegistered = product.id !== "490537" && productName !== "Rybelsus";
+  
+  // Get description/tagline
+  const description = product.description || 
+                     product.product_tagline ||
+                     productData.shortDescription ||
+                     '';
+  
+  // Get price
+  const price = variant?.price || 
+               productData.basePrice ||
+               product.price ||
+               null;
+  
   // Check if product is available (default to true if not specified)
   const isAvailable = product.supplyAvailable !== false && product.available !== false;
-
-  // Get product name - handle both formats
-  const productName = product.title || product.name;
-  const showRegistered = product.id !== "490537" && productName !== "Rybelsus";
 
   return (
     <>
@@ -74,13 +96,19 @@ const WLProductCard = ({ product, onSelect, isSelected }) => {
         </h2>
         
         <p className="text-sm md:text-base text-[#212121]">
-          {product.description || product.product_tagline}
+          {description}
         </p>
         
-        {product.image && product.image.trim() && (
+        {price && (
+          <p className="text-lg font-semibold text-[#000000] mt-2">
+            ${price}
+          </p>
+        )}
+        
+        {imageUrl && imageUrl.trim() && (
           <div className="w-full h-full mt-2 relative">
             <img
-              src={product.image}
+              src={imageUrl}
               alt={productName || "Product"}
               className="w-full h-full object-contain rounded-2xl"
               onError={(e) => {

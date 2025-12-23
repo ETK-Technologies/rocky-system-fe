@@ -422,7 +422,7 @@ const OrderReceivedContent = ({ userId }) => {
           setIsQuestionnaireCompleted(false);
           setQuestionnaireCheckComplete(true);
           // Clear from sessionStorage after setting up redirect
-          sessionStorage.removeItem("_rocky_main_quiz_redirect");
+         // sessionStorage.removeItem("_rocky_main_quiz_redirect");
           logger.log("[SessionStorage] Cleared mainQuizId after redirect setup");
           // Countdown will start automatically
         }
@@ -676,6 +676,31 @@ const ThankYouMessage = ({ userEmail }) => {
 };
 
 const BasicOrderInfo = ({ order }) => {
+  // Extract payment method display string
+  const getPaymentMethodDisplay = (payment) => {
+    if (!payment) return "Credit Card";
+    
+    // If payment has a method string property
+    if (typeof payment.method === 'string') return payment.method;
+    
+    // If payment is an object with payment details
+    if (payment.type) {
+      if (payment.type === 'card' || payment.type === 'credit_card') {
+        return payment.brand 
+          ? `${payment.brand.toUpperCase()} ending in ${payment.last4 || '****'}`
+          : "Credit Card";
+      }
+      if (payment.type === 'bank_account') {
+        return payment.bankName 
+          ? `${payment.bankName} ending in ${payment.accountLast4 || '****'}`
+          : "Bank Account";
+      }
+      return payment.type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+    }
+    
+    return "Credit Card";
+  };
+
   return (
     <div className="border-y border-[#E2E2E1] mt-3">
       <div className="text-[#212121]">
@@ -687,7 +712,7 @@ const BasicOrderInfo = ({ order }) => {
         </div>
         <div className="py-3 border-b border-[#E2E2E1]">
           <p className="text-[14px] font-[500] mb-3">Payment Method</p>
-          <p className="text-[12px] font-[400]">{order.payment?.method || "Credit Card"}</p>
+          <p className="text-[12px] font-[400]">{getPaymentMethodDisplay(order.payment)}</p>
         </div>
       </div>
     </div>

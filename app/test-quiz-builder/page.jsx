@@ -334,7 +334,18 @@ export default function QuizBuilderTestPage() {
                   </div>
                 </div>
                 <div className="bg-white border border-purple-300 rounded p-3">
-                  <p className="text-sm font-medium text-gray-700 mb-2">Full Runtime Data:</p>
+                  <div className="flex justify-between items-center mb-2">
+                    <p className="text-sm font-medium text-gray-700">Full Runtime Data:</p>
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(JSON.stringify(runtimeQuizData, null, 2));
+                        toast.success("Runtime data copied to clipboard!");
+                      }}
+                      className="px-3 py-1 text-xs bg-purple-600 hover:bg-purple-700 text-white rounded transition-colors"
+                    >
+                      📋 Copy JSON
+                    </button>
+                  </div>
                   <pre className="text-xs text-gray-600 overflow-auto bg-gray-50 p-2 rounded max-h-96">
                     {JSON.stringify(runtimeQuizData, null, 2)}
                   </pre>

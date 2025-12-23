@@ -1,15 +1,16 @@
 import { useState, useEffect } from "react";
 import { getComponent } from '@/components/Quiz/CustomComponents/registry';
 
-export default function ComponentStep({ step, answer, onAnswerChange }) {
-  const { title, selectedComponentId, componentPath, component } = step;
+export default function ComponentStep({ step, answer, onAnswerChange, onBack }) {
+  const { title, selectedComponentId, componentPath, component, description } = step;
   const [DynamicComponent, setDynamicComponent] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
   useEffect(() => {
     // Extract component path from step data
-    const path = componentPath || component?.path || component;
+    // Check multiple possible locations: componentPath, component.path, component, or description field
+    const path = componentPath || component?.path || component || description;
     
     if (path && typeof path === 'string') {
       // Dynamic import based on path
@@ -20,7 +21,7 @@ export default function ComponentStep({ step, answer, onAnswerChange }) {
     } else {
       setLoading(false);
     }
-  }, [componentPath, component, selectedComponentId]);
+  }, [componentPath, component, selectedComponentId, description]);
 
   const loadComponent = async (path) => {
     try {
@@ -69,6 +70,8 @@ export default function ComponentStep({ step, answer, onAnswerChange }) {
       "cmj7kexzg00dblf01hi3kw7ha": "components/Quiz/CustomComponents/PopupComponent",
       "cmj7kkogf00ddlf01pvfw8mva": "components/Quiz/CustomComponents/MedicationPopup",
       "cmj7lb6mw00dhlf0192oznq0p": "components/Quiz/CustomComponents/PotentialWeightLoss",
+      "cmjd2k89a0058nv01kfmpwzzf": "components/Quiz/CustomComponents/TimeToGet",
+      "cmjd2usqq005ynv01njlm7tul": "components/Quiz/CustomComponents/CustomeNote",
       
       // Alternative naming conventions
       "BMICalculator": "components/Quiz/CustomComponents/BMICalculator",
@@ -86,6 +89,18 @@ export default function ComponentStep({ step, answer, onAnswerChange }) {
       "PotentialWeightLoss": "components/Quiz/CustomComponents/PotentialWeightLoss",
       "weight-loss-potential": "components/Quiz/CustomComponents/PotentialWeightLoss",
       "potential_weight_loss": "components/Quiz/CustomComponents/PotentialWeightLoss",
+      
+      "TimeToGet": "components/Quiz/CustomComponents/TimeToGet",
+      "time-to-get": "components/Quiz/CustomComponents/TimeToGet",
+      
+      "CustomeNote": "components/Quiz/CustomComponents/CustomeNote",
+      "custom-note": "components/Quiz/CustomComponents/CustomeNote",
+      
+      "FinasterideWarnning": "components/Quiz/CustomComponents/FinasterideWarnning",
+      "finasteride-warning": "components/Quiz/CustomComponents/FinasterideWarnning",
+      
+      "PleaseKeepInMind": "components/Quiz/CustomComponents/PleaseKeepInMind",
+      "please-keep-in-mind": "components/Quiz/CustomComponents/PleaseKeepInMind",
     };
 
     const path = componentPaths[componentId];
@@ -100,8 +115,7 @@ export default function ComponentStep({ step, answer, onAnswerChange }) {
 
   return (
     <div>
-      <h2 className="subheaders-font text-[26px] md:text-[32px] font-medium leading-[120%] text-gray-900 mb-6">{title}</h2>
-      
+
       {loading && (
         <div className="text-center py-8">
           <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mb-2"></div>
@@ -116,7 +130,7 @@ export default function ComponentStep({ step, answer, onAnswerChange }) {
           <details className="text-left">
             <summary className="cursor-pointer text-xs text-gray-500">Debug Info</summary>
             <pre className="mt-2 text-xs bg-white p-2 rounded overflow-auto">
-              {JSON.stringify({ componentPath, component, selectedComponentId }, null, 2)}
+              {JSON.stringify({ componentPath, component, selectedComponentId, description }, null, 2)}
             </pre>
           </details>
         </div>
@@ -127,6 +141,7 @@ export default function ComponentStep({ step, answer, onAnswerChange }) {
           step={step}
           answer={answer}
           onAnswerChange={onAnswerChange}
+          onBack={onBack}
         />
       )}
 
