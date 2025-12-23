@@ -120,6 +120,8 @@ export async function POST(req) {
         cartData.item_data = { attributes: item.attributes };
       }
 
+
+      logger.log("cartData:", cartData);
       // Build the individual request for the batch
       const batchRequest = {
         path: "/wc/store/v1/cart/add-item",

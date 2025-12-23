@@ -13,10 +13,10 @@ import { formatPrice } from "@/utils/priceFormatter";
 import { getCurrency } from "@/lib/constants/currency";
 
 // AWIN API configuration
-const AWIN_CONFIG = {
-  endpoint: "/api/awin/track-order", // Proxy to WP BASE_URL
-  timeout: 5000, // 5 second timeout for non-critical tracking
-};
+// const AWIN_CONFIG = {
+//   endpoint: "/api/awin/track-order", // Proxy to WP BASE_URL
+//   timeout: 5000, // 5 second timeout for non-critical tracking
+// };
 
 // Helper: read cookie by name (client-only)
 const readCookie = (name) => {
@@ -88,7 +88,7 @@ const fireAwinClientPixel = (orderData, s2sOrderData = null) => {
       products,
     };
 
-    // Fire the official AWIN JS conversion pixel (sread.js)
+  // Fire the official AWIN JS conversion pixel (sread.js)
     const params = new URLSearchParams();
     params.set("a", merchantId);
     params.set("b", formatPrice(subtotal));
@@ -113,7 +113,7 @@ const fireAwinClientPixel = (orderData, s2sOrderData = null) => {
   }
 };
 
-// Function to send AWIN tracking
+//Function to send AWIN tracking
 const sendAwinTracking = async (orderData) => {
   if (!orderData || !orderData.id) {
     logger.warn("[AWIN] No order data provided for tracking");
@@ -217,6 +217,20 @@ const OrderReceivedContent = ({ userId }) => {
   const wlFlow = searchParams.get("wl-flow");
   const hairFlow = searchParams.get("hair-flow");
   const smokingFlow = searchParams.get("smoking-flow");
+  
+  // State for mainQuiz redirect (from pre-quiz purchases via sessionStorage)
+  const [mainQuizId, setMainQuizId] = useState(null);
+
+  // Check for mainQuiz redirect on mount
+  useEffect(() => {
+    const storedMainQuizId = sessionStorage.getItem("_rocky_main_quiz_redirect");
+    if (storedMainQuizId) {
+      logger.log("[SessionStorage] Found mainQuizId for redirect:", storedMainQuizId);
+      setMainQuizId(storedMainQuizId);
+    } else {
+      logger.log("[SessionStorage] No mainQuizId found - regular order");
+    }
+  }, []);
 
   // Determine if we should redirect and where to
   const shouldRedirect =
@@ -224,7 +238,15 @@ const OrderReceivedContent = ({ userId }) => {
     edFlow === "1" ||
     wlFlow === "1" ||
     hairFlow === "1" ||
-    smokingFlow === "1";
+    smokingFlow === "1" ||
+    !!mainQuizId; // Also redirect if mainQuiz ID is found
+  
+  // Log redirect state for debugging
+  useEffect(() => {
+    logger.log("[Redirect Logic] Should redirect:", shouldRedirect);
+    logger.log("[Redirect Logic] mainQuizId:", mainQuizId);
+    logger.log("[Redirect Logic] Flow params:", { mhFlow, edFlow, wlFlow, hairFlow, smokingFlow });
+  }, [shouldRedirect, mainQuizId, mhFlow, edFlow, wlFlow, hairFlow, smokingFlow]);
 
   // Function to generate the seskey
   const generateSeskey = (userId) => {
@@ -237,7 +259,14 @@ const OrderReceivedContent = ({ userId }) => {
   };
   // Determine the redirect destination
   const getRedirectPath = () => {
-    // Build the base path based on flow type
+    // If mainQuiz ID is present (from pre-quiz purchase), redirect to main consultation quiz
+    if (mainQuizId) {
+      logger.log("[Debug] Redirecting to main quiz from pre-quiz purchase:", mainQuizId);
+      // For main quiz, we just need the quiz slug
+      return `/quiz/${mainQuizId}`;
+    }
+    
+    // Build the base path based on flow type (legacy flows)
     let basePath = "";
     if (mhFlow === "1") basePath = "/mh-quiz";
     if (edFlow === "1") basePath = "/ed-consultation-quiz";
@@ -319,6 +348,7 @@ const OrderReceivedContent = ({ userId }) => {
     questionnaireCheckComplete,
     edFlow,
     hairFlow,
+    mainQuizId,
   ]);
 
   // Handle the countdown timer
@@ -356,6 +386,9 @@ const OrderReceivedContent = ({ userId }) => {
         const data = await res.json();
         setOrder(data);
         logger.log("Order loaded successfully");
+        
+        // Note: mainQuizId is read from sessionStorage on component mount
+        // No need to extract from order metadata
 
         // Send GA4 event after successfully fetching the order
         if (data && data.id) {
@@ -383,15 +416,27 @@ const OrderReceivedContent = ({ userId }) => {
             }
 
             // Send AWIN tracking (await for parity values), then fire client pixel matching S2S
-            (async () => {
-              const s2s = await sendAwinTracking(data);
-              fireAwinClientPixel(data, s2s);
-            })();
+            // (async () => {
+            //   const s2s = await sendAwinTracking(data);
+            //   fireAwinClientPixel(data, s2s);
+            // })();
           }, 1000);
         }
 
         // Check if we need to redirect to a questionnaire
-        if (shouldRedirect) {
+        // Check sessionStorage for mainQuiz redirect
+        const storedMainQuizId = sessionStorage.getItem("_rocky_main_quiz_redirect");
+        if (storedMainQuizId) {
+          logger.log("[MainQuiz Redirect] Setting up redirect to main consultation:", storedMainQuizId);
+          setIsQuestionnaireCompleted(false);
+          setQuestionnaireCheckComplete(true);
+          // Clear from sessionStorage after setting up redirect
+         // sessionStorage.removeItem("_rocky_main_quiz_redirect");
+          logger.log("[SessionStorage] Cleared mainQuizId after redirect setup");
+          // Countdown will start automatically
+        }
+        // Then check other flow redirects
+        else if (shouldRedirect) {
           // Only perform questionnaire completion check for ED and Hair flows
           if (edFlow === "1" || hairFlow === "1") {
             // Determine which questionnaire ID to check based on flow type
@@ -425,10 +470,11 @@ const OrderReceivedContent = ({ userId }) => {
             // For other flows (mental health, weight loss), start redirect countdown without checking
             logger.log("Starting redirect countdown for non-ED/Hair flow");
             setIsQuestionnaireCompleted(false); // Ensure state is false
-            // Don't set questionnaireCheckComplete to true here - let the useEffect handle the countdown
-            // The countdown will start automatically via useEffect when all conditions are met
+            setQuestionnaireCheckComplete(true); // Mark check as complete for non-ED/Hair flows
           }
-        } else {
+        }
+        // No redirect needed
+        else if (!foundMainQuizId && !shouldRedirect) {
           // No redirect needed, mark check as complete
           setQuestionnaireCheckComplete(true);
         }

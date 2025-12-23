@@ -28,7 +28,9 @@ const BASE_URL = process.env.BASE_URL;
 export async function POST(req) {
   try {
     const body = await req.json();
+    
 
+    logger.log("BODY -> ", body);
     // Extract ONLY the fields we need, ignore all extra fields (name, price, image, etc.)
     const {
       productId,
@@ -170,7 +172,7 @@ export async function POST(req) {
     logger.log("=== FINAL REQUEST TO BACKEND ===");
     logger.log("URL:", `${BASE_URL}/api/v1/cart/items`);
     logger.log("Method: POST");
-    logger.log("Payload:", JSON.stringify(requestBody, null, 2));
+    logger.log("Payload:", JSON.stringify(requestBody, null));
 
     if (authToken) {
       logger.log("✅ Authorization: Full Bearer token is being sent");

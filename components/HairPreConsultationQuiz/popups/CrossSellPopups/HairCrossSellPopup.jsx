@@ -11,7 +11,7 @@ import {
 } from "react-icons/fa";
 import { RiDeleteBin6Line } from "react-icons/ri";
 import { IoIosCloseCircleOutline } from "react-icons/io";
-import CrossSellCartDisplay from "../../../shared/CrossSellCartDisplay";
+import CrossSellCartDisplay from "../../../Quiz/CrossSellPopup/CrossSellCartDisplay";
 import { useCrossSellCart } from "@/lib/hooks/useCrossSellCart";
 
 const HairCrossSellPopup = ({

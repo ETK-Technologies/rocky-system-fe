@@ -46,6 +46,10 @@ export const layoutExemptRoutes = [
   "/ed-simple-quiz1",
   "/ed-simple-quiz2",
   "/checkout2",
+  "/quiz/wlprecons",
+  "/quiz/ed-pre-consultation",
+  "/quiz/hair-pre-consultation-quiz",
+  "/quiz/hair-main-questionnaire-v1",
 ];
 
 /**

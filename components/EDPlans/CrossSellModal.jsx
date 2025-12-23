@@ -13,7 +13,7 @@ import {
 import { RiDeleteBin6Line } from "react-icons/ri";
 import { IoIosCloseCircleOutline } from "react-icons/io";
 import LidocaineInfoPopup from "./LidocaineInfoPopup";
-import CrossSellCartDisplay from "../shared/CrossSellCartDisplay";
+import CrossSellCartDisplay from "../Quiz/CrossSellPopup/CrossSellCartDisplay";
 import { useCrossSellCart } from "@/lib/hooks/useCrossSellCart";
 
 const CrossSellModal = ({

@@ -49,6 +49,17 @@ const CrossSellCartDisplay = ({
     return parseFloat(price || 0).toFixed(2);
   };
 
+  // Debug logging
+  React.useEffect(() => {
+    logger.log("🛒 CrossSellCartDisplay - Received data:", {
+      cartItems,
+      cartItemsLength: cartItems?.length || 0,
+      subtotal,
+      isLoading,
+      flowType,
+    });
+  }, [cartItems, subtotal, isLoading, flowType]);
+
   if (isLoading) {
     return (
       <div className="bg-gray-50 rounded-lg p-6 mb-6">
@@ -80,7 +91,20 @@ const CrossSellCartDisplay = ({
 
       {/* Cart Items */}
       <div className="space-y-0">
-        {cartItems.map((item) => {
+        {cartItems.map((item, index) => {
+          // Debug logging
+          if (index === 0) {
+            logger.log("🛒 Cart Item Structure:", {
+              key: item.key,
+              id: item.id,
+              name: item.name,
+              image: item.image,
+              total: item.total,
+              quantity: item.quantity,
+              variation: item.variation,
+            });
+          }
+          
           // Check if item is being removed (use new function if available, fallback to old approach)
           const isRemoving = isRemovingItem 
             ? isRemovingItem(item.key) 
@@ -89,7 +113,7 @@ const CrossSellCartDisplay = ({
 
           return (
             <div
-              key={item.key}
+              key={item.key || `cart-item-${item.id || index}`}
               className={`flex border-b border-gray-200 py-[24px] px-0 md:px-10 justify-between items-center transition-opacity ${
                 isRemoving ? "opacity-50" : "opacity-100"
               }`}
@@ -114,61 +138,128 @@ const CrossSellCartDisplay = ({
                     {item.name}
                   </p>
 
-                  {/* Variation info if available - Show frequency/subscription period */}
-                  {item.variation &&
-                    Array.isArray(item.variation) &&
-                    item.variation.length > 0 && (
-                      <p className="text-[12px] text-[#212121] block text-left mt-1">
-                        {item.variation
-                          .filter((v) => v.attribute && v.value)
-                          .find((v) =>
-                            v.attribute.toLowerCase().includes("subscription")
-                          )?.value ||
-                          item.variation[0]?.value ||
-                          ""}
+                  {/* Price per unit / frequency - matching CartItem format */}
+                  {item.name !== "Body Optimization Program" && (
+                    <p className="text-[12px] font-[400] text-[#212121] opacity-85 mt-1">
+                      ${formatPrice(item.price)}
+                      {(() => {
+                        // Check if this is a subscription product (matching CartItem logic)
+                        const productType = item.product?.type;
+                        const hasSubscriptionInterval = item.variant?.subscriptionInterval;
+                        const hasSubscriptionPeriod = item.variant?.subscriptionPeriod;
+                        const variantSubscription = (productType === "VARIABLE_SUBSCRIPTION" && hasSubscriptionInterval) || (hasSubscriptionInterval && hasSubscriptionPeriod);
+                        const isSubscription = variantSubscription;
+                        
+                        // Helper function to format subscription period (matching CartItem)
+                        const formatSubscriptionPeriod = (period, interval) => {
+                          if (!period) return "";
+                          
+                          const periodMap = {
+                            "DAY": "daily",
+                            "WEEK": "weekly",
+                            "MONTH": "monthly",
+                            "YEAR": "yearly"
+                          };
+                          
+                          // Special case: 3 months = quarterly
+                          if (period.toUpperCase() === "MONTH" && interval === 3) {
+                            return "quarterly";
+                          }
+                          
+                          const periodText = periodMap[period.toUpperCase()] || period.toLowerCase();
+                          
+                          if (interval && interval > 1) {
+                            return `every ${interval} ${periodText.replace("ly", "")}s`;
+                          }
+                          
+                          return periodText;
+                        };
+                        
+                        // Parse variant name for tabs frequency and subscription type
+                        let tabsFrequency = "";
+                        let subscriptionType = "";
+                        
+                        if (item.variation && Array.isArray(item.variation) && item.variation.length > 0) {
+                          const variantName = item.variation
+                            .map((v) => `${v.attribute}: ${v.value}`)
+                            .join(" | ");
+                          
+                          const parts = variantName.split("|");
+                          
+                          // Extract tabs frequency
+                          const tabsPart = parts.find(p => p.toLowerCase().includes("tabs frequency:"));
+                          if (tabsPart) {
+                            const match = tabsPart.match(/:\s*(.+)/);
+                            if (match) {
+                              tabsFrequency = match[1].trim().toLowerCase();
+                            }
+                          }
+                          
+                          // Extract subscription type
+                          const subscriptionPart = parts.find(p => p.toLowerCase().includes("subscription type:"));
+                          if (subscriptionPart) {
+                            const match = subscriptionPart.match(/:\s*(.+)/);
+                            if (match) {
+                              subscriptionType = match[1].trim().toLowerCase();
+                            }
+                          }
+                        }
+                        
+                        // Build the display text (matching CartItem logic)
+                        let frequencyText = "";
+                        if (tabsFrequency && subscriptionType) {
+                          // Format: "3 tabs monthly supply"
+                          frequencyText = `${tabsFrequency} ${subscriptionType}`;
+                        } else if (hasSubscriptionPeriod) {
+                          // If variant.name doesn't exist or doesn't contain the expected pattern,
+                          // construct from subscriptionPeriod and subscriptionInterval
+                          const periodText = formatSubscriptionPeriod(hasSubscriptionPeriod, hasSubscriptionInterval);
+                          frequencyText = periodText ? `${periodText} supply` : "subscription";
+                        } else if (isSubscription) {
+                          // Fallback to subscription
+                          frequencyText = "subscription";
+                        } else {
+                          // One time purchase
+                          frequencyText = "one time purchase";
+                        }
+                        
+                        return frequencyText ? ` / ${frequencyText}` : "";
+                      })()}
+                    </p>
+                  )}
+
+                  {/* Special handling for Body Optimization Program */}
+                  {item.name === "Body Optimization Program" && (
+                    <div className="flex flex-col mt-1">
+                      <p className="text-[12px] font-[500] text-[#212121] underline">
+                        Monthly membership:
                       </p>
-                    )}
+                      <p className="text-[12px] text-[#212121]">
+                        Initial fee $99 | Monthly fee $99
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Flavor info for Zonnic products */}
+                  {item.name?.toLowerCase().includes("zonnic") && 
+                    item.variation?.find(v => v.attribute?.toLowerCase() === "flavors")?.value && (
+                    <p className="text-[12px] font-[400] text-[#212121] mt-1">
+                      {item.variation.find(v => v.attribute?.toLowerCase() === "flavors")?.value}
+                    </p>
+                  )}
                 </div>
               </div>
 
-              {/* Right side: Price + Details + Remove Button */}
+              {/* Right side: Quantity + Total + Remove Button */}
               <div className="flex items-start gap-4">
-                <div className="flex flex-col items-end justify-start">
-                  <p className="font-[500] text-[16px] text-black">
-                    ${formatPrice(item.total)}{" "}
-                    <span className="text-[14px] text-gray-500 ml-1">
-                      x {item.quantity}
-                    </span>
+                <div className="flex flex-col items-end justify-start min-w-[80px]">
+                  {/* Quantity */}
+                  <p className="text-[14px] text-gray-500">
+                    x {item.quantity}
                   </p>
-                  <p className="text-[12px] text-[#212121] block text-right mt-1">
-                    {(() => {
-                      if (
-                        item.variation &&
-                        Array.isArray(item.variation) &&
-                        item.variation.length > 0
-                      ) {
-                        // Find the tabs/pills frequency
-                        const tabsInfo = item.variation
-                          .filter((v) => v.attribute && v.value)
-                          .find(
-                            (v) =>
-                              v.attribute.toLowerCase().includes("tabs") ||
-                              v.attribute.toLowerCase().includes("frequency") ||
-                              v.attribute.toLowerCase().includes("pills")
-                          );
-
-                        if (tabsInfo) {
-                          // Check if value already contains "Generic" or "Brand"
-                          const hasType =
-                            tabsInfo.value.toLowerCase().includes("generic") ||
-                            tabsInfo.value.toLowerCase().includes("brand");
-                          return hasType
-                            ? tabsInfo.value
-                            : `${tabsInfo.value} (Generic)`;
-                        }
-                      }
-                      return "Pills (Generic)";
-                    })()}
+                  {/* Total Price */}
+                  <p className="font-[500] text-[16px] text-black mt-1">
+                    ${formatPrice(item.total)}
                   </p>
                 </div>
 
