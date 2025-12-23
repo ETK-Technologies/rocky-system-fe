@@ -28,142 +28,150 @@ const readCookie = (name) => {
 };
 
 // Configure AWIN.Tracking.Sale and explicitly fire the AWIN JS conversion (sread.js)
-// const fireAwinClientPixel = (orderData, s2sOrderData = null) => {
-//   try {
-//     if (!orderData || !orderData.id) return;
-//     const merchantId = process.env.NEXT_PUBLIC_AWIN_MERCHANT_ID || "101159";
-//     const subtotal = s2sOrderData
-//       ? Number.parseFloat(s2sOrderData.subtotal_amount || 0) || 0
-//       : Math.max(
-//           0,
-//           (Number.parseFloat(orderData.total || 0) || 0) -
-//             (Number.parseFloat(orderData.total_tax || 0) || 0) -
-//             (Number.parseFloat(orderData.shipping_total || 0) || 0)
-//         );
-//     const currency = s2sOrderData?.currency || orderData.currency || getCurrency();
-//     const orderRef =
-//       s2sOrderData?.order_reference || orderData.number || String(orderData.id);
-//     const commissionGroup = s2sOrderData?.commission_group || "DEFAULT";
-//     const vouchers =
-//       s2sOrderData?.voucher ??
-//       (Array.isArray(orderData.coupon_lines)
-//         ? orderData.coupon_lines.map((c) => c.code).filter(Boolean).join(",")
-//         : "");
-//     const awc = readCookie("_awin_awc") || readCookie("awc");
-//     const channel = awc ? "aw" : "other";
-//     const loc = typeof window !== "undefined" ? window.location.href : "";
+const fireAwinClientPixel = (orderData, s2sOrderData = null) => {
+  try {
+    if (!orderData || !orderData.id) return;
+    const merchantId = process.env.NEXT_PUBLIC_AWIN_MERCHANT_ID || "101159";
+    const subtotal = s2sOrderData
+      ? Number.parseFloat(s2sOrderData.subtotal_amount || 0) || 0
+      : Math.max(
+          0,
+          (Number.parseFloat(orderData.total || 0) || 0) -
+            (Number.parseFloat(orderData.total_tax || 0) || 0) -
+            (Number.parseFloat(orderData.shipping_total || 0) || 0)
+        );
+    const currency =
+      s2sOrderData?.currency || orderData.currency || getCurrency();
+    const orderRef =
+      s2sOrderData?.order_reference || orderData.number || String(orderData.id);
+    const commissionGroup = s2sOrderData?.commission_group || "DEFAULT";
+    const vouchers =
+      s2sOrderData?.voucher ??
+      (Array.isArray(orderData.coupon_lines)
+        ? orderData.coupon_lines
+            .map((c) => c.code)
+            .filter(Boolean)
+            .join(",")
+        : "");
+    const awc = readCookie("_awin_awc") || readCookie("awc");
+    const channel = awc ? "aw" : "other";
+    const loc = typeof window !== "undefined" ? window.location.href : "";
 
-//     // Map products to AWIN format
-//     const products = Array.isArray(orderData.line_items)
-//       ? orderData.line_items.map((it) => {
-//           const qty = parseInt(it.quantity || 1, 10) || 1;
-//           const lineTotal = Number.parseFloat(it.total || 0) || 0;
-//           const unit = qty > 0 ? lineTotal / qty : 0;
-//           return {
-//             sku: String(it.sku || it.id || it.product_id || it.variation_id || ""),
-//             quantity: String(qty),
-//             unitPrice: formatPrice(unit),
-//           };
-//         })
-//       : [];
+    // Map products to AWIN format
+    const products = Array.isArray(orderData.line_items)
+      ? orderData.line_items.map((it) => {
+          const qty = parseInt(it.quantity || 1, 10) || 1;
+          const lineTotal = Number.parseFloat(it.total || 0) || 0;
+          const unit = qty > 0 ? lineTotal / qty : 0;
+          return {
+            sku: String(
+              it.sku || it.id || it.product_id || it.variation_id || ""
+            ),
+            quantity: String(qty),
+            unitPrice: formatPrice(unit),
+          };
+        })
+      : [];
 
-//     window.AWIN = window.AWIN || {};
-//     window.AWIN.Tracking = window.AWIN.Tracking || {};
-//     window.AWIN.Tracking.Sale = {
-//       amount: formatPrice(subtotal),
-//       orderRef: String(orderRef),
-//       currency,
-//       test: String(parseInt(process.env.NEXT_PUBLIC_AWIN_TESTMODE || "0", 10) === 1 ? 1 : 0),
-//       parts: `${commissionGroup}:${formatPrice(subtotal)}`,
-//       voucher: vouchers,
-//       channel,
-//       products,
-//     };
+    window.AWIN = window.AWIN || {};
+    window.AWIN.Tracking = window.AWIN.Tracking || {};
+    window.AWIN.Tracking.Sale = {
+      amount: formatPrice(subtotal),
+      orderRef: String(orderRef),
+      currency,
+      test: String(
+        parseInt(process.env.NEXT_PUBLIC_AWIN_TESTMODE || "0", 10) === 1 ? 1 : 0
+      ),
+      parts: `${commissionGroup}:${formatPrice(subtotal)}`,
+      voucher: vouchers,
+      channel,
+      products,
+    };
 
-//     // Fire the official AWIN JS conversion pixel (sread.js)
-//     const params = new URLSearchParams();
-//     params.set("a", merchantId);
-//     params.set("b", formatPrice(subtotal));
-//     params.set("cr", currency);
-//     params.set("c", String(orderRef));
-//     params.set("d", `${commissionGroup}:${formatPrice(subtotal)}`);
-//     params.set("ch", channel);
-//     if (vouchers) params.set("vc", vouchers);
-//     if (awc) params.set("cks", awc);
-//     params.set("tv", "2");
-//     params.set("tt", "js");
-//     if (loc) params.set("l", loc);
+  // Fire the official AWIN JS conversion pixel (sread.js)
+    const params = new URLSearchParams();
+    params.set("a", merchantId);
+    params.set("b", formatPrice(subtotal));
+    params.set("cr", currency);
+    params.set("c", String(orderRef));
+    params.set("d", `${commissionGroup}:${formatPrice(subtotal)}`);
+    params.set("ch", channel);
+    if (vouchers) params.set("vc", vouchers);
+    if (awc) params.set("cks", awc);
+    params.set("tv", "2");
+    params.set("tt", "js");
+    if (loc) params.set("l", loc);
 
-//     const src = `https://www.awin1.com/sread.js?${params.toString()}`;
-//     const s = document.createElement("script");
-//     s.async = true;
-//     s.defer = true;
-//     s.src = src;
-//     (document.head || document.body).appendChild(s);
-//   } catch (e) {
-//     logger?.warn?.("[AWIN] Failed to configure client conversion:", e);
-//   }
-// };
+    const src = `https://www.awin1.com/sread.js?${params.toString()}`;
+    const s = document.createElement("script");
+    s.async = true;
+    s.defer = true;
+    s.src = src;
+    (document.head || document.body).appendChild(s);
+  } catch (e) {
+    logger?.warn?.("[AWIN] Failed to configure client conversion:", e);
+  }
+};
 
-// Function to send AWIN tracking
-// const sendAwinTracking = async (orderData) => {
-//   if (!orderData || !orderData.id) {
-//     logger.warn("[AWIN] No order data provided for tracking");
-//     return null;
-//   }
+//Function to send AWIN tracking
+const sendAwinTracking = async (orderData) => {
+  if (!orderData || !orderData.id) {
+    logger.warn("[AWIN] No order data provided for tracking");
+    return null;
+  }
 
-//   try {
-//     logger.log(`[AWIN] Sending tracking for order ${orderData.id}...`);
+  try {
+    logger.log(`[AWIN] Sending tracking for order ${orderData.id}...`);
 
-//     const trackingData = {
-//       order_id: parseInt(orderData.id, 10),
-//       order_data: orderData,
-//     };
+    const trackingData = {
+      order_id: parseInt(orderData.id, 10),
+      order_data: orderData,
+    };
 
-//     // Create AbortController for timeout handling
-//     const controller = new AbortController();
-//     const timeoutId = setTimeout(() => controller.abort(), AWIN_CONFIG.timeout);
+    // Create AbortController for timeout handling
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), AWIN_CONFIG.timeout);
 
-//     const response = await fetch(AWIN_CONFIG.endpoint, {
-//       method: "POST",
-//       headers: {
-//         "Content-Type": "application/json",
-//       },
-//       body: JSON.stringify(trackingData),
-//       signal: controller.signal,
-//     });
+    const response = await fetch(AWIN_CONFIG.endpoint, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(trackingData),
+      signal: controller.signal,
+    });
 
-//     clearTimeout(timeoutId);
+    clearTimeout(timeoutId);
 
-//     if (response.ok) {
-//       const responseData = await response.json();
-//       logger.log("[AWIN] ✅ Order tracking successful", {
-//         order_id: orderData.id,
-//         order_total: orderData.total,
-//         currency: orderData.currency,
-//         order_number: orderData.number,
-//         awc_sent: !!trackingData.order_data?.meta_data?.find(
-//           (m) => m.key === "_awin_awc"
-//         )?.value,
-//         awin_response: responseData,
-//       });
-//       return responseData?.order_data || null;
-//     } else {
-//       logger.warn(
-//         `[AWIN] Tracking response not OK: ${response.status} ${response.statusText}`
-//       );
-//       return null;
-//     }
-//   } catch (error) {
-//     // Silently log error since this shouldn't affect user experience
-//     if (error.name === "AbortError") {
-//       logger.warn("[AWIN] Tracking request timed out (non-critical)");
-//     } else {
-//       logger.error("[AWIN] Error sending tracking (non-critical):", error);
-//     }
-//     return null;
-//   }
-// };
+    if (response.ok) {
+      const responseData = await response.json();
+      logger.log("[AWIN] ✅ Order tracking successful", {
+        order_id: orderData.id,
+        order_total: orderData.total,
+        currency: orderData.currency,
+        order_number: orderData.number,
+        awc_sent: !!trackingData.order_data?.meta_data?.find(
+          (m) => m.key === "_awin_awc"
+        )?.value,
+        awin_response: responseData,
+      });
+      return responseData?.order_data || null;
+    } else {
+      logger.warn(
+        `[AWIN] Tracking response not OK: ${response.status} ${response.statusText}`
+      );
+      return null;
+    }
+  } catch (error) {
+    // Silently log error since this shouldn't affect user experience
+    if (error.name === "AbortError") {
+      logger.warn("[AWIN] Tracking request timed out (non-critical)");
+    } else {
+      logger.error("[AWIN] Error sending tracking (non-critical):", error);
+    }
+    return null;
+  }
+};
 
 // sendGA4PurchaseEvent replaced by analyticsService.trackPurchase
 
@@ -290,7 +298,8 @@ const OrderReceivedContent = ({ userId }) => {
     // Add purchased_product parameter (use first product name from order if available)
     if (order && order.items && order.items.length > 0) {
       const firstItem = order.items[0];
-      const productName = firstItem.product?.name || firstItem.variant?.name || "";
+      const productName =
+        firstItem.product?.name || firstItem.variant?.name || "";
       if (productName) {
         queryParams.append("purchased_product", productName);
       }
@@ -509,7 +518,9 @@ const OrderReceivedContent = ({ userId }) => {
     <section className="px-5 sectionWidth:px-0 py-4 md:py-8 undefined">
       <div className="flex justify-center">
         <div className="border rounded-xl w-full max-w-[480px] p-6">
-          <ThankYouMessage userEmail={order.user?.email || order.guestEmail || ""} />
+          <ThankYouMessage
+            userEmail={order.user?.email || order.guestEmail || ""}
+          />
           {countdown !== null && countdown > 0 && !isQuestionnaireCompleted && (
             <div className="mt-2 mb-2 py-4 px-6 bg-[#03A670] rounded-lg text-center rounded-lg">
               <p className="text-[16px] font-[600] text-white">
@@ -625,8 +636,13 @@ const OrderItems = ({ order }) => {
     <>
       <h3 className="text-[14px] font-[500] pt-3">Your Order</h3>
       {order.items?.map((item) => {
-        const productName = item.product?.name || item.variant?.name || "Product";
-        const imageUrl = item.product?.primaryImage?.url || item.product?.images?.[0]?.url || item.variant?.imageUrl || "";
+        const productName =
+          item.product?.name || item.variant?.name || "Product";
+        const imageUrl =
+          item.product?.primaryImage?.url ||
+          item.product?.images?.[0]?.url ||
+          item.variant?.imageUrl ||
+          "";
         return (
           <div key={item.id} className="flex items-start gap-3 py-3 border-b">
             <div className="min-w-[70px] w-[70px] min-h-[70px] h-[70px] rounded-[12px] overflow-hidden relative">
@@ -676,29 +692,22 @@ const ThankYouMessage = ({ userEmail }) => {
 };
 
 const BasicOrderInfo = ({ order }) => {
-  // Extract payment method display string
-  const getPaymentMethodDisplay = (payment) => {
-    if (!payment) return "Credit Card";
-    
-    // If payment has a method string property
-    if (typeof payment.method === 'string') return payment.method;
-    
-    // If payment is an object with payment details
-    if (payment.type) {
-      if (payment.type === 'card' || payment.type === 'credit_card') {
-        return payment.brand 
-          ? `${payment.brand.toUpperCase()} ending in ${payment.last4 || '****'}`
-          : "Credit Card";
-      }
-      if (payment.type === 'bank_account') {
-        return payment.bankName 
-          ? `${payment.bankName} ending in ${payment.accountLast4 || '****'}`
-          : "Bank Account";
-      }
-      return payment.type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+  // Format payment method display
+  const formatPaymentMethod = () => {
+    const method = order.payment?.method;
+    if (!method) return "Credit Card";
+
+    if (method.type === "CARD" && method.brand && method.last4) {
+      const brandName =
+        method.brand.charAt(0).toUpperCase() + method.brand.slice(1);
+      return `${brandName} ending in ${method.last4}`;
     }
-    
-    return "Credit Card";
+
+    if (method.type === "CARD") {
+      return "Credit Card";
+    }
+
+    return method.type || "Credit Card";
   };
 
   return (
@@ -707,12 +716,12 @@ const BasicOrderInfo = ({ order }) => {
         <div className="py-3 border-b border-[#E2E2E1]">
           <p className="text-[14px] font-[500] mb-3">Transaction Date</p>
           <p className="text-[12px] font-[400]">
-            {formatDate(order.date_created)}
+            {formatDate(order.createdAt || order.date_created)}
           </p>
         </div>
         <div className="py-3 border-b border-[#E2E2E1]">
           <p className="text-[14px] font-[500] mb-3">Payment Method</p>
-          <p className="text-[12px] font-[400]">{getPaymentMethodDisplay(order.payment)}</p>
+          <p className="text-[12px] font-[400]">{formatPaymentMethod()}</p>
         </div>
       </div>
     </div>
