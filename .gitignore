@@ -56,3 +56,5 @@ post-copilot.bat
 .cursor
 
 *.php
+
+/docs

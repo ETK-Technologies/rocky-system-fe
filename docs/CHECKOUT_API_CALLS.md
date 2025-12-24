@@ -40,7 +40,7 @@ This document lists all API calls that occur during the checkout process to help
    - Note: Replaces `/api/cart/update-customer` (removed)
 
 ### Checkout Submission
-7. **POST `/api/checkout-new`** (Line 1371, 1454)
+7. **POST `/api/checkout`** (Line 1342)
    - Purpose: Create order and process payment
    - When: On checkout form submission
    - Frequency: Once per checkout attempt
@@ -135,7 +135,7 @@ This document lists all API calls that occur during the checkout process to help
 | `/api/payment-methods` | GET | Fetch saved cards | Once | ✅ Active |
 | `/api/shipping/calculate-by-cart` | POST | Calculate shipping | Multiple | ✅ Active |
 | `/api/update-customer-profile` | POST | Update customer profile | Once | ✅ Active |
-| `/api/checkout-new` | POST | Create order & payment | Once | ✅ Active |
+| `/api/checkout` | POST | Create order & payment | Once | ✅ Active |
 | `/api/create-pending-order` | POST | Create order (test flow) | Once | ✅ Active |
 | `/api/process-payment` | POST | Process payment (test flow) | Once | ✅ Active |
 | `/api/process-stripe-payment` | POST | Process Stripe (test flow) | Once | ✅ Active |
@@ -145,7 +145,7 @@ This document lists all API calls that occur during the checkout process to help
 
 ## Notes
 
-- The new checkout flow (`/api/checkout-new`) handles both order creation and payment in a single call
+- The checkout flow (`/api/checkout`) handles both order creation and payment in a single call
 - The convert test flow uses a 3-step process: create order → process payment
 - Customer profile updates are now handled separately from cart updates
 - Shipping calculation is independent of cart updates

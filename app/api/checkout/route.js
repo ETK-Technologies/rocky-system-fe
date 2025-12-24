@@ -12,6 +12,9 @@ const BASE_URL = process.env.BASE_URL;
  * Based on the checkout integration guide
  */
 export async function POST(req) {
+  const startTime = Date.now();
+  const timings = {};
+  
   try {
     const cookieStore = await cookies();
     const authToken = cookieStore.get("authToken");
@@ -59,6 +62,7 @@ export async function POST(req) {
 
     // Step 1: Get cart ID from the cart API
     // The cart API returns cart data, but we need to check if cart exists
+    const cartStartTime = Date.now();
     logger.log("Fetching cart to get cart ID...");
     const cartResponse = await axios.get(`${BASE_URL}/api/v1/cart`, {
       headers: {
@@ -68,7 +72,10 @@ export async function POST(req) {
         "X-App-Secret": process.env.NEXT_PUBLIC_APP_SECRET,
         Origin: origin,
       },
+      timeout: 10000, // 10 seconds timeout
     });
+    timings.cartFetch = Date.now() - cartStartTime;
+    logger.log(`✅ Cart fetched in ${timings.cartFetch}ms`);
 
     const cart = cartResponse.data;
 
@@ -90,6 +97,7 @@ export async function POST(req) {
     });
 
     // Step 2: Validate cart (optional but recommended)
+    const validationStartTime = Date.now();
     try {
       logger.log("Validating cart before checkout...");
       await axios.post(
@@ -104,11 +112,14 @@ export async function POST(req) {
             "X-App-Secret": process.env.NEXT_PUBLIC_APP_SECRET,
             Origin: origin,
           },
+          timeout: 10000, // 10 seconds timeout
         }
       );
-      logger.log("Cart validation passed");
+      timings.cartValidation = Date.now() - validationStartTime;
+      logger.log(`✅ Cart validation passed in ${timings.cartValidation}ms`);
     } catch (validationError) {
-      logger.error("Cart validation failed:", validationError.response?.data);
+      timings.cartValidation = Date.now() - validationStartTime;
+      logger.error(`❌ Cart validation failed in ${timings.cartValidation}ms:`, validationError.response?.data);
       return NextResponse.json(
         {
           success: false,
@@ -117,6 +128,7 @@ export async function POST(req) {
             validationError.response?.data?.message ||
             "Cart validation failed. Please check your cart and try again.",
           details: validationError.response?.data,
+          timings, // Include timing info in error response
         },
         { status: validationError.response?.status || 400 }
       );
@@ -201,6 +213,8 @@ export async function POST(req) {
     // Step 5: Create order via POST /api/v1/orders
     // Set a longer timeout (90 seconds) to handle slow backend responses
     // The backend may take time to process payment, send emails, etc.
+    const orderStartTime = Date.now();
+    logger.log("⏳ Creating order (this may take time)...");
     const orderResponse = await axios.post(
       `${BASE_URL}/api/v1/orders`,
       checkoutRequestBody,
@@ -216,6 +230,8 @@ export async function POST(req) {
         timeout: 90000, // 90 seconds timeout
       }
     );
+    timings.orderCreation = Date.now() - orderStartTime;
+    logger.log(`✅ Order created successfully in ${timings.orderCreation}ms`);
 
     const { order, payment } = orderResponse.data;
 
@@ -223,6 +239,16 @@ export async function POST(req) {
       orderId: order.id,
       orderNumber: order.orderNumber,
       hasPaymentIntent: !!payment?.clientSecret,
+    });
+    
+    // Log total timing and breakdown
+    timings.total = Date.now() - startTime;
+    logger.log("📊 Checkout Performance Breakdown:", {
+      total: `${timings.total}ms (${(timings.total / 1000).toFixed(2)}s)`,
+      cartFetch: `${timings.cartFetch}ms`,
+      cartValidation: `${timings.cartValidation}ms`,
+      orderCreation: `${timings.orderCreation}ms`,
+      other: `${timings.total - timings.cartFetch - timings.cartValidation - timings.orderCreation}ms`,
     });
 
     // Step 6: Return order and payment intent
@@ -245,14 +271,18 @@ export async function POST(req) {
             status: payment.status,
           }
         : null,
+      timings, // Include performance timing in response for debugging
     });
   } catch (error) {
+    timings.total = Date.now() - startTime;
+    
     // Handle timeout errors specifically
     if (error.code === "ECONNABORTED" || error.message.includes("timeout")) {
       logger.error("Checkout timeout error:", {
         message: error.message,
         code: error.code,
         timeout: error.config?.timeout,
+        timings,
       });
 
       return NextResponse.json(
@@ -261,6 +291,7 @@ export async function POST(req) {
           error:
             "Request timeout - The order may have been created but the server took too long to respond. Please check your order history or contact support.",
           timeout: true,
+          timings, // Include timing info to identify which step timed out
         },
         { status: 408 }
       );
@@ -271,6 +302,7 @@ export async function POST(req) {
       response: error.response?.data,
       status: error.response?.status,
       code: error.code,
+      timings,
     });
 
     const errorMessage =
@@ -283,6 +315,7 @@ export async function POST(req) {
         success: false,
         error: errorMessage,
         details: error.response?.data || null,
+        timings, // Include timing info in error response
       },
       { status: error.response?.status || 500 }
     );

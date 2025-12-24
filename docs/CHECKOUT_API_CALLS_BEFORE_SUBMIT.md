@@ -1,6 +1,6 @@
 # API Calls Before Checkout Submission
 
-This document lists all API calls made in `CheckoutPageContent.jsx` **BEFORE** the checkout submission (`/api/checkout-new`).
+This document lists all API calls made in `CheckoutPageContent.jsx` **BEFORE** the checkout submission (`/api/checkout`).
 
 ## Summary
 
@@ -78,7 +78,7 @@ These calls happen right before submitting the checkout:
 1. ✅ GET `/api/cart` (initial load)
 2. ✅ GET `/api/cart` (if URL params exist - redundant)
 3. ✅ GET `/api/profile?t={timestamp}` (fetch profile)
-4. ✅ POST `/api/checkout-new` (CHECKOUT SUBMISSION)
+4. ✅ POST `/api/checkout` (CHECKOUT SUBMISSION)
 
 **Total: 2-3 calls before checkout** (reduced from 5-7)
 
@@ -91,7 +91,7 @@ These calls happen right before submitting the checkout:
 5. ✅ GET `/api/profile` (if Zonnic, province change #1)
 6. ✅ POST `/api/shipping/calculate-by-cart` (province change #2)
 7. ✅ GET `/api/profile` (if Zonnic, province change #2)
-8. ✅ POST `/api/checkout-new` (CHECKOUT SUBMISSION)
+8. ✅ POST `/api/checkout` (CHECKOUT SUBMISSION)
 
 **Total: 4-7 calls before checkout** (reduced from 7-10+)
 
