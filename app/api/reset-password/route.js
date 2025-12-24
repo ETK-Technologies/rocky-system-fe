@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import axios from "axios";
 import { logger } from "@/utils/devLogger";
 import { getAppAuthHeaders } from "@/utils/environmentConfig";
+import { getOrigin } from "@/lib/utils/getOrigin";
 
 export async function POST(request) {
   try {
@@ -31,6 +32,9 @@ export async function POST(request) {
     // Get app authentication headers
     const authHeaders = getAppAuthHeaders();
 
+    // Get origin for Origin header (required for backend domain whitelist)
+    const origin = getOrigin(request);
+
     // Call the new backend API to reset the password
     try {
       const response = await axios.post(
@@ -44,6 +48,7 @@ export async function POST(request) {
             "Content-Type": "application/json",
             accept: "application/json",
             ...authHeaders,
+            Origin: origin,
           },
         }
       );
