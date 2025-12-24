@@ -14,7 +14,7 @@ const BASE_URL = process.env.BASE_URL;
 export async function POST(req) {
   const startTime = Date.now();
   const timings = {};
-  
+
   try {
     const cookieStore = await cookies();
     const authToken = cookieStore.get("authToken");
@@ -119,7 +119,10 @@ export async function POST(req) {
       logger.log(`✅ Cart validation passed in ${timings.cartValidation}ms`);
     } catch (validationError) {
       timings.cartValidation = Date.now() - validationStartTime;
-      logger.error(`❌ Cart validation failed in ${timings.cartValidation}ms:`, validationError.response?.data);
+      logger.error(
+        `❌ Cart validation failed in ${timings.cartValidation}ms:`,
+        validationError.response?.data
+      );
       return NextResponse.json(
         {
           success: false,
@@ -240,7 +243,7 @@ export async function POST(req) {
       orderNumber: order.orderNumber,
       hasPaymentIntent: !!payment?.clientSecret,
     });
-    
+
     // Log total timing and breakdown
     timings.total = Date.now() - startTime;
     logger.log("📊 Checkout Performance Breakdown:", {
@@ -248,7 +251,12 @@ export async function POST(req) {
       cartFetch: `${timings.cartFetch}ms`,
       cartValidation: `${timings.cartValidation}ms`,
       orderCreation: `${timings.orderCreation}ms`,
-      other: `${timings.total - timings.cartFetch - timings.cartValidation - timings.orderCreation}ms`,
+      other: `${
+        timings.total -
+        timings.cartFetch -
+        timings.cartValidation -
+        timings.orderCreation
+      }ms`,
     });
 
     // Step 6: Return order and payment intent
@@ -275,7 +283,7 @@ export async function POST(req) {
     });
   } catch (error) {
     timings.total = Date.now() - startTime;
-    
+
     // Handle timeout errors specifically
     if (error.code === "ECONNABORTED" || error.message.includes("timeout")) {
       logger.error("Checkout timeout error:", {
