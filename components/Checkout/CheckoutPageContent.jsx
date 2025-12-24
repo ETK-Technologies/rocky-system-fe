@@ -1245,6 +1245,9 @@ const CheckoutPageContent = () => {
         // AWIN affiliate metadata (frontend-sourced)
         awin_awc: awinAwc || "",
         awin_channel: awinChannel || "other",
+
+        // Cart ID (if available from cart fetch on checkout page)
+        cartId: cartItems?.id || null,
       };
 
       // ========================================

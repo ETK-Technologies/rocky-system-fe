@@ -55,89 +55,69 @@ export async function POST(req) {
       toMailBox,
       // Payment method (for saved cards - will be handled separately)
       paymentMethodId,
+      // Cart ID (optional - if provided from frontend, use it; otherwise backend uses authenticated user's cart)
+      cartId: cartIdFromRequest,
     } = requestData;
 
     // Get origin for Origin header (required for backend domain whitelist)
     const origin = getOrigin(req);
 
-    // Step 1: Get cart ID from the cart API
-    // The cart API returns cart data, but we need to check if cart exists
-    const cartStartTime = Date.now();
-    logger.log("Fetching cart to get cart ID...");
-    const cartResponse = await axios.get(`${BASE_URL}/api/v1/cart`, {
-      headers: {
-        Authorization: authToken.value,
-        accept: "application/json",
-        "X-App-Key": process.env.NEXT_PUBLIC_APP_KEY,
-        "X-App-Secret": process.env.NEXT_PUBLIC_APP_SECRET,
-        Origin: origin,
-      },
-      timeout: 10000, // 10 seconds timeout
-    });
-    timings.cartFetch = Date.now() - cartStartTime;
-    logger.log(`✅ Cart fetched in ${timings.cartFetch}ms`);
+    // OPTIMIZATION: Use cartId from request if provided, otherwise skip cart fetch
+    // The backend API can use the authenticated user's cart without needing cartId
+    // If cartId is provided from frontend (already fetched on checkout page), use it
+    const cartId =
+      cartIdFromRequest && typeof cartIdFromRequest === "string"
+        ? cartIdFromRequest
+        : null; // Let backend use authenticated user's cart if not provided
+    logger.log(
+      cartId
+        ? `Using cartId from request: ${cartId}`
+        : "Skipping cart fetch - backend will use authenticated user's cart"
+    );
 
-    const cart = cartResponse.data;
-
-    // Check if cart has items
-    if (!cart || !cart.items || cart.items.length === 0) {
-      return NextResponse.json(
-        { success: false, error: "Cart is empty" },
-        { status: 400 }
-      );
-    }
-
-    // The backend API may use cart ID or we can omit it and let backend use user's cart
-    // According to the guide, we can send cartId or let backend use authenticated user's cart
-    const cartId = cart.id || null;
-
-    logger.log("Cart retrieved:", {
-      hasItems: cart.items?.length > 0,
-      cartId: cartId || "will use authenticated user's cart",
-    });
-
-    // Step 2: Validate cart (optional but recommended)
+    // OPTIMIZATION: Make cart validation non-blocking (fire-and-forget)
+    // Cart validation runs in parallel and won't block checkout flow
+    // If validation fails, backend will catch it during order creation
+    // Only validate if we have a valid string cartId
     const validationStartTime = Date.now();
-    try {
-      logger.log("Validating cart before checkout...");
-      await axios.post(
-        `${BASE_URL}/api/v1/cart/validate`,
-        { cartId },
-        {
-          headers: {
-            Authorization: authToken.value,
-            "Content-Type": "application/json",
-            accept: "application/json",
-            "X-App-Key": process.env.NEXT_PUBLIC_APP_KEY,
-            "X-App-Secret": process.env.NEXT_PUBLIC_APP_SECRET,
-            Origin: origin,
-          },
-          timeout: 10000, // 10 seconds timeout
-        }
-      );
-      timings.cartValidation = Date.now() - validationStartTime;
-      logger.log(`✅ Cart validation passed in ${timings.cartValidation}ms`);
-    } catch (validationError) {
-      timings.cartValidation = Date.now() - validationStartTime;
-      logger.error(
-        `❌ Cart validation failed in ${timings.cartValidation}ms:`,
-        validationError.response?.data
-      );
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Cart validation failed",
-          message:
-            validationError.response?.data?.message ||
-            "Cart validation failed. Please check your cart and try again.",
-          details: validationError.response?.data,
-          timings, // Include timing info in error response
-        },
-        { status: validationError.response?.status || 400 }
+    if (cartId && typeof cartId === "string") {
+      logger.log("Validating cart (non-blocking)...");
+      axios
+        .post(
+          `${BASE_URL}/api/v1/cart/validate`,
+          { cartId }, // Only send cartId if it's a valid string
+          {
+            headers: {
+              Authorization: authToken.value,
+              "Content-Type": "application/json",
+              accept: "application/json",
+              "X-App-Key": process.env.NEXT_PUBLIC_APP_KEY,
+              "X-App-Secret": process.env.NEXT_PUBLIC_APP_SECRET,
+              Origin: origin,
+            },
+            timeout: 5000, // 5 seconds timeout (shorter since non-blocking)
+          }
+        )
+        .then(() => {
+          timings.cartValidation = Date.now() - validationStartTime;
+          logger.log(
+            `✅ Cart validation passed in ${timings.cartValidation}ms (non-blocking)`
+          );
+        })
+        .catch((validationError) => {
+          timings.cartValidation = Date.now() - validationStartTime;
+          logger.warn(
+            `⚠️ Cart validation failed in ${timings.cartValidation}ms (non-blocking, continuing):`,
+            validationError.response?.data
+          );
+        });
+    } else {
+      logger.log(
+        "Skipping cart validation (no valid cartId provided, backend will validate during order creation)"
       );
     }
 
-    // Step 3: Build address objects in the new API format
+    // Step 1: Build address objects in the new API format (runs in parallel with validation)
     const shippingAddress = {
       type: "SHIPPING",
       firstName: shipToAnotherAddress
@@ -176,14 +156,14 @@ export async function POST(req) {
       isDefault: true,
     };
 
-    // Step 4: Build checkout request body
+    // Step 2: Build checkout request body
     const checkoutRequestBody = {
       shippingAddress,
       billingAddress,
     };
 
-    // Add cartId only if it exists (backend can use authenticated user's cart if not provided)
-    if (cartId) {
+    // Add cartId only if it's a valid string (backend can use authenticated user's cart if not provided)
+    if (cartId && typeof cartId === "string") {
       checkoutRequestBody.cartId = cartId;
     }
 
@@ -208,12 +188,12 @@ export async function POST(req) {
     }
 
     logger.log("Creating order with checkout request:", {
-      cartId,
+      cartId: cartId || "using authenticated user's cart",
       hasShippingAddress: !!shippingAddress,
       hasBillingAddress: !!billingAddress,
     });
 
-    // Step 5: Create order via POST /api/v1/orders
+    // Step 3: Create order via POST /api/v1/orders
     // Set a longer timeout (90 seconds) to handle slow backend responses
     // The backend may take time to process payment, send emails, etc.
     const orderStartTime = Date.now();
@@ -248,18 +228,17 @@ export async function POST(req) {
     timings.total = Date.now() - startTime;
     logger.log("📊 Checkout Performance Breakdown:", {
       total: `${timings.total}ms (${(timings.total / 1000).toFixed(2)}s)`,
-      cartFetch: `${timings.cartFetch}ms`,
-      cartValidation: `${timings.cartValidation}ms`,
+      cartFetch: "SKIPPED (optimized)",
+      cartValidation: timings.cartValidation
+        ? `${timings.cartValidation}ms (non-blocking)`
+        : "non-blocking (may still be running)",
       orderCreation: `${timings.orderCreation}ms`,
       other: `${
-        timings.total -
-        timings.cartFetch -
-        timings.cartValidation -
-        timings.orderCreation
+        timings.total - (timings.cartValidation || 0) - timings.orderCreation
       }ms`,
     });
 
-    // Step 6: Return order and payment intent
+    // Step 4: Return order and payment intent
     return NextResponse.json({
       success: true,
       order: {
