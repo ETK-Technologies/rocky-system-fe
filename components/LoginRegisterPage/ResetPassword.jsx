@@ -1,16 +1,12 @@
 "use client";
 
-import { useState, Suspense } from "react";
+import { useState } from "react";
 import { logger } from "@/utils/devLogger";
-import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { toast } from "react-toastify";
 import { MdOutlineRemoveRedEye, MdOutlineVisibilityOff } from "react-icons/md";
-import Loader from "@/components/Loader";
 
-const ResetPasswordContent = () => {
-  const searchParams = useSearchParams();
-  const token = searchParams.get("token");
+const ResetPasswordContent = ({ token }) => {
   const [submitting, setSubmitting] = useState(false);
   const [resetSuccess, setResetSuccess] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -221,12 +217,10 @@ const ResetPasswordContent = () => {
   );
 };
 
-export default function ResetPassword() {
+export default function ResetPassword({ token }) {
   return (
     <div suppressHydrationWarning>
-      <Suspense fallback={<Loader />}>
-        <ResetPasswordContent />
-      </Suspense>
+      <ResetPasswordContent token={token} />
     </div>
   );
 }

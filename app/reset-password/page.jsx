@@ -1,12 +1,6 @@
-import ResetPassword from "@/components/LoginRegisterPage/ResetPassword";
-import { Suspense } from "react";
+import { redirect } from "next/navigation";
 
-const ResetPasswordPage = () => {
-  return (
-    <Suspense fallback={<></>}>
-      <ResetPassword />
-    </Suspense>
-  );
-};
-
-export default ResetPasswordPage;
+// Redirect to forgot-password if accessed without a token
+export default function ResetPasswordPage() {
+  redirect("/forgot-password");
+}
