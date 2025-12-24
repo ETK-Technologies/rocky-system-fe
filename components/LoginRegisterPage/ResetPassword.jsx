@@ -70,9 +70,16 @@ const ResetPasswordContent = ({ token }) => {
         setResetSuccess(true);
         toast.success("Your password has been reset successfully");
       } else {
-        toast.error(
-          data.message || "Failed to reset password. Please try again."
-        );
+        // Handle message as string or array
+        let errorMessage = "Failed to reset password. Please try again.";
+        if (data.message) {
+          if (Array.isArray(data.message)) {
+            errorMessage = data.message[0] || errorMessage;
+          } else {
+            errorMessage = data.message;
+          }
+        }
+        toast.error(errorMessage);
       }
     } catch (err) {
       logger.error("Error:", err);
