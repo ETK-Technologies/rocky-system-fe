@@ -1,19 +1,20 @@
 import { NextResponse } from "next/server";
 import axios from "axios";
 import { logger } from "@/utils/devLogger";
+import { getAppAuthHeaders } from "@/utils/environmentConfig";
 
 export async function POST(request) {
   try {
-    const { password, token, login } = await request.json();
+    const { token, newPassword } = await request.json();
 
-    if (!password || !token || !login) {
+    if (!token || !newPassword) {
       return NextResponse.json(
-        { success: false, message: "Password, token and login are required" },
+        { success: false, message: "Token and new password are required" },
         { status: 400 }
       );
     }
 
-    if (password.length < 8) {
+    if (newPassword.length < 8) {
       return NextResponse.json(
         {
           success: false,
@@ -23,19 +24,26 @@ export async function POST(request) {
       );
     }
 
-    // Connect to WordPress REST API to reset the password
+    // Get backend API base URL
+    const apiUrl =
+      process.env.BASE_URL || "https://rocky-be-production.up.railway.app";
+
+    // Get app authentication headers
+    const authHeaders = getAppAuthHeaders();
+
+    // Call the new backend API to reset the password
     try {
       const response = await axios.post(
-        `${process.env.BASE_URL}/wp-json/custom/v1/reset-password`,
+        `${apiUrl}/api/v1/auth/reset-password`,
         {
-          password,
-          key: token,
-          login: login,
+          token,
+          newPassword,
         },
         {
           headers: {
             "Content-Type": "application/json",
-            Authorization: `${process.env.ADMIN_TOKEN}`,
+            accept: "application/json",
+            ...authHeaders,
           },
         }
       );
@@ -43,7 +51,8 @@ export async function POST(request) {
       return NextResponse.json(
         {
           success: true,
-          message: "Password has been reset successfully",
+          message:
+            response.data?.message || "Password has been reset successfully",
         },
         { status: 200 }
       );

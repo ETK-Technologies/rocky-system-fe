@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, Suspense, useEffect } from "react";
+import { useState, Suspense } from "react";
 import { logger } from "@/utils/devLogger";
-import { useSearchParams, useRouter } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { toast } from "react-toastify";
 import { MdOutlineRemoveRedEye, MdOutlineVisibilityOff } from "react-icons/md";
@@ -10,56 +10,15 @@ import Loader from "@/components/Loader";
 
 const ResetPasswordContent = () => {
   const searchParams = useSearchParams();
-  const router = useRouter();
-  const key = searchParams.get("key");
-  const login = searchParams.get("login");
+  const token = searchParams.get("token");
   const [submitting, setSubmitting] = useState(false);
   const [resetSuccess, setResetSuccess] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [verifyingToken, setVerifyingToken] = useState(true);
-  const [tokenValid, setTokenValid] = useState(false);
   const [formData, setFormData] = useState({
     password: "",
     confirm_password: "",
-    token: "",
-    login: "",
   });
-
-  // Verify token on page load
-  useEffect(() => {
-    const verifyToken = async () => {
-      if (!key || !login) {
-        setVerifyingToken(false);
-        return;
-      }
-
-      try {
-        const response = await fetch(
-          `/api/reset-password/verify?key=${key}&login=${login}`
-        );
-        const data = await response.json();
-
-        if (response.ok && data.success) {
-          setTokenValid(true);
-          setFormData((prev) => ({
-            ...prev,
-            token: key,
-            login: login,
-          }));
-        } else {
-          toast.error(data.message || "Invalid or expired password reset link");
-        }
-      } catch (error) {
-        logger.error("Error verifying token:", error);
-        toast.error("Failed to verify reset token");
-      } finally {
-        setVerifyingToken(false);
-      }
-    };
-
-    verifyToken();
-  }, [key, login]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -80,6 +39,11 @@ const ResetPasswordContent = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
+    if (!token) {
+      toast.error("Invalid reset link. Please request a new password reset.");
+      return;
+    }
+
     if (formData.password !== formData.confirm_password) {
       toast.error("Passwords do not match");
       return;
@@ -99,9 +63,8 @@ const ResetPasswordContent = () => {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          password: formData.password,
-          token: formData.token,
-          login: formData.login,
+          token: token,
+          newPassword: formData.password,
         }),
       });
 
@@ -123,30 +86,14 @@ const ResetPasswordContent = () => {
     }
   };
 
-  if (verifyingToken) {
-    return (
-      <div className="flex flex-col items-center justify-center mx-auto py-8 px-8 w-[100%] max-w-[500px] text-center">
-        <h2 className="text-[#251f20] text-[32px] headers-font font-[450] leading-[44.80px] mb-4">
-          Verifying Reset Link
-        </h2>
-        <div className="my-6">
-          <Loader />
-        </div>
-        <p className="text-gray-700">
-          Please wait while we verify your password reset link...
-        </p>
-      </div>
-    );
-  }
-
-  if (!key || !login || !tokenValid) {
+  if (!token) {
     return (
       <div className="flex flex-col items-center justify-center mx-auto py-8 px-8 w-[100%] max-w-[500px] text-center">
         <h2 className="text-[#251f20] text-[32px] headers-font font-[450] leading-[44.80px] mb-4">
           Invalid Reset Link
         </h2>
         <p className="mb-6 text-gray-700">
-          The password reset link is invalid or has expired.
+          The password reset link is invalid or missing the token.
         </p>
         <Link href="/forgot-password" className="text-[#AE7E56] underline">
           Request a new password reset link

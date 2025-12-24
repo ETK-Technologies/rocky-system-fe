@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import axios from "axios";
 import { logger } from "@/utils/devLogger";
+import { getAppAuthHeaders } from "@/utils/environmentConfig";
 
 export async function POST(request) {
   try {
@@ -13,29 +14,34 @@ export async function POST(request) {
       );
     }
 
-    // Connect to WordPress REST API for password reset
+    // Get backend API base URL
+    const apiUrl =
+      process.env.BASE_URL || "https://rocky-be-production.up.railway.app";
+
+    // Get app authentication headers
+    const authHeaders = getAppAuthHeaders();
+
+    // Call the new backend API for password reset
     try {
       const response = await axios.post(
-        `${process.env.BASE_URL}/wp-json/custom/v1/forgot-password`,
+        `${apiUrl}/api/v1/auth/forgot-password`,
         { email },
         {
           headers: {
             "Content-Type": "application/json",
-            Authorization: `${process.env.ADMIN_TOKEN}`,
+            accept: "application/json",
+            ...authHeaders,
           },
         }
       );
 
-      const { success, message, reset_url } = response.data;
-
-      // Return the success response from WordPress
+      // Return the success response from backend
       return NextResponse.json(
         {
-          success: success,
+          success: true,
           message:
-            message ||
+            response.data?.message ||
             "Password reset instructions have been sent to your email",
-          reset_url: reset_url,
         },
         { status: 200 }
       );
