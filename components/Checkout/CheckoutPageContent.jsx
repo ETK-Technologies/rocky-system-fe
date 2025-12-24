@@ -1332,11 +1332,48 @@ const CheckoutPageContent = () => {
 
           // Step 3: Create order and get PaymentIntent from new backend API
           logger.log("Creating order via new checkout API...");
-          const checkoutResponse = await fetch("/api/checkout-new", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(dataToSend),
-          });
+          
+          // Add timeout to prevent hanging (100 seconds to match backend timeout)
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 100000);
+          
+          let checkoutResponse;
+          try {
+            checkoutResponse = await fetch("/api/checkout", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(dataToSend),
+              signal: controller.signal,
+            });
+            clearTimeout(timeoutId);
+          } catch (fetchError) {
+            clearTimeout(timeoutId);
+            if (fetchError.name === "AbortError") {
+              throw new Error(
+                "Request timeout - The order may have been created but the server took too long to respond. Please check your order history or contact support."
+              );
+            }
+            throw fetchError;
+          }
+
+          // Check if response is OK before parsing JSON
+          if (!checkoutResponse.ok) {
+            let errorMessage = "Failed to create order";
+            try {
+              const errorData = await checkoutResponse.json();
+              errorMessage = errorData.error || errorMessage;
+              
+              // Handle timeout specifically
+              if (checkoutResponse.status === 408 || errorData.timeout) {
+                errorMessage =
+                  "Request timeout - The order may have been created but the server took too long to respond. Please check your order history or contact support.";
+              }
+            } catch (parseError) {
+              // If JSON parsing fails, use status text
+              errorMessage = `Request failed with status ${checkoutResponse.status}: ${checkoutResponse.statusText}`;
+            }
+            throw new Error(errorMessage);
+          }
 
           const checkoutResult = await checkoutResponse.json();
 

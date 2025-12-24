@@ -3,22 +3,22 @@ import { logger } from "@/utils/devLogger";
 
 /**
  * @deprecated This endpoint uses WordPress/WooCommerce APIs.
- * Use /api/checkout-new instead, which uses the new backend API and handles order creation with payment intent.
+ * Use /api/checkout instead, which uses the new backend API and handles order creation with payment intent.
  *
  * This endpoint is kept for backward compatibility but should not be used for new implementations.
  */
 export async function POST(req) {
   logger.warn(
-    "⚠️ DEPRECATED: /api/create-pending-order endpoint called. Use /api/checkout-new instead."
+    "⚠️ DEPRECATED: /api/create-pending-order endpoint called. Use /api/checkout instead."
   );
 
   return NextResponse.json(
     {
       success: false,
       error:
-        "This endpoint is deprecated. Please use /api/checkout-new instead.",
+        "This endpoint is deprecated. Please use /api/checkout instead.",
       message:
-        "The checkout endpoint has been migrated to use the new backend API. Please update your frontend code to use /api/checkout-new.",
+        "The checkout endpoint has been migrated to use the new backend API. Please update your frontend code to use /api/checkout.",
     },
     { status: 410 } // 410 Gone - indicates the resource is no longer available
   );
