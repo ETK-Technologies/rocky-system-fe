@@ -9,6 +9,7 @@ import ProductCard from "@/components/Quiz/ProductCard";
 import CrossSellModal from "@/components/Quiz/CrossSellPopup/CrossSellModal";
 import { addToCartDirectly } from "@/utils/flowCartHandler";
 import { transformEDProducts } from "@/components/Quiz/functions/transformEdProducts";
+import { transformProductDataForCard } from "@/utils/recommendationRulesEngine";
 
 export default function QuizResultsPage({ params }) {
   const router = useRouter();
@@ -52,12 +53,18 @@ export default function QuizResultsPage({ params }) {
   useEffect(() => {
     // Load results from sessionStorage
     const storedResults = sessionStorage.getItem('quiz-results');
+
+    logger.log("Loaded stored quiz results from sessionStorage:", storedResults);
     
     if (!storedResults) {
       toast.error("No quiz results found");
       router.push(`/quiz/${slug}`);
       return;
     }
+
+
+
+
 
     try {
       const parsedResults = JSON.parse(storedResults);
@@ -76,9 +83,13 @@ export default function QuizResultsPage({ params }) {
       setResults(parsedResults);
       
       // Find the matching result for the selected product (will be set after product selection)
-      if (parsedResults?.recommendations?.[0]) {
-        setCurrentResult(parsedResults.recommendations[0]);
+      if (parsedResults?.recommendations) {
+        setCurrentResult(transformProductDataForCard(parsedResults?.recommendations, flowType));
       }
+
+
+      logger.log("Transformed quiz results set in state", transformProductDataForCard(parsedResults?.recommendations, flowType));
+
     } catch (error) {
       logger.error("Error parsing quiz results:", error);
       toast.error("Invalid quiz results");
@@ -90,8 +101,8 @@ export default function QuizResultsPage({ params }) {
 
   // Debug: Log the data to see what we're receiving
   useEffect(() => {
-    if (results?.recommendations?.[0]) {
-      logger.log("Recommended product data:", results.recommendations[0]);
+    if (results?.recommendations) {
+      logger.log("Recommended product data:", results.recommendations);
       logger.log("All recommendations:", results.recommendations);
     }
   }, [results]);
@@ -255,211 +266,12 @@ export default function QuizResultsPage({ params }) {
 
   const { recommendations, quizData } = results;
 
-  /**
-   * Transform product data from backend format to ProductCard format
-   */
-  const transformProductData = (product) => {
-    if (!product) return null;
-
-    const productData = product.productData || product;
-    // Get the first variant from the variants array (default selection)
-    const variant = product.variant || productData.variants?.[0];
-    
-    // Extract variant ID - this is the WooCommerce variation ID we need for cart
-    const variantId = variant?.id || product.variationId;
-    
-    // Extract image URL (prefer variant image, fallback to product image)
-    const imageUrl = variant?.imageUrl ||
-                     productData.images?.[0]?.url || 
-                     product.image || 
-                     '';
-    
-    // Extract price from variant or product (variants have specific pricing)
-    const price = variant?.price || 
-                  productData.basePrice ||
-                  productData.price || 
-                  product.price || 
-                  0;
-    
-    // Extract regular price if available
-    const regularPrice = variant?.regularPrice || 
-                         productData.regularPrice || 
-                         product.regularPrice || 
-                         null;
-
-    // Extract product_tagline from metadata
-    const productTagline = productData.metadata?.find(meta => meta.key === 'product_tagline')?.value || 
-                           product.product_tagline || 
-                           productData.shortDescription ||
-                           '';
-
-    // Extract description from metadata or product
-    const description = productData.metadata?.find(meta => meta.key === 'product_description_0_detailed_description')?.value ||
-                        product.description || 
-                        productData.description || 
-                        '';
-
-    // Map subscription period from WordPress to our format
-    const mapSubscriptionPeriod = (period, interval) => {
-      if (!period) return '1_month';
-      const periodMap = {
-        'WEEK': interval === 6 ? '6_week' : `${interval}_week`,
-        'MONTH': `${interval || 1}_month`,
-        'DAY': `${interval}_day`,
-      };
-      return periodMap[period] || '1_month';
-    };
-
-    // Transform ED-specific data from globalAttributes to ED card format
-    const buildEDSpecificData = () => {
-      if (flowType !== 'ed' || !productData.globalAttributes) {
-        return {};
-      }
-
-      // Find Tabs frequency and Subscription Type attributes
-      const tabsAttr = productData.globalAttributes.find(attr => 
-        attr.slug === 'tabs-frequency' || attr.name === 'Tabs frequency'
-      );
-      
-      const subscriptionAttr = productData.globalAttributes.find(attr => 
-        attr.slug === 'subscription-type' || attr.name === 'Subscription Type'
-      );
-
-      if (!tabsAttr || !subscriptionAttr) {
-        return {};
-      }
-
-      // Build frequencies map
-      const frequencies = {};
-      subscriptionAttr.options?.forEach(option => {
-        const key = option.value; // e.g., "monthly-supply", "quarterly-supply"
-        frequencies[key] = key.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-      });
-
-      // Build pillOptions structure
-      const pillOptions = {};
-      subscriptionAttr.options?.forEach(freqOption => {
-        const frequencyKey = freqOption.value; // e.g., "monthly-supply"
-        pillOptions[frequencyKey] = [];
-
-        // For each tab count, find variants that match this frequency
-        tabsAttr.options?.forEach(tabOption => {
-          const tabCount = tabOption.value?.replace('-tabs', '').replace('-tab', '');
-          
-          // Find variants that match both this frequency and tab count
-          const matchingVariants = freqOption.variants?.filter(v => {
-            // Check if variant is published and matches this tab count
-            return v.status === "PUBLISHED" && 
-                   (v.sku?.includes(tabCount) || tabOption.variants?.some(tv => tv.id === v.id));
-          }) || [];
-
-          if (matchingVariants.length > 0) {
-            // Use the first matching variant for generic
-            const genericVariant = matchingVariants[0];
-            // Brand would typically be a different variant, for now use same
-            const brandVariant = matchingVariants[1] || genericVariant;
-
-            pillOptions[frequencyKey].push({
-              count: parseInt(tabCount) || tabCount,
-              genericPrice: genericVariant.price,
-              brandPrice: brandVariant.price,
-              genericVariationId: genericVariant.id,
-              brandVariationId: brandVariant.id,
-            });
-          }
-        });
-
-        // Sort by count
-        pillOptions[frequencyKey].sort((a, b) => {
-          const aNum = parseInt(a.count) || 0;
-          const bNum = parseInt(b.count) || 0;
-          return aNum - bNum;
-        });
-      });
-
-      // Extract active ingredient from metadata or attributes
-      const activeIngredient = productData.metadata?.find(meta => 
-        meta.key === 'active_ingredient'
-      )?.value || 'Sildenafil';
-
-      // Extract strengths from Dose/Strength attribute
-      const strengthsAttr = productData.globalAttributes.find(attr => 
-        attr.slug === 'dose-strength' || attr.name === 'Dose/ Strength'
-      );
-      const strengths = strengthsAttr?.value?.split(',').map(s => s.trim()) || [];
-
-      return {
-        activeIngredient,
-        strengths,
-        preferences: ['generic', 'brand'], // ED products typically have both
-        frequencies,
-        pillOptions,
-      };
-    };
-
-    const edData = buildEDSpecificData();
-
-    return {
-      id: variantId || productData.id || product.id,
-      variationId: variantId, // Use variant ID from WordPress variants array
-      productId: productData.id, // Keep reference to parent product
-      name: productData.name || product.name || '',
-      title: product.title || productData.name || product.name || '',
-      product_tagline: productTagline,
-      description: description,
-      image: imageUrl,
-      price: price,
-      regularPrice: regularPrice,
-      frequency: product.frequency || variant?.subscriptionPeriod || '',
-      supply: product.supply || '',
-      pills: product.pills || '',
-      badge: product.badge || '',
-      features: product.features || [],
-      isSubscription: productData.type?.includes('SUBSCRIPTION') || product.isSubscription || false,
-      subscriptionPeriod: mapSubscriptionPeriod(variant?.subscriptionPeriod, variant?.subscriptionInterval),
-      supplyAvailable: product.supplyAvailable !== false,
-      available: product.available !== false,
-      requireConsultation: product.requireConsultation || false,
-      details: product.details || '',
-      strengthLevel: product.strengthLevel || 0,
-      isPrescription: product.isPrescription || false,
-      sku: variant?.sku || productData.sku || '',
-      // ED-specific fields
-      tagline: product.tagline || productTagline,
-      ...edData, // Spread the ED-specific data (activeIngredient, strengths, preferences, frequencies, pillOptions)
-    };
-  };
-
-  // Transform recommendations to proper format
-  // For ED flow, use the special ED product transformer
-  let transformedRecommendations;
   
-  if (flowType === FLOW_TYPES.ED) {
-    logger.log("🔄 Using ED product transformer for recommendations");
-    logger.log("📦 User's recommendation:", recommendations);
-    logger.log("📦 All products for merging:", results.allProducts?.length || 0);
-    
-    // Use ALL products for transformation (to enable brand/generic merging)
-    // ED products are grouped into brand/generic pairs, show all transformed cards
-    const allProducts = results.allProducts || recommendations;
-    
-    transformedRecommendations = transformEDProducts(allProducts);
-    
-    logger.log("✅ Transformed ED products:", transformedRecommendations.length);
-    logger.log("✅ ED products to display:", transformedRecommendations);
-  } else {
-    // Use standard transformation for other flows
-    transformedRecommendations = recommendations.map(transformProductData).filter(Boolean);
-  }
-  
-  const recommended = transformedRecommendations[0]; // First recommendation as primary
-  const alternatives = transformedRecommendations.slice(1); // Rest as alternatives
-
   const stepData = {
     title: "Your treatment plan",
     description: `Based on your quiz responses for ${quizData?.name || "your health goals"}`,
-    recommended: recommended,
-    alternatives: alternatives
+    recommended: currentResult,
+    alternatives: []
   };
 
   // Create a custom setSelectedProduct handler that works with ED product selections
@@ -495,7 +307,7 @@ export default function QuizResultsPage({ params }) {
         setSelectedProduct={handleProductSelection}
         onContinue={handleContinue}
         ProductCard={ProductCard}
-        showAlternatives={alternatives.length > 0}
+        showAlternatives={false}
         variations={[]}
         showIncluded={true}
         isLoading={isAddingToCart}

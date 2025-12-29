@@ -10,81 +10,104 @@ const EDProductCard = ({
   isSelected = false,
   onContinue,
 }) => {
+  // Extract product properties from the new structure
+  const {
+    id,
+    name,
+    image,
+    tagline,
+    activeIngredient,
+    strengths = [],
+    preferences = [],
+    pillOptions = [],
+  } = product;
 
-  //logger.log("PProduct received in", product);
-  // Check if this is a pack product
-  const isPack = product.isPack;
-  
-  // Store both brand and generic products (or pack products)
-  const brandProduct = isPack ? null : product._originalBrand;
-  const genericProduct = isPack ? null : product._originalGeneric;
-  
-  // For packs, store all 4 products
-  const viagraBrand = isPack ? product._originalViagraBrand : null;
-  const viagraGeneric = isPack ? product._originalViagraGeneric : null;
-  const cialisBrand = isPack ? product._originalCialisBrand : null;
-  const cialisGeneric = isPack ? product._originalCialisGeneric : null;
-
-  logger.log("EDProductCard rendering product:", product);
-  logger.log("EDProductCard isPack:", isPack);
-  if (isPack) {
-    logger.log("EDProductCard pack products:", { viagraBrand, viagraGeneric, cialisBrand, cialisGeneric });
-  } else {
-    logger.log("EDProductCard brandProduct:", brandProduct);
-    logger.log("EDProductCard genericProduct:", genericProduct);
-  }
-  
-  // If product comes with a selected preference, use it, otherwise default to "generic"
-  const [selectedPreference, setSelectedPreference] = useState(
-    product.selectedPreference || "generic"
-  );
+  // State management
+  const [selectedPreference, setSelectedPreference] = useState(preferences[0] || "generic");
   const [selectedFrequency, setSelectedFrequency] = useState("monthly-supply");
   const [selectedPills, setSelectedPills] = useState(null);
 
-  // Get the active product based on preference
-  const getActiveProduct = () => {
-    if (isPack) {
-      // For packs, use generic products as base (or first available)
-      return viagraGeneric || viagraBrand || cialisGeneric || cialisBrand || product;
-    }
-    if (selectedPreference === "brand" && brandProduct) {
-      return brandProduct;
-    }
-    return genericProduct || brandProduct || product;
+  // Frequency labels - can come from product or use defaults
+  const frequencies = product.frequencies || {
+    "monthly-supply": "Monthly",
+    "quarterly-supply": "Quarterly",
   };
 
-  const activeProduct = getActiveProduct();
-  
-  const {
-    activeIngredient,
-    strengths,
-    preferences,
-    frequencies,
-    pillOptions,
-  } = product;
-
-  // Get dynamic properties from active product based on preference
-  const name = activeProduct.name || product.name;
-  const title = activeProduct.title || activeProduct.name || product.title || product.name;
-  const tagline = activeProduct.tagline || product.tagline;
-  const product_tagline = activeProduct.product_tagline || product.product_tagline;
-  const image = activeProduct.images?.[0]?.url || product.image;
-
-  // Only auto-select the recommended product on initial render
-  useEffect(() => {
-    if (isRecommended && onSelect && !isSelected) {
-      // This will only run once when the component is initially mounted
-      // to set the initial recommended product
-      handleCardSelect();
+  // Helper function to get pill options array based on structure
+  const getPillOptionsArray = () => {
+    if (!pillOptions) return [];
+    
+    // Check if pillOptions is an object (variety pack format)
+    if (typeof pillOptions === 'object' && !Array.isArray(pillOptions)) {
+      return pillOptions[selectedFrequency] || [];
     }
-    // Empty dependency array means this only runs once on initial mount
+    
+    // Otherwise it's an array (regular product format)
+    return pillOptions;
+  };
+
+  // Helper function to get available pill options based on current selections
+  const getAvailablePillOptions = () => {
+    const optionsArray = getPillOptionsArray();
+    if (optionsArray.length === 0) return [];
+    
+    // For object structure (variety pack), options are already filtered by frequency
+    if (typeof pillOptions === 'object' && !Array.isArray(pillOptions)) {
+      return optionsArray.filter((option) => {
+        const hasPrice = selectedPreference === "generic" 
+          ? option.genericPrice != null 
+          : option.brandPrice != null;
+        return hasPrice;
+      });
+    }
+    
+    // For array structure (regular product), filter by frequency
+    return optionsArray.filter((option) => {
+      if (option.type !== selectedFrequency) return false;
+      
+      const hasPrice = selectedPreference === "generic" 
+        ? option.genericPrice != null 
+        : option.brandPrice != null;
+      
+      return hasPrice;
+    });
+  };
+
+  // Helper function to check if a preference is available
+  const isPreferenceAvailable = (preference) => {
+    const optionsArray = getPillOptionsArray();
+    if (optionsArray.length === 0) return false;
+    
+    // For object structure (variety pack), options are already filtered by frequency
+    if (typeof pillOptions === 'object' && !Array.isArray(pillOptions)) {
+      return optionsArray.some((option) => {
+        return preference === "generic" 
+          ? option.genericPrice != null 
+          : option.brandPrice != null;
+      });
+    }
+    
+    // For array structure (regular product), filter by frequency
+    return optionsArray.some((option) => {
+      if (option.type !== selectedFrequency) return false;
+      return preference === "generic" 
+        ? option.genericPrice != null 
+        : option.brandPrice != null;
+    });
+  };
+
+  // Initialize selected pills when component mounts or when frequency/preference changes
+  useEffect(() => {
+    const availableOptions = getAvailablePillOptions();
+    if (availableOptions.length > 0 && !selectedPills) {
+      setSelectedPills(availableOptions[0]);
+    }
   }, []);
 
+  // Update selected pills when frequency or preference changes
   useEffect(() => {
-    // Automatically select the first available pill option when frequency or preference changes
     const availableOptions = getAvailablePillOptions();
     if (availableOptions.length > 0) {
-      // Only update if the count actually changed (avoid infinite loop from object reference changes)
       const firstOption = availableOptions[0];
       const currentCount = selectedPills?.count;
       const firstCount = firstOption?.count;
@@ -97,11 +120,10 @@ const EDProductCard = ({
         setSelectedPills(null);
       }
     }
-  }, [selectedFrequency, selectedPreference, selectedPills?.count]);
+  }, [selectedFrequency, selectedPreference]);
 
-  // Auto-update selection when options change
+  // Auto-update parent component when selection changes
   useEffect(() => {
-    // When any selection changes, update the parent component
     if (isSelected && onSelect && selectedPills) {
       const price =
         selectedPreference === "generic"
@@ -110,24 +132,11 @@ const EDProductCard = ({
 
       const variationId =
         selectedPreference === "generic"
-          ? selectedPills.genericVariationId
+          ? selectedPills.variationId
           : selectedPills.brandVariationId;
 
       if (price && variationId) {
-        logger.log("🔄 Auto-updating selection:", {
-          isPack,
-          preference: selectedPreference,
-          frequency: selectedFrequency,
-          pills: selectedPills.count,
-          variationId,
-          price
-        });
-
-        // For pack products, pass the main product object (contains all pack data)
-        // For regular products, pass the activeProduct (brand or generic)
-        const productToPass = isPack ? product : activeProduct;
-
-        onSelect(productToPass, {
+        onSelect(product, {
           preference: selectedPreference,
           frequency: selectedFrequency,
           pills: selectedPills,
@@ -139,167 +148,84 @@ const EDProductCard = ({
     }
   }, [selectedPreference, selectedFrequency, selectedPills, isSelected]);
 
-  // Get available pill options for selected frequency and preference
-  const getAvailablePillOptions = () => {
-    if (!pillOptions || !pillOptions[selectedFrequency]) return [];
-    
-    // Filter to only show options that have the selected preference available
-    return pillOptions[selectedFrequency].filter((pill) => {
-      if (selectedPreference === "generic") {
-        return pill.genericPrice !== null && pill.genericVariationId !== null;
-      } else {
-        return pill.brandPrice !== null && pill.brandVariationId !== null;
-      }
-    });
-  };
-
-  // Check if the current preference is available for all pill counts
-  const isPreferenceAvailable = (preference) => {
-    if (!pillOptions || !pillOptions[selectedFrequency]) return false;
-    
-    const priceKey = preference === "generic" ? "genericPrice" : "brandPrice";
-    const hasAnyOption = pillOptions[selectedFrequency].some(
-      (pill) => pill[priceKey] !== null
-    );
-    
-    return hasAnyOption;
-  };
-
-  // Handle card selection
+  // Handle card selection and add to cart
   const handleCardSelect = async () => {
-    if (onSelect && selectedPills) {
-      logger.log("Handling card select with preference:", selectedPills);
-      // Calculate the correct price based on preference
-      const price =
-        selectedPreference === "generic"
-          ? selectedPills.genericPrice
-          : selectedPills.brandPrice;
+    if (!selectedPills) {
+      logger.log("No pill option selected");
+      return;
+    }
 
-      // If price is null, fall back to the other option or show error
-      if (!price) {
-        console.error("Price is null for selected preference:", {
-          selectedPreference,
-          selectedPills,
-          product: activeProduct.name
-        });
-        return;
-      }
+    const price =
+      selectedPreference === "generic"
+        ? selectedPills.genericPrice
+        : selectedPills.brandPrice;
 
-      // Get the correct variation ID based on preference
-      const variationId =
-        selectedPreference === "generic"
-          ? selectedPills.genericVariationId
-          : selectedPills.brandVariationId;
+    const variationId =
+      selectedPreference === "generic"
+        ? selectedPills.variationId
+        : selectedPills.brandVariationId;
 
-      // If variation ID is null, show error
-      if (!variationId) {
-        logger.log("Variation ID is null for selected preference:", {
-          selectedPreference,
-          selectedPills,
-          product: activeProduct.name
-        });
-        return;
-      }
-
-      // Pass the active product (brand or generic) with the selected options
-      // onSelect(isPack ? product : activeProduct, {
-      //   preference: selectedPreference,
-      //   frequency: selectedFrequency,
-      //   pills: selectedPills,
-      //   pillCount: selectedPills.count,
-      //   price: price,
-      //   variationId: variationId,
-      // });
-
-      // For pack products, pass the main product object (contains all pack data)
-      // For regular products, pass the activeProduct (brand or generic)
-      const productToPass = isPack ? product : activeProduct;
-
-      logger.log("✅ Selecting product with options:", {
-        isPack,
-        preference: selectedPreference,
-        frequency: selectedFrequency,
-        pills: selectedPills,
-        pillCount: selectedPills.count,
-        price: price,
-        variationId: variationId,
-        productId: isPack ? product.productId : activeProduct.id,
-        productName: isPack ? product.name : activeProduct.name,
-        product: productToPass
+    if (!price) {
+      console.error("Price is null for selected preference:", {
+        selectedPreference,
+        selectedPills,
+        product: name
       });
+      return;
+    }
 
-      const ProductToCart = {
-        preference: selectedPreference,
-        frequency: selectedFrequency == "monthly-supply" ? "1_month" : "3_month",
-        pills: selectedPills,
-        pillCount: selectedPills.count,
-        price: price,
-        variationId: variationId,
-        productId: isPack ? product.productId : activeProduct.id,
-        dataAddToCart: isPack ? product.name : activeProduct.name,
-      };
+    if (!variationId) {
+      logger.log("Variation ID is null for selected preference:", {
+        selectedPreference,
+        selectedPills,
+        product: name
+      });
+      return;
+    }
 
-      const result = await addToCartDirectly(ProductToCart, [], "ed");
+    logger.log("✅ Selecting product with options:", {
+      preference: selectedPreference,
+      frequency: selectedFrequency,
+      pills: selectedPills,
+      pillCount: selectedPills.count,
+      price: price,
+      variationId: variationId,
+      productId: id,
+      productName: name,
+    });
 
-      if(result.success){
-        logger.log("Product added to cart successfully:", result);
-        window.location.href = result.redirectUrl;
-      } else {
-        logger.log("Failed to add product to cart:", result);
-      }
-      
-      // // If onContinue is provided (ED flow), trigger add to cart immediately
-      // if (onContinue) {
-      //   // Small delay to ensure state updates
-      //   setTimeout(() => onContinue(), 100);
-      // }
+    // Prepare product data in the format expected by addToCartDirectly
+    const mainProduct = {
+      id: id,
+      name: name,
+      price: price,
+      quantity: 1,
+      variationId: variationId,
+      isSubscription: selectedFrequency === "quarterly-supply",
+      subscriptionPeriod: selectedFrequency === "quarterly-supply" ? "3_month" : "1_month",
+    };
+
+    const result = await addToCartDirectly(mainProduct, [], "ed");
+
+    if (result.success) {
+      logger.log("Product added to cart successfully:", result);
+      window.location.href = result.redirectUrl;
+    } else {
+      logger.log("Failed to add product to cart:", result);
     }
   };
 
-  // If no pill options available, show simplified version
-  const hasCompleteData = 
-    pillOptions && 
-    Object.keys(pillOptions).length > 0 &&
-    preferences && 
-    preferences.length > 0 &&
-    frequencies && 
-    Object.keys(frequencies).length > 0;
-
-  if (!hasCompleteData) {
-    return (
-      <div
-        className={`border-[0.5px] bg-white border-solid ${
-          isSelected ? "border-[#A55255] border-2" : "border-[#E2E2E1]"
-        } shadow-[0px_1px_1px_0px_#E2E2E1] rounded-[16px] p-[16px] md:p-[24px] text-center h-full w-full min-w-[280px] md:min-w-[380px] cursor-pointer`}
-        onClick={handleCardSelect}
-      >
-        <div className="flex justify-between items-start">
-          <p className="text-[18px] font-[500] leading-[115%] mb-[4px] text-left">
-            {title || name}
-          </p>
-          {/* Radio button indicator */}
-          <div className="w-6 h-6 rounded-full border-2 border-[#B0855B] flex items-center justify-center">
-            {isSelected && (
-              <div className="w-4 h-4 rounded-full bg-[#B0855B]"></div>
-            )}
-          </div>
-        </div>
-        
-        <p className="text-[14px] font-[400] leading-[140%] mb-[4px] text-[#212121] text-left">
-          {tagline || product_tagline}
-        </p>
-
-        {image && (
-          <div className="relative overflow-hidden rounded-[16px] w-[248px] h-[140px] md:h-[130px] mx-auto">
-            <CustomContainImage src={image} fill alt={title || name} />
-          </div>
-        )}
-      </div>
-    );
-  }
 
   return (
     <div className="relative">
+      {isRecommended && (
+        <div className="absolute -top-3 left-1/2 transform -translate-x-1/2 z-10">
+          <div className="bg-[#A55255] text-white px-4 py-1 rounded-full text-sm font-medium shadow-md">
+            Recommended
+          </div>
+        </div>
+      )}
+      
       <div
         className={`border-[0.5px] bg-white border-solid ${
           isSelected ? "border-[#A55255] border-2" : "border-[#E2E2E1]"
@@ -307,38 +233,29 @@ const EDProductCard = ({
           isRecommended
             ? "pt-[32px] md:shadow-[0px_0px_16px_0px_#00000040]"
             : ""
-        } cursor-pointer`}
-       
+        }`}
       >
-        <div className="flex justify-center items-center mb-4">
+        <div className="flex justify-between items-center mb-4">
           <p className="text-[18px] font-[500] leading-[115%] mb-[4px] text-left">
-            {title}
-            {isPack && (
-              <span className="ml-2 text-[12px] bg-[#A55255] text-white px-2 py-1 rounded-md">COMBO</span>
-            )}
+            {name}
           </p>
-          {/* Radio button indicator */}
-          {/* <div className="w-6 h-6 rounded-full border-2 border-[#B0855B] flex items-center justify-center">
-            {isSelected && (
-              <div className="w-4 h-4 rounded-full bg-[#B0855B]"></div>
-            )}
-          </div> */}
         </div>
 
-        {/* Rest of the component */}
-        {/* <p className="text-[14px] font-[400] leading-[140%] mb-[4px] text-[#212121] text-left">
-          {tagline || product_tagline}
-        </p> */}
+        {tagline && (
+          <p className="text-[14px] font-[400] leading-[140%] mb-[12px] text-[#212121] text-left">
+            {tagline}
+          </p>
+        )}
 
         {image && (
-          <div className="relative overflow-hidden rounded-[16px] w-[248px] h-[112px] md:h-[130px] mx-auto ">
-            <CustomContainImage src={image} fill alt={title} />
+          <div className="relative overflow-hidden rounded-[16px] w-[248px] h-[112px] md:h-[130px] mx-auto mb-4">
+            <CustomContainImage src={image} fill alt={name} />
           </div>
         )}
 
         <div className="min-h-[80px] md:min-h-[60px]">
           {activeIngredient && (
-            <p className="text-sm font-semibold text-[#212121] mt-6">
+            <p className="text-sm font-semibold text-[#212121] mt-2">
               Active ingredient:{" "}
               <span className="font-base font-normal">{activeIngredient}</span>
             </p>
@@ -375,7 +292,7 @@ const EDProductCard = ({
                   isAvailable ? "cursor-pointer" : "cursor-not-allowed"
                 } shadow-[0px_1px_1px_0px_#E2E2E1] relative`}
                 onClick={(e) => {
-                  e.stopPropagation(); // Prevent card selection when clicking preference
+                  e.stopPropagation();
                   if (isAvailable) {
                     setSelectedPreference(pref);
                   }
@@ -404,7 +321,7 @@ const EDProductCard = ({
                   : "border-[#CECECE]"
               } text-black text-center py-[6px] leading-[140%] rounded-[8px] w-full h-[32px] text-[14px] cursor-pointer shadow-[0px_1px_1px_0px_#E2E2E1]`}
               onClick={(e) => {
-                e.stopPropagation(); // Prevent card selection when clicking frequency
+                e.stopPropagation();
                 setSelectedFrequency(freq);
               }}
             >
@@ -414,7 +331,7 @@ const EDProductCard = ({
         </div>
 
         <p className="mt-[12px] md:mt-[16px] mb-[8px] text-[14px] leading-[140%] font-[500] text-left">
-          {isPack ? "How many pills per medication?" : "How many pills?"}
+          How many pills?
         </p>
         <div className="flex gap-[4px] md:gap-2 flex-wrap">
           {getAvailablePillOptions().map((pill) => (
@@ -426,11 +343,11 @@ const EDProductCard = ({
                   : "border-[#CECECE]"
               } text-black text-center py-[6px] leading-[140%] rounded-[8px] flex-1 h-[32px] text-[14px] cursor-pointer shadow-[0px_1px_1px_0px_#E2E2E1]`}
               onClick={(e) => {
-                e.stopPropagation(); // Prevent card selection when clicking pill count
+                e.stopPropagation();
                 setSelectedPills(pill);
               }}
             >
-              {pill.count}
+              {pill.count.replace(/-tabs/g, '')}
             </p>
           ))}
           {getAvailablePillOptions().length === 0 && (
@@ -441,26 +358,25 @@ const EDProductCard = ({
         </div>
 
         <button
-          className="bg-black transition hover:bg-gray-900 text-white font-semibold text-center py-3 rounded-full mt-[16px] md:mt-[24px] cursor-pointer w-full"
+          className="bg-black transition hover:bg-gray-900 text-white font-semibold text-center py-3 rounded-full mt-[16px] md:mt-[24px] cursor-pointer w-full disabled:opacity-50 disabled:cursor-not-allowed"
           onClick={(e) => {
-            e.stopPropagation(); // Prevent double handling
+            e.stopPropagation();
             handleCardSelect();
           }}
+          disabled={!selectedPills}
         >
           {(() => {
+            if (!selectedPills) {
+              return "Select options";
+            }
+            
             const currentPrice = selectedPreference === "generic"
               ? selectedPills?.genericPrice
               : selectedPills?.brandPrice;
             
             const priceText = currentPrice ? `$${currentPrice}/month` : "Price unavailable";
             
-            if (onContinue) {
-              return `Add to cart - ${priceText}`;
-            } else if (isSelected) {
-              return `Selected - ${priceText}`;
-            } else {
-              return `Select - ${priceText}`;
-            }
+            return `Add to cart - ${priceText}`;
           })()}
         </button>
       </div>

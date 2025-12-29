@@ -155,7 +155,7 @@ export default function ComponentStep({ step, answer, onAnswerChange, onBack }) 
       {/* Allow proceeding through component steps */}
       {!DynamicComponent && (
         <button
-          onClick={() => onAnswerChange("viewed")}
+          onClick={() => onAnswerChange({ answerType: 'text', answer: 'viewed' })}
           className="mt-6 w-full py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
         >
           Continue

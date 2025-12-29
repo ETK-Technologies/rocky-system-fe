@@ -17,7 +17,7 @@ export default function PopupComponent({ step, answer, onAnswerChange }) {
       </div>
 
       <button
-        onClick={() => onAnswerChange("acknowledged")}
+        onClick={() => onAnswerChange({ answerType: "text", answer: "acknowledged" })}
         className="w-full py-3 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition-colors"
       >
         I Understand, Continue

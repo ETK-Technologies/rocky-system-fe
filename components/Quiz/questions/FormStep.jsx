@@ -13,7 +13,7 @@ export default function FormStep({ step, answer, onAnswerChange }) {
   const handleInputChange = (inputId, value) => {
     const updated = { ...formData, [inputId]: value };
     setFormData(updated);
-    onAnswerChange(updated);
+    onAnswerChange({ answerType: "text", answer: updated });
   };
 
   return (

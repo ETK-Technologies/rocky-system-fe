@@ -7,7 +7,7 @@ export default function AboutYourMedication({ step, answer, onAnswerChange, onBa
 
   const handleSelect = (value) => {
     setAcknowledged(value);
-    onAnswerChange(value);
+    onAnswerChange({ answerType: "text", answer: value });
   };
 
   return (

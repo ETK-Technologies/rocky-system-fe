@@ -27,7 +27,7 @@ export default function MedicationPopup({ step, answer, onAnswerChange }) {
       </div>
 
       <button
-        onClick={() => onAnswerChange("acknowledged")}
+        onClick={() => onAnswerChange({ answerType: "text", answer: "acknowledged" })}
         className="w-full py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
       >
         I Understand, Continue

@@ -2,7 +2,7 @@ export default function DropdownQuestion({ step, answer, onAnswerChange }) {
   const { title, description, options } = step;
 
   const handleChange = (e) => {
-    onAnswerChange(e.target.value);
+    onAnswerChange({ answerType: "text", answer: e.target.value });
   };
 
   return (

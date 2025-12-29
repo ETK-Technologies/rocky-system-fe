@@ -37,7 +37,7 @@ export default function MultipleChoiceQuestion({ step, answer, onAnswerChange })
     }
 
     setSelectedOptions(newSelection);
-    onAnswerChange(newSelection);
+    onAnswerChange({ answerType: "text", answer: newSelection });
   };
 
   const handleTextareaChange = (optionText, value) => {

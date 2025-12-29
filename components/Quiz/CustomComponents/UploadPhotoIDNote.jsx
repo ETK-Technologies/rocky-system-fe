@@ -36,7 +36,7 @@ export default function UploadPhotoIDNote({ step, answer, onAnswerChange }) {
             onChange={(e) => {
               setIsChecked(e.target.checked);
               if (e.target.checked) {
-                onAnswerChange("acknowledged");
+                onAnswerChange({ answerType: "text", answer: "acknowledged" });
               } else {
                 onAnswerChange(null);
               }

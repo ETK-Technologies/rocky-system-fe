@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { logger } from "@/utils/devLogger";
 import { getOrigin } from "@/lib/utils/getOrigin";
+import { cookies } from "next/headers";
 
 const BASE_URL = process.env.BASE_URL;
 
@@ -8,7 +9,7 @@ const BASE_URL = process.env.BASE_URL;
  * POST /api/quizzes/[quizId]/start
  * Start a quiz session for the given quiz ID
  */
-export async function POST(request, { params }) {
+export async function POST(request, { params })  {
   try {
     // In Next.js 15, params is a Promise and needs to be awaited
     const { quizId } = await params;
@@ -20,19 +21,19 @@ export async function POST(request, { params }) {
       );
     }
 
-    logger.log(`🚀 Starting quiz session for quiz ID: ${quizId}`);
+    const cookieStore = await cookies();
+    const authToken = cookieStore.get("authToken");
 
     // Get origin for Origin header (required for backend domain whitelist)
     const origin = getOrigin(request);
 
-    // Use Railway backend URL
-    const apiUrl = BASE_URL || "https://rocky-be-production.up.railway.app";
-    
-    // Call backend API to start quiz
-    const backendUrl = `${apiUrl}/api/v1/quizzes/${quizId}/start`;
-    
-    logger.log(`🔗 Backend URL: ${backendUrl}`);
-    logger.log(`🔗 API URL: ${apiUrl}`);
+    const headers = {
+      accept: "application/json",
+      "Content-Type": "application/json",
+      "X-App-Key": process.env.NEXT_PUBLIC_APP_KEY,
+      "X-App-Secret": process.env.NEXT_PUBLIC_APP_SECRET,
+      Origin: origin,
+    };
 
     // Parse request body if any
     let requestBody = {};
@@ -43,15 +44,36 @@ export async function POST(request, { params }) {
       logger.log("No request body provided or invalid JSON");
     }
 
+    if (authToken) {
+      logger.log("🔐 Starting quiz with authenticated user");
+      headers["Authorization"] = `${authToken.value}`;
+    } else {
+      logger.log("🔓 Starting quiz with guest user");
+      // Check if sessionId is provided in request body
+      if (requestBody.sessionId) {
+        logger.log("👤 Using sessionId from request:", requestBody.sessionId);
+      } else {
+        logger.warn("⚠️ No sessionId provided in request body for guest user");
+      }
+    }
+
+    logger.log(`🚀 Starting quiz session for quiz ID: ${quizId}`);
+
+    // Use Railway backend URL
+    const apiUrl = BASE_URL || "https://rocky-be-production.up.railway.app";
+
+    // Call backend API to start quiz
+    const backendUrl = `${apiUrl}/api/v1/quizzes/${quizId}/start`;
+
+    logger.log(`🔗 Backend URL: ${backendUrl}`);
+    logger.log(`🔗 API URL: ${apiUrl}`);
+
+    logger.log("Start Quiz with Body:", requestBody);
+    
+
     const response = await fetch(backendUrl, {
       method: "POST",
-      headers: {
-        "accept": "application/json",
-        "Content-Type": "application/json",
-        "X-App-Key": process.env.NEXT_PUBLIC_APP_KEY,
-        "X-App-Secret": process.env.NEXT_PUBLIC_APP_SECRET,
-        "Origin": origin,
-      },
+      headers: headers,
       body: JSON.stringify(requestBody),
       cache: "no-store", // Disable caching
     });
@@ -59,7 +81,7 @@ export async function POST(request, { params }) {
     if (!response.ok) {
       const errorText = await response.text();
       logger.error(`❌ Backend error: ${response.status} - ${errorText}`);
-      
+
       return NextResponse.json(
         {
           success: false,
@@ -73,7 +95,7 @@ export async function POST(request, { params }) {
     }
 
     const quizSessionData = await response.json();
-    
+
     logger.log("✅ Quiz session started successfully:", {
       quizId: quizId,
       sessionId: quizSessionData?.session_id || quizSessionData?.sessionId,
@@ -85,7 +107,7 @@ export async function POST(request, { params }) {
     });
   } catch (error) {
     logger.error("❌ Error starting quiz session:", error);
-    
+
     return NextResponse.json(
       {
         success: false,

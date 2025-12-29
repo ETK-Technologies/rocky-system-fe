@@ -4,6 +4,7 @@ import DropdownQuestion from "./questions/DropdownQuestion";
 import FormStep from "./questions/FormStep";
 import ComponentStep from "./questions/ComponentStep";
 import PrivacyText from "./PrivacyText";
+import TrueFalseQuestion from "./questions/TrueFalseQuestion";
 
 export default function StepRenderer({ step, answer, onAnswerChange, onBack }) {
   if (!step) return null;
@@ -29,6 +30,19 @@ export default function StepRenderer({ step, answer, onAnswerChange, onBack }) {
         return (
           <>
             <SingleChoiceQuestion
+              step={step}
+              answer={answer}
+              onAnswerChange={onAnswerChange}
+            />
+            <PrivacyText />
+          </>
+        );
+
+
+       case "true-false":
+        return (
+          <>
+            <TrueFalseQuestion
               step={step}
               answer={answer}
               onAnswerChange={onAnswerChange}

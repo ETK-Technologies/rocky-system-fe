@@ -12,15 +12,15 @@ export default function SingleChoiceQuestion({ step, answer, onAnswerChange }) {
     // Handle unselectOther logic
     if (option.unselectOther) {
       // If this option unselects others, just select this one
-      onAnswerChange(optionText);
+      onAnswerChange({ answerType: "text", answer: optionText });
     } else {
       // Check if any other option has unselectOther and is currently selected
       const unselectOtherOption = options.find(opt => opt.unselectOther);
       if (unselectOtherOption && answer === unselectOtherOption.text) {
         // If an unselectOther option is selected, replace it with this one
-        onAnswerChange(optionText);
+        onAnswerChange({ answerType: "text", answer: optionText });
       } else {
-        onAnswerChange(optionText);
+        onAnswerChange({ answerType: "text", answer: optionText });
       }
     }
   };
