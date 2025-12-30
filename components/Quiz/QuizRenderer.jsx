@@ -11,9 +11,9 @@ import Logo from "../Navbar/Logo";
 import { isAuthenticated } from "@/services/userDataService";
 import { createRules } from "@/utils/recommendationRulesEngine";
 
-export default function QuizRenderer({ quizData, sessionData, onComplete }) {
+export default function QuizRenderer({ quizData, sessionData, existingAnswers, onComplete }) {
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
-  const [answers, setAnswers] = useState({});
+  const [answers, setAnswers] = useState(existingAnswers || {});
   const [currentAnswer, setCurrentAnswer] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [visitedSteps, setVisitedSteps] = useState([0]);
@@ -36,7 +36,39 @@ export default function QuizRenderer({ quizData, sessionData, onComplete }) {
     logger.log("QuizRenderer - Response ID:", responseId);
     logger.log("QuizRenderer - Session ID:", sessionId);
     logger.log("QuizRenderer - Session Data:", sessionData);
-  }, [steps.length, currentStep, responseId, sessionId, sessionData]);
+    logger.log("QuizRenderer - Existing Answers:", existingAnswers);
+  }, [steps.length, currentStep, responseId, sessionId, sessionData, existingAnswers]);
+
+  // Initialize with existing answers if available
+  useEffect(() => {
+    if (existingAnswers && Object.keys(existingAnswers).length > 0) {
+      logger.log("Initializing quiz with existing answers:", existingAnswers);
+      setAnswers(existingAnswers);
+      
+      // Set current answer if the first question has an existing answer
+      const firstQuestionId = String(steps[0]?.id);
+      if (existingAnswers[firstQuestionId]) {
+        setCurrentAnswer(existingAnswers[firstQuestionId].value);
+        logger.log("Set current answer for first question:", existingAnswers[firstQuestionId].value);
+      }
+    }
+  }, [existingAnswers, steps]);
+
+  // Load existing answer when navigating to a new step
+  useEffect(() => {
+    if (currentStep && answers) {
+      const currentQuestionId = String(currentStep.id);
+      if (answers[currentQuestionId]) {
+        setCurrentAnswer(answers[currentQuestionId].value);
+        logger.log("Loaded existing answer for current step:", currentQuestionId, answers[currentQuestionId].value);
+      } else {
+        // Only clear if we're not on the first load with existing answers
+        if (currentStepIndex > 0 || !existingAnswers) {
+          setCurrentAnswer(null);
+        }
+      }
+    }
+  }, [currentStepIndex, currentStep, answers]);
 
   // Save answer to backend (DISABLED FOR NOW)
   const saveAnswer = useCallback(
@@ -150,7 +182,7 @@ export default function QuizRenderer({ quizData, sessionData, onComplete }) {
     } else {
       setCurrentStepIndex(nextStepIndex);
       setVisitedSteps([...visitedSteps, nextStepIndex]);
-      setCurrentAnswer(null);
+      // Don't clear currentAnswer here - let the useEffect handle it based on existing answers
     }
 
     setIsSubmitting(false);
@@ -328,7 +360,7 @@ export default function QuizRenderer({ quizData, sessionData, onComplete }) {
           const { getSessionId } = await import("@/services/sessionService");
           const sessionId = getSessionId();
           if (sessionId) {
-            body["sessionId"] = sessionId;
+            body["cartSessionId"] = sessionId;
             logger.log("👤 Using sessionId from request:", sessionId);
           }
         }
@@ -446,8 +478,10 @@ export default function QuizRenderer({ quizData, sessionData, onComplete }) {
             <StepRenderer
               step={currentStep}
               answer={currentAnswer}
+              allAnswers={answers}
               onAnswerChange={handleAnswerChange}
               onBack={handleBack}
+              onNext={handleNext}
             />
           ) : (
             <div className="text-center text-gray-500">

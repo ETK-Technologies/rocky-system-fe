@@ -56,7 +56,7 @@ export async function POST(request, { params }) {
       } else {
         const { getSessionId } = await import("@/services/sessionService");
         const sessionId = getSessionId();
-        RequestBody["sessionId"] = sessionId;
+        RequestBody["cartSessionId"] = sessionId;
         logger.warn("⚠️ No sessionId provided in request body for guest user");
       }
     }

@@ -10,6 +10,17 @@ export default function MultipleChoiceQuestion({ step, answer, onAnswerChange })
 
   const { title, description, options } = step;
 
+  // Sync selectedOptions with answer prop when it changes
+  useEffect(() => {
+    if (answer) {
+      const answerValue = typeof answer === 'object' && answer.answer ? answer.answer : answer;
+      const answerArray = Array.isArray(answerValue) ? answerValue : [answerValue];
+      setSelectedOptions(answerArray);
+    } else {
+      setSelectedOptions([]);
+    }
+  }, [answer]);
+
   const handleOptionToggle = (option) => {
     const optionText = option.text;
     let newSelection;

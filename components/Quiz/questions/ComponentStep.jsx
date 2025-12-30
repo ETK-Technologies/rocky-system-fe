@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { getComponent } from '@/components/Quiz/CustomComponents/registry';
 
-export default function ComponentStep({ step, answer, onAnswerChange, onBack }) {
+export default function ComponentStep({ step, answer, onAnswerChange, onBack, onNext }) {
   const { title, selectedComponentId, componentPath, component, description } = step;
   const [DynamicComponent, setDynamicComponent] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -142,6 +142,7 @@ export default function ComponentStep({ step, answer, onAnswerChange, onBack }) 
           answer={answer}
           onAnswerChange={onAnswerChange}
           onBack={onBack}
+          onNext={onNext}
         />
       )}
 

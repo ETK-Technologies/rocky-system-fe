@@ -1,12 +1,14 @@
-
 "use client";
 
+import { logger } from "@/utils/devLogger";
 import React, { useState, useEffect } from "react";
 
 const Counter = ({ step, answer, onAnswerChange }) => {
+  logger.log("Counter Component - step:", step);
+  logger.log("Counter Component - answer:", answer);
   // Get configuration from step or use defaults
-  const seconds =  3;
-  const texts =  [
+  const seconds = 3;
+  const texts = [
     "Your height is {height}",
     "Your weight is {weight}",
     "Calculating based on clinical data",
@@ -35,8 +37,8 @@ const Counter = ({ step, answer, onAnswerChange }) => {
             answer: {
               completed: true,
               timestamp: new Date().toISOString(),
-              duration: seconds
-            }
+              duration: seconds,
+            },
           });
         }
       }, 500); // 500ms delay
@@ -59,7 +61,8 @@ const Counter = ({ step, answer, onAnswerChange }) => {
   const strokeWidth = 8;
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
-  const progress = count > 0 ? ((seconds - count) / seconds) * circumference : circumference;
+  const progress =
+    count > 0 ? ((seconds - count) / seconds) * circumference : circumference;
 
   return (
     <div>
@@ -136,9 +139,6 @@ const Counter = ({ step, answer, onAnswerChange }) => {
           ))}
         </>
       )}
-
-
-      
     </div>
   );
 };

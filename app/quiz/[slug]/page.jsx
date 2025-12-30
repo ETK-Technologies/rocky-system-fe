@@ -15,6 +15,7 @@ export default function QuizPage({ params }) {
   const slug = resolvedParams.slug;
   const [quizData, setQuizData] = useState(null);
   const [sessionData, setSessionData] = useState(null);
+  const [existingAnswers, setExistingAnswers] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -76,7 +77,7 @@ export default function QuizPage({ params }) {
         const { getSessionId } = await import("@/services/sessionService");
         const sessionId = getSessionId();
         if(sessionId) {
-          Body['sessionId'] = sessionId;
+          Body['cartSessionId'] = sessionId;
           logger.log("👤 Using sessionId from request:", sessionId);
         }
       }
@@ -111,6 +112,46 @@ export default function QuizPage({ params }) {
 
       logger.log("Processed session info:", sessionInfo);
       setSessionData(sessionInfo);
+
+      // Step 3: Fetch existing answers if any
+      try {
+        const sessionIdForAnswers = sessionInfo.sessionId || sessionInfo.session_id;
+        if (sessionIdForAnswers) {
+          logger.log("Fetching existing answers for session:", sessionIdForAnswers);
+          
+          const answersResponse = await fetch(
+            `/api/quizzes/answers/${sessionIdForAnswers}`
+          );
+          
+          if (answersResponse.ok) {
+            const answersResult = await answersResponse.json();
+            
+            if (answersResult.success && answersResult.data?.answers) {
+              logger.log("Existing answers found:", answersResult.data.answers);
+              
+              // Transform answers array to object format {questionId: {value: answer}}
+              const answersObject = {};
+              answersResult.data.answers.forEach(answer => {
+                if (answer.questionId && answer.answer !== undefined) {
+                  answersObject[answer.questionId] = { value: answer.answer };
+                }
+              });
+              
+              logger.log("Transformed answers object:", answersObject);
+              setExistingAnswers(answersObject);
+              toast.info("Resuming your previous progress");
+            } else {
+              logger.log("No existing answers found");
+            }
+          } else {
+            logger.log("No existing answers response:", answersResponse.status);
+          }
+        }
+      } catch (answersErr) {
+        // Don't fail the quiz load if answers fetch fails
+        logger.log("Could not fetch existing answers:", answersErr);
+      }
+
       toast.success("Quiz loaded successfully!");
     } catch (err) {
       logger.log("Quiz initialization error:", err);
@@ -289,6 +330,7 @@ export default function QuizPage({ params }) {
         <QuizRenderer
           quizData={quizData}
           sessionData={sessionData}
+          existingAnswers={existingAnswers}
           onComplete={handleQuizComplete}
         />
       </div>
