@@ -1,48 +1,109 @@
 "use client";
 
-import { useRef } from "react";
+import { useRef, useState, useEffect } from "react";
 import Link from "next/link";
 import ScrollArrows from "../ScrollArrows";
 import EdProductCard from "./EdProductCard";
 import CustomImage from "../utils/CustomImage";
 // import HighesttRate from "../convert_test/Flows/HighestRate"; // Removed - convert_test directory deleted
 import EdComparisonTable from "../Sex/EdComparisonTable";
+import { transformEdFlowProducts, filterEdFlowProducts } from "@/utils/transformEdFlowProducts";
+import { logger } from "@/utils/devLogger";
 
 const EdProducts = ({ showonly }) => {
   const scrollContainerRef = useRef(null);
+  const [products, setProducts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  // Fetch products from API on mount
+  useEffect(() => {
+    const fetchProducts = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+
+        logger.log("[ED Products] Fetching products from API");
+
+        const response = await fetch("/api/products/ed-flow");
+
+        if (!response.ok) {
+          throw new Error(`Failed to fetch products: ${response.statusText}`);
+        }
+
+        const data = await response.json();
+
+        if (!data.products || data.products.length === 0) {
+          throw new Error("No products returned from API");
+        }
+
+        logger.log(`[ED Products] Received ${data.products.length} product(s) from API`);
+
+        // Transform products to EdProductCard format
+        const transformed = transformEdFlowProducts(data.products);
+
+        if (!transformed || transformed.length === 0) {
+          throw new Error("Failed to transform products");
+        }
+
+        logger.log(`[ED Products] Transformed ${transformed.length} product(s)`);
+
+        setProducts(transformed);
+      } catch (err) {
+        logger.error("[ED Products] Error fetching products:", err);
+        setError(err.message || "Failed to load products");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchProducts();
+  }, []);
 
   // Filter products based on the showonly parameter
   const getFilteredProducts = () => {
-    const productsMap = {
-      cialis: cialisProduct,
-      viagra: viagraProduct,
-      // chewalis: chewalisProduct,
-      variety: varietyPackProduct,
-    };
-
-    if (!showonly) {
-      // If no filter is specified, show all products
-      return [
-        cialisProduct,
-        viagraProduct,
-        // chewalisProduct,
-        varietyPackProduct,
-      ];
+    if (loading || error) {
+      return [];
     }
 
-    // Convert to lowercase for case-insensitive matching
-    const filter = showonly.toLowerCase();
-
-    // If the filter matches a product name, return only that product
-    if (productsMap[filter]) {
-      return [productsMap[filter]];
-    }
-
-    // If no match is found, return all products as fallback
-    return [cialisProduct, viagraProduct, chewalisProduct, varietyPackProduct];
+    return filterEdFlowProducts(products, showonly);
   };
 
   const filteredProducts = getFilteredProducts();
+
+  // Show loading state
+  if (loading) {
+    return (
+      <div className="text-center py-12">
+        <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+        <p className="mt-4 text-gray-600">Loading products...</p>
+      </div>
+    );
+  }
+
+  // Show error state
+  if (error) {
+    return (
+      <div className="text-center py-12">
+        <p className="text-red-600 mb-4">Error loading products: {error}</p>
+        <button
+          onClick={() => window.location.reload()}
+          className="px-4 py-2 bg-black text-white rounded-full hover:bg-gray-800"
+        >
+          Retry
+        </button>
+      </div>
+    );
+  }
+
+  // Show empty state
+  if (!filteredProducts || filteredProducts.length === 0) {
+    return (
+      <div className="text-center py-12">
+        <p className="text-gray-600">No products available at this time.</p>
+      </div>
+    );
+  }
 
   return (
     <>
@@ -72,7 +133,7 @@ const EdProducts = ({ showonly }) => {
             >
               {filteredProducts.map((product, index) => (
                 <div
-                  key={index}
+                  key={product.id || product.slug || index}
                   className={`${
                     filteredProducts.length === 1
                       ? "w-full max-w-[450px]"
@@ -142,193 +203,3 @@ const EdProducts = ({ showonly }) => {
 };
 
 export default EdProducts;
-
-const cialisProduct = {
-  name: "Cialis",
-  tagline: '"The weekender"',
-  image:
-    "https://myrocky.b-cdn.net/WP%20Images/Sexual%20Health/webp-images/RockyHealth-cialis-400px.webp",
-  activeIngredient: "Tadalafil",
-  strengths: ["10mg", "20mg"],
-  preferences: ["generic", "brand"],
-  frequencies: {
-    "monthly-supply": "One Month",
-    "quarterly-supply": "Three Months",
-  },
-  pillOptions: {
-    "monthly-supply": [
-      {
-        count: 8,
-        genericPrice: 84,
-        brandPrice: 195,
-        variationId: "259",
-        brandVariationId: "1422",
-      },
-      {
-        count: 12,
-        genericPrice: 126,
-        brandPrice: 285,
-        variationId: "1960",
-        brandVariationId: "1962",
-      },
-    ],
-    "quarterly-supply": [
-      {
-        count: 12,
-        genericPrice: 126,
-        brandPrice: 285,
-        variationId: "260",
-        brandVariationId: "1423",
-      },
-      {
-        count: 24,
-        genericPrice: 252,
-        brandPrice: 555,
-        variationId: "261",
-        brandVariationId: "1424",
-      },
-      {
-        count: 36,
-        genericPrice: 378,
-        brandPrice: 829,
-        variationId: "1961",
-        brandVariationId: "1420",
-      },
-    ],
-  },
-};
-
-const viagraProduct = {
-  name: "Viagra",
-  tagline: '"The one-nighter"',
-  image:
-    "https://myrocky.b-cdn.net/WP%20Images/Sexual%20Health/webp-images/RockyHealth-viagra-400px.webp",
-  activeIngredient: "Sildenafil",
-  strengths: ["50mg", "100mg"],
-  preferences: ["generic", "brand"],
-  frequencies: {
-    "monthly-supply": "One Month",
-    "quarterly-supply": "Three Months",
-  },
-  pillOptions: {
-    "monthly-supply": [
-      {
-        count: 8,
-        genericPrice: 64,
-        brandPrice: 136,
-        variationId: "233",
-        brandVariationId: "1428",
-      },
-      {
-        count: 12,
-        genericPrice: 96,
-        brandPrice: 199,
-        variationId: "234",
-        brandVariationId: "1429",
-      },
-    ],
-    "quarterly-supply": [
-      {
-        count: 12,
-        genericPrice: 96,
-        brandPrice: 199,
-        variationId: "235",
-        brandVariationId: "1430",
-      },
-      {
-        count: 24,
-        genericPrice: 192,
-        brandPrice: 388,
-        variationId: "236",
-        brandVariationId: "1431",
-      },
-      {
-        count: 36,
-        genericPrice: 288,
-        brandPrice: 577,
-        variationId: "237",
-        brandVariationId: "1432",
-      },
-    ],
-  },
-};
-
-// const chewalisProduct = {
-//   name: "Chewalis",
-//   tagline: '"The weekender"',
-//   image:
-//     "https://myrocky.b-cdn.net/WP%20Images/Sexual%20Health/chewalis-ed.webp",
-//   activeIngredient: "Tadalafil",
-//   strengths: ["10mg", "20mg"],
-//   preferences: ["generic"],
-//   frequencies: {
-//     "monthly-supply": "One Month",
-//     "quarterly-supply": "Three Months",
-//   },
-//   pillOptions: {
-//     "monthly-supply": [
-//       { count: 8, genericPrice: 138, brandPrice: 138, variationId: "219484" },
-//       { count: 12, genericPrice: 202, brandPrice: 202, variationId: "278229" },
-//     ],
-//     "quarterly-supply": [
-//       { count: 12, genericPrice: 202, brandPrice: 202, variationId: "278230" },
-//       { count: 24, genericPrice: 394, brandPrice: 394, variationId: "278231" },
-//       { count: 36, genericPrice: 586, brandPrice: 586, variationId: "219488" },
-//     ],
-//   },
-// };
-
-const varietyPackProduct = {
-  name: "Cialis + Viagra",
-  tagline: '"The Variety Pack"',
-  image:
-    "https://myrocky.b-cdn.net/WP%20Images/Sexual%20Health/RockyHealth-variety-400px%20(1).webp",
-  activeIngredient: "Tadalafil + Sildenafil",
-  strengths: ["50mg & 100mg (Viagra)", "10mg & 20mg (Cialis)"],
-  preferences: ["generic", "brand"],
-  frequencies: {
-    "monthly-supply": "One Month",
-    "quarterly-supply": "Three Months",
-  },
-  pillOptions: {
-    "monthly-supply": [
-      {
-        count: "4/4",
-        genericPrice: 134,
-        brandPrice: 174,
-        variationId: "37669,37668",
-        brandVariationId: "1421,1427",
-      },
-      {
-        count: "6/6",
-        genericPrice: 183,
-        brandPrice: 235,
-        variationId: "3440,3287",
-        brandVariationId: "3471,3467",
-      },
-    ],
-    "quarterly-supply": [
-      {
-        count: "6/6",
-        genericPrice: 183,
-        brandPrice: 235,
-        variationId: "3439,3438",
-        brandVariationId: "3470,3466",
-      },
-      {
-        count: "12/12",
-        genericPrice: 363,
-        brandPrice: 484,
-        variationId: "37673,37674",
-        brandVariationId: "1423,1430",
-      },
-      {
-        count: "18/18",
-        genericPrice: 469,
-        brandPrice: 685,
-        variationId: "3442,3437",
-        brandVariationId: "3469,3465",
-      },
-    ],
-  },
-};
