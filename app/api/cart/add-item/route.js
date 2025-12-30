@@ -6,6 +6,48 @@ import { getOrigin } from "@/lib/utils/getOrigin";
 
 const BASE_URL = process.env.BASE_URL;
 
+// Allowed origins for CORS
+const ALLOWED_ORIGINS = [
+  "https://guardian-patient-portal-production.up.railway.app",
+  "https://rocky-system-fe.vercel.app",
+  "http://localhost:3000",
+  process.env.NEXT_PUBLIC_SITE_URL,
+  process.env.SITE_URL,
+].filter(Boolean); // Remove any undefined values
+
+/**
+ * Get CORS headers based on the request origin
+ */
+function getCorsHeaders(req) {
+  const origin = req.headers.get("origin");
+  const headers = {
+    "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+    "Access-Control-Allow-Headers":
+      "Content-Type, Authorization, X-Requested-With",
+    "Access-Control-Allow-Credentials": "true",
+  };
+
+  // If origin is in allowed list, add it to Access-Control-Allow-Origin
+  if (origin && ALLOWED_ORIGINS.includes(origin)) {
+    headers["Access-Control-Allow-Origin"] = origin;
+  } else if (origin) {
+    // For development, allow any localhost origin
+    if (origin.includes("localhost") || origin.includes("127.0.0.1")) {
+      headers["Access-Control-Allow-Origin"] = origin;
+    }
+  }
+
+  return headers;
+}
+
+/**
+ * Handle OPTIONS preflight request
+ */
+export async function OPTIONS(req) {
+  const corsHeaders = getCorsHeaders(req);
+  return NextResponse.json({}, { headers: corsHeaders });
+}
+
 /**
  * POST /api/cart/add-item
  * Add item to cart using the new API endpoint
@@ -28,7 +70,6 @@ const BASE_URL = process.env.BASE_URL;
 export async function POST(req) {
   try {
     const body = await req.json();
-    
 
     logger.log("BODY -> ", body);
     // Extract ONLY the fields we need, ignore all extra fields (name, price, image, etc.)
@@ -127,7 +168,7 @@ export async function POST(req) {
       accept: "application/json",
       "X-App-Key": process.env.NEXT_PUBLIC_APP_KEY,
       "X-App-Secret": process.env.NEXT_PUBLIC_APP_SECRET,
-      "Origin": origin,
+      Origin: origin,
     };
 
     // AUTHENTICATION LOGIC - This determines the final payload structure
@@ -138,11 +179,13 @@ export async function POST(req) {
       // Add FULL Authorization header with complete Bearer token
       // Token already contains "Bearer " prefix + full JWT token
       headers.Authorization = authToken;
-      
+
       // Explicitly remove sessionId from request body if it was sent
       // Authenticated users should NOT use sessionId
       if (sessionId) {
-        logger.log("⚠️ Warning: sessionId provided but user is authenticated. Ignoring sessionId and using authentication.");
+        logger.log(
+          "⚠️ Warning: sessionId provided but user is authenticated. Ignoring sessionId and using authentication."
+        );
       }
       // Do NOT include sessionId in requestBody for authenticated users
     } else {
@@ -245,7 +288,12 @@ export async function POST(req) {
 
     logger.log("✅ Item added to cart successfully:", response.data);
 
-    return NextResponse.json(response.data, { status: 201 });
+    // Add CORS headers to the response
+    const corsHeaders = getCorsHeaders(req);
+    return NextResponse.json(response.data, {
+      status: 201,
+      headers: corsHeaders,
+    });
   } catch (error) {
     logger.error("❌ ERROR adding item to cart:");
     logger.error("   Status:", error.response?.status);
@@ -267,13 +315,18 @@ export async function POST(req) {
       error.response?.data?.error ||
       "Failed to add item to cart";
 
+    // Add CORS headers to error response as well
+    const corsHeaders = getCorsHeaders(req);
     return NextResponse.json(
       {
         error: errorMessage,
         statusCode: statusCode,
         details: error.response?.data || error.message,
       },
-      { status: statusCode }
+      {
+        status: statusCode,
+        headers: corsHeaders,
+      }
     );
   }
 }
