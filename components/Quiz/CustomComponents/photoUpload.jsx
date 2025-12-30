@@ -1,53 +1,101 @@
 "use client";
 
 import { useState } from "react";
+import { uploadPhotos } from "@/utils/uploadService";
+import { logger } from "@/utils/devLogger";
 
 export default function PhotoUpload({ step, answer, onAnswerChange }) {
   const [frontPhoto, setFrontPhoto] = useState(answer?.frontPhoto || null);
   const [topPhoto, setTopPhoto] = useState(answer?.topPhoto || null);
-  const [frontPhotoFile, setFrontPhotoFile] = useState(answer?.frontPhotoFile || null);
-  const [topPhotoFile, setTopPhotoFile] = useState(answer?.topPhotoFile || null);
+  const [frontPhotoCdnUrl, setFrontPhotoCdnUrl] = useState(answer?.frontPhotoCdnUrl || null);
+  const [topPhotoCdnUrl, setTopPhotoCdnUrl] = useState(answer?.topPhotoCdnUrl || null);
+  const [uploading, setUploading] = useState(false);
 
-  const handleFrontPhotoSelect = (e) => {
+  const handleFrontPhotoSelect = async (e) => {
     const file = e.target.files[0];
     if (file) {
       const previewUrl = URL.createObjectURL(file);
       setFrontPhoto(previewUrl);
-      setFrontPhotoFile(file);
+      setUploading(true);
       
-      // Save photo data with answer
-      const updatedAnswer = {
-        frontPhoto: previewUrl,
-        frontPhotoFile: file,
-        topPhoto: topPhoto,
-        topPhotoFile: topPhotoFile,
-        status: (file && topPhotoFile) ? "uploaded" : "partial"
-      };
-      onAnswerChange(updatedAnswer);
+      // Upload to backend
+      logger.log("📤 Uploading front hairline photo...");
+      const result = await uploadPhotos(file);
+      setUploading(false);
+      
+      if (result.success && result.files && result.files.length > 0) {
+        const cdnUrl = result.files[0].cdnUrl;
+        setFrontPhotoCdnUrl(cdnUrl);
+        logger.log("✅ Front photo uploaded:", cdnUrl);
+        
+        // Save CDN URL with answer
+        const updatedAnswer = {
+          answerType: "img",
+          answer: {
+            frontPhoto: previewUrl,
+            frontPhotoCdnUrl: cdnUrl,
+            topPhoto: topPhoto,
+            topPhotoCdnUrl: topPhotoCdnUrl,
+            status: (cdnUrl && topPhotoCdnUrl) ? "uploaded" : "partial"
+          }
+        };
+        onAnswerChange(updatedAnswer);
+      } else {
+        logger.error("❌ Front photo upload failed:", result.error);
+        alert(`Upload failed: ${result.error || 'Unknown error'}`);
+      }
     }
   };
 
-  const handleTopPhotoSelect = (e) => {
+  const handleTopPhotoSelect = async (e) => {
     const file = e.target.files[0];
     if (file) {
       const previewUrl = URL.createObjectURL(file);
       setTopPhoto(previewUrl);
-      setTopPhotoFile(file);
+      setUploading(true);
       
-      // Save photo data with answer
-      const updatedAnswer = {
-        frontPhoto: frontPhoto,
-        frontPhotoFile: frontPhotoFile,
-        topPhoto: previewUrl,
-        topPhotoFile: file,
-        status: (frontPhotoFile && file) ? "uploaded" : "partial"
-      };
-      onAnswerChange(updatedAnswer);
+      // Upload to backend
+      logger.log("📤 Uploading top of head photo...");
+      const result = await uploadPhotos(file);
+      setUploading(false);
+      
+      if (result.success && result.files && result.files.length > 0) {
+        const cdnUrl = result.files[0].cdnUrl;
+        setTopPhotoCdnUrl(cdnUrl);
+        logger.log("✅ Top photo uploaded:", cdnUrl);
+        
+        // Save CDN URL with answer
+        const updatedAnswer = {
+          answerType: "img",
+          answer: {
+            frontPhoto: frontPhoto,
+            frontPhotoCdnUrl: frontPhotoCdnUrl,
+            topPhoto: previewUrl,
+            topPhotoCdnUrl: cdnUrl,
+            status: (frontPhotoCdnUrl && cdnUrl) ? "uploaded" : "partial"
+          }
+        };
+        onAnswerChange(updatedAnswer);
+      } else {
+        logger.error("❌ Top photo upload failed:", result.error);
+        alert(`Upload failed: ${result.error || 'Unknown error'}`);
+      }
     }
   };
 
   return (
     <div className="w-full space-y-8">
+      {uploading && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded-lg shadow-xl">
+            <div className="flex items-center space-x-3">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#C19A6B]"></div>
+              <span className="text-lg">Uploading photo...</span>
+            </div>
+          </div>
+        </div>
+      )}
+      
       {/* Front Hairline Photo Upload */}
       <div className="w-full md:w-4/5 mx-auto">
         <input
@@ -57,10 +105,11 @@ export default function PhotoUpload({ step, answer, onAnswerChange }) {
           name="photo_upload_1"
           accept="image/*"
           onChange={handleFrontPhotoSelect}
+          disabled={uploading}
         />
         <label
           htmlFor="photo_upload_1"
-          className="flex items-center cursor-pointer p-5 border-2 border-gray-300 rounded-lg shadow-md hover:bg-gray-50"
+          className={`flex items-center cursor-pointer p-5 border-2 border-gray-300 rounded-lg shadow-md hover:bg-gray-50 ${uploading ? 'opacity-50 cursor-not-allowed' : ''}`}
         >
           <div className="flex w-full flex-col">
             <div className="flex items-center mb-2">
@@ -71,7 +120,7 @@ export default function PhotoUpload({ step, answer, onAnswerChange }) {
               />
               <div className="flex-1 min-w-0">
                 <span className="text-[#C19A6B] break-words">
-                  Tap to upload Front Hairline photo
+                  {frontPhotoCdnUrl ? '✅ Front Hairline uploaded' : 'Tap to upload Front Hairline photo'}
                 </span>
               </div>
             </div>
@@ -91,10 +140,11 @@ export default function PhotoUpload({ step, answer, onAnswerChange }) {
           name="photo_upload_2"
           accept="image/*"
           onChange={handleTopPhotoSelect}
+          disabled={uploading}
         />
         <label
           htmlFor="photo_upload_2"
-          className="flex items-center cursor-pointer p-5 border-2 border-gray-300 rounded-lg shadow-md hover:bg-gray-50"
+          className={`flex items-center cursor-pointer p-5 border-2 border-gray-300 rounded-lg shadow-md hover:bg-gray-50 ${uploading ? 'opacity-50 cursor-not-allowed' : ''}`}
         >
           <div className="flex w-full flex-col">
             <div className="flex items-center mb-2">
@@ -105,7 +155,7 @@ export default function PhotoUpload({ step, answer, onAnswerChange }) {
               />
               <div className="flex-1 min-w-0">
                 <span className="text-[#C19A6B] break-words">
-                  Tap to upload Top of Head photo
+                  {topPhotoCdnUrl ? '✅ Top of Head uploaded' : 'Tap to upload Top of Head photo'}
                 </span>
               </div>
             </div>

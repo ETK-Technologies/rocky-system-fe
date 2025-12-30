@@ -10,7 +10,7 @@ export default function FinasterideWarnning({ step, answer, onAnswerChange, onBa
   const handleContinue = () => {
     if (!isChecked) return;
     if (onAnswerChange) {
-      onAnswerChange({ acknowledged: true });
+      onAnswerChange({ answerType: "text", answer: { acknowledged: true } });
     }
   };
 

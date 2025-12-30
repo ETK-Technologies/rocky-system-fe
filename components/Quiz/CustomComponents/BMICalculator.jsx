@@ -32,7 +32,7 @@ export default function BMICalculator({ step, answer, onAnswerChange }) {
       weight: weightPounds,
     };
     setUserData(newUserData);
-    onAnswerChange(newUserData);
+    onAnswerChange({ answerType: "text", answer: newUserData });
   }, [weightPounds, heightFeet, heightInches]);
 
   const PrivacyText = () => (
@@ -48,8 +48,18 @@ export default function BMICalculator({ step, answer, onAnswerChange }) {
 
   return (
     <div className="w-full h-full flex flex-col">
-      <div className="w-full">
-
+        <div className="w-full">
+          <div className="mb-4">
+          <h1 className="subheaders-font text-[26px] md:text-[32px]  font-medium leading-[120%] ">
+            What is your height and weight?
+          </h1>
+        </div>
+        <p className="text-[14px] text-[#AE7E56] mb-[24px] md:w-full font-medium">
+          <span className="text-[#B4845A] text-[16px]">
+            This helps calculate your BMI (Body Mass Index), a general screening
+            tool for body composition.
+          </span>
+        </p>
         <div className="mb-6">
           <label className="block mb-2 text-[14px] md:text-[16px] font-medium leading-[140%] tracking-[0%] text-black">
             Your height is:
@@ -208,10 +218,10 @@ export default function BMICalculator({ step, answer, onAnswerChange }) {
 
         {bmi && !isEligible ? (
           <p className="text-center text-sm text-red-700 mb-2 font-bold">
-            Based on your BMI ({bmiDisplay}), you may not qualify for medical weight loss
+            Based on your BMI ({bmiDisplay}), you may not qualify for medical
+            weight loss
           </p>
         ) : null}
-
       </div>
     </div>
   );

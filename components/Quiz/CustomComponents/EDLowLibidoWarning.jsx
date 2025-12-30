@@ -3,7 +3,7 @@
 import Logo from "@/components/Navbar/Logo";
 import { useState, useEffect } from "react";
 
-export default function NoCallAcknowledgement({
+export default function EDLowLibidoWarning({
   step,
   answer,
   onAnswerChange,
@@ -19,12 +19,6 @@ export default function NoCallAcknowledgement({
       };
     }
   }, []);
-
-  const handleRequestCallInstead = () => {
-    if (onBack) {
-      onBack();
-    }
-  };
 
   return (
     <div
@@ -58,23 +52,35 @@ export default function NoCallAcknowledgement({
           </div>
 
           <h3 className="text-[18px] md:text-[20px] text-black mb-8">
-            No Call Acknowledgement
+            Low Sex Drive Notice
           </h3>
 
           <p
             className="text-[16px] md:text-[18px] mb-8 text-[#000000] text-left"
             style={{ fontFamily: "Fellix" }}
           >
-            I hereby acknowledge that by foregoing an appointment with a
-            licensed physician or pharmacist, it is my sole responsibility to
-            ensure I am aware of how to appropriately use the medication
-            requested, furthermore I hereby confirm that I am aware of any
-            potential side effects that may occur through the use of the
-            aforementioned medication and hereby confirm that I do not have any
-            medical questions to ask. I will ensure I have read the relevant
-            product page and FAQ prior to use of the prescribed medication.
-            Should I have any questions to ask, I am aware of how to contact the
-            clinical team at Rocky or get a hold of my primary care provider.
+            You've indicated you have low sex drive. While erectile dysfunction and low libido can sometimes occur together, they are often caused by different underlying issues.
+          </p>
+
+          <p
+            className="text-[16px] md:text-[18px] mb-8 text-[#000000] text-left"
+            style={{ fontFamily: "Fellix" }}
+          >
+            💡 Please note: Treatments for erectile dysfunction are unlikely to improve sex drive.
+          </p>
+
+          <p
+            className="text-[16px] md:text-[18px] mb-8 text-[#000000] text-left"
+            style={{ fontFamily: "Fellix" }}
+          >
+            Low libido may require further evaluation, as it can be linked to hormonal, psychological, or medical factors.
+          </p>
+
+          <p
+            className="text-[16px] md:text-[18px] mb-8 text-[#000000] text-left"
+            style={{ fontFamily: "Fellix" }}
+          >
+            👉 We strongly recommend that you consult your physician or a healthcare professional for a full assessment.
           </p>
 
           <div className="mb-8">
@@ -138,14 +144,6 @@ export default function NoCallAcknowledgement({
           >
             I Acknowledge
           </button>
-          <p className="mt-4 text-center font-medium text-md text-[#000000]">
-            <button
-              onClick={handleRequestCallInstead}
-              className="underline hover:text-gray-900"
-            >
-              I would like to request the call instead
-            </button>
-          </p>
         </div>
       </div>
     </div>

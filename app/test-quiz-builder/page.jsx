@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { toast } from "react-toastify";
+import { createRules } from "@/utils/recommendationRulesEngine";
+import { logger } from "@/utils/devLogger";
 
 export default function QuizBuilderTestPage() {
   const [quizSlug, setQuizSlug] = useState("test-quiz");
@@ -19,6 +21,10 @@ export default function QuizBuilderTestPage() {
   const [loadingRuntime, setLoadingRuntime] = useState(false);
   const [runtimeQuizData, setRuntimeQuizData] = useState(null);
   const [runtimeError, setRuntimeError] = useState(null);
+  
+  // Generated rules state
+  const [generatedRules, setGeneratedRules] = useState(null);
+  const [rulesError, setRulesError] = useState(null);
 
   // Active tab for response viewer
   const [activeTab, setActiveTab] = useState("quiz");
@@ -106,6 +112,8 @@ export default function QuizBuilderTestPage() {
     setLoadingRuntime(true);
     setRuntimeError(null);
     setRuntimeQuizData(null);
+    setGeneratedRules(null);
+    setRulesError(null);
 
     try {
       const response = await fetch(`/api/quizzes/runtime/${quizSlug.trim()}`);
@@ -123,6 +131,38 @@ export default function QuizBuilderTestPage() {
       toast.error(`Error: ${err.message}`);
     } finally {
       setLoadingRuntime(false);
+    }
+  };
+
+  const generateRules = () => {
+    if (!runtimeQuizData) {
+      toast.error("Please fetch runtime quiz data first");
+      return;
+    }
+
+    setRulesError(null);
+    setGeneratedRules(null);
+
+    try {
+      const edges = runtimeQuizData.logicResults?.edges;
+      
+      if (!edges || edges.length === 0) {
+        setRulesError("No logicResults edges found in quiz data");
+        toast.error("No logicResults edges found in quiz data");
+        return;
+      }
+
+      console.log("📊 Generating rules from edges:", edges);
+      logger.log("runtimeQuizData for rule generation:", runtimeQuizData);
+      const rules = createRules(edges, runtimeQuizData);
+      console.log("✅ Generated rules:", rules);
+      
+      setGeneratedRules(rules);
+      toast.success(`Generated ${rules.length} rules successfully!`);
+    } catch (err) {
+      setRulesError(err.message);
+      toast.error(`Error generating rules: ${err.message}`);
+      console.error("Rule generation error:", err);
     }
   };
 
@@ -310,9 +350,17 @@ export default function QuizBuilderTestPage() {
             {/* Runtime Quiz Data */}
             {runtimeQuizData && (
               <div className="bg-purple-50 border border-purple-200 rounded-lg p-6">
-                <h2 className="text-2xl font-bold text-purple-900 mb-4">
-                  🎮 Runtime Quiz Data
-                </h2>
+                <div className="flex justify-between items-start mb-4">
+                  <h2 className="text-2xl font-bold text-purple-900">
+                    🎮 Runtime Quiz Data
+                  </h2>
+                  <button
+                    onClick={generateRules}
+                    className="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-lg font-medium transition-colors"
+                  >
+                    🔧 Generate Rules
+                  </button>
+                </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                   <div>
                     <p className="text-sm text-purple-700">Title</p>
@@ -330,6 +378,12 @@ export default function QuizBuilderTestPage() {
                     <p className="text-sm text-purple-700">Questions Count</p>
                     <p className="font-semibold text-purple-900">
                       {runtimeQuizData.questions?.length || 0}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-purple-700">Logic Edges</p>
+                    <p className="font-semibold text-purple-900">
+                      {runtimeQuizData.logicResults?.edges?.length || 0}
                     </p>
                   </div>
                 </div>
@@ -360,6 +414,67 @@ export default function QuizBuilderTestPage() {
                   Runtime Quiz Error
                 </h3>
                 <p className="text-red-600">{runtimeError}</p>
+              </div>
+            )}
+
+            {/* Generated Rules */}
+            {generatedRules && (
+              <div className="bg-orange-50 border border-orange-200 rounded-lg p-6">
+                <h2 className="text-2xl font-bold text-orange-900 mb-4">
+                  🔧 Generated Recommendation Rules
+                </h2>
+                <div className="mb-4">
+                  <p className="text-sm text-orange-700">Total Rules: <span className="font-bold text-orange-900">{generatedRules.length}</span></p>
+                </div>
+                <div className="space-y-4">
+                  {generatedRules.map((rule, index) => (
+                    <div key={index} className="bg-white border border-orange-300 rounded p-4">
+                      <div className="flex items-center gap-2 mb-3">
+                        <span className="bg-orange-600 text-white px-3 py-1 rounded-full text-sm font-bold">
+                          Rule {index + 1}
+                        </span>
+                        {rule.result && (
+                          <span className="bg-green-100 text-green-700 px-3 py-1 rounded-full text-xs font-semibold">
+                            → Result ID: {rule.result}
+                          </span>
+                        )}
+                      </div>
+                      <div className="bg-gray-50 p-3 rounded">
+                        <p className="text-xs font-semibold text-gray-700 mb-2">Conditions:</p>
+                        <pre className="text-xs text-gray-600 overflow-auto">
+                          {JSON.stringify(rule, null, 2)}
+                        </pre>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-4 bg-white border border-orange-300 rounded p-3">
+                  <div className="flex justify-between items-center mb-2">
+                    <p className="text-sm font-medium text-gray-700">Full Rules JSON:</p>
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(JSON.stringify(generatedRules, null, 2));
+                        toast.success("Rules copied to clipboard!");
+                      }}
+                      className="px-3 py-1 text-xs bg-orange-600 hover:bg-orange-700 text-white rounded transition-colors"
+                    >
+                      📋 Copy Rules
+                    </button>
+                  </div>
+                  <pre className="text-xs text-gray-600 overflow-auto bg-gray-50 p-2 rounded max-h-48">
+                    {JSON.stringify(generatedRules, null, 2)}
+                  </pre>
+                </div>
+              </div>
+            )}
+
+            {/* Rules Generation Error */}
+            {rulesError && (
+              <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                <h3 className="text-red-800 font-semibold mb-2">
+                  Rules Generation Error
+                </h3>
+                <p className="text-red-600">{rulesError}</p>
               </div>
             )}
 

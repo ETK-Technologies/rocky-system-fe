@@ -2,8 +2,13 @@ export default function DropdownQuestion({ step, answer, onAnswerChange }) {
   const { title, description, options } = step;
 
   const handleChange = (e) => {
-    onAnswerChange(e.target.value);
+    onAnswerChange({ answerType: "text", answer: e.target.value });
   };
+
+  // Extract answer value if it's an object
+  const selectedValue = answer && typeof answer === 'object' && !Array.isArray(answer) && answer.answer 
+    ? answer.answer 
+    : answer;
 
   return (
     <div>
@@ -13,7 +18,7 @@ export default function DropdownQuestion({ step, answer, onAnswerChange }) {
       )}
 
       <select
-        value={answer || ""}
+        value={selectedValue || ""}
         onChange={handleChange}
         className="w-full p-4 border-2 border-gray-300 rounded-lg focus:border-blue-600 focus:outline-none text-[14px] md:text-[16px] font-medium leading-[140%] tracking-[0%] text-black"
       >

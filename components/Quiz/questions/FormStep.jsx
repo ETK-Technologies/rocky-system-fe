@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import RadioInput from "./inputs/RadioInput";
 import DateInput from "./inputs/DateInput";
 import TextInput from "./inputs/TextInput";
@@ -10,10 +10,20 @@ export default function FormStep({ step, answer, onAnswerChange }) {
   const { title, description, formInputs } = step;
   const [formData, setFormData] = useState(answer || {});
 
+  // Sync formData with answer prop when it changes
+  useEffect(() => {
+    if (answer) {
+      const answerValue = typeof answer === 'object' && answer.answer ? answer.answer : answer;
+      setFormData(answerValue || {});
+    } else {
+      setFormData({});
+    }
+  }, [answer]);
+
   const handleInputChange = (inputId, value) => {
     const updated = { ...formData, [inputId]: value };
     setFormData(updated);
-    onAnswerChange(updated);
+    onAnswerChange({ answerType: "text", answer: updated });
   };
 
   return (

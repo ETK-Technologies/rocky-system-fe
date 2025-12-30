@@ -8,17 +8,24 @@ import StepRenderer from "./StepRenderer";
 import { getBranchingLogic } from "@/utils/quizLogic";
 import { logger } from "@/utils/devLogger";
 import Logo from "../Navbar/Logo";
+import { isAuthenticated } from "@/services/userDataService";
+import { createRules } from "@/utils/recommendationRulesEngine";
 
-export default function QuizRenderer({ quizData, sessionData, onComplete }) {
+export default function QuizRenderer({ quizData, sessionData, existingAnswers, onComplete }) {
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
-  const [answers, setAnswers] = useState({});
+  const [answers, setAnswers] = useState(existingAnswers || {});
   const [currentAnswer, setCurrentAnswer] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [visitedSteps, setVisitedSteps] = useState([0]);
 
+  const [matchedRule, setMatchedRule] = useState(null);
+  const [recommendationProduct, setRecommendationProduct] = useState(null);
+  const [totalResults, setTotalResults] = useState(0);
+
   const steps = quizData.steps || [];
   const currentStep = steps[currentStepIndex];
-  const responseId = sessionData?.responseId || sessionData?.response_id || sessionData?.id;
+  const responseId =
+    sessionData?.responseId || sessionData?.response_id || sessionData?.id;
   const sessionId = sessionData?.sessionId || sessionData?.session_id;
 
   // Debug logging
@@ -29,48 +36,87 @@ export default function QuizRenderer({ quizData, sessionData, onComplete }) {
     logger.log("QuizRenderer - Response ID:", responseId);
     logger.log("QuizRenderer - Session ID:", sessionId);
     logger.log("QuizRenderer - Session Data:", sessionData);
-  }, [steps.length, currentStep, responseId, sessionId, sessionData]);
+    logger.log("QuizRenderer - Existing Answers:", existingAnswers);
+  }, [steps.length, currentStep, responseId, sessionId, sessionData, existingAnswers]);
+
+  // Initialize with existing answers if available
+  useEffect(() => {
+    if (existingAnswers && Object.keys(existingAnswers).length > 0) {
+      logger.log("Initializing quiz with existing answers:", existingAnswers);
+      setAnswers(existingAnswers);
+      
+      // Set current answer if the first question has an existing answer
+      const firstQuestionId = String(steps[0]?.id);
+      if (existingAnswers[firstQuestionId]) {
+        setCurrentAnswer(existingAnswers[firstQuestionId].value);
+        logger.log("Set current answer for first question:", existingAnswers[firstQuestionId].value);
+      }
+    }
+  }, [existingAnswers, steps]);
+
+  // Load existing answer when navigating to a new step
+  useEffect(() => {
+    if (currentStep && answers) {
+      const currentQuestionId = String(currentStep.id);
+      if (answers[currentQuestionId]) {
+        setCurrentAnswer(answers[currentQuestionId].value);
+        logger.log("Loaded existing answer for current step:", currentQuestionId, answers[currentQuestionId].value);
+      } else {
+        // Only clear if we're not on the first load with existing answers
+        if (currentStepIndex > 0 || !existingAnswers) {
+          setCurrentAnswer(null);
+        }
+      }
+    }
+  }, [currentStepIndex, currentStep, answers]);
 
   // Save answer to backend (DISABLED FOR NOW)
-  const saveAnswer = useCallback(async (questionId, answer) => {
-    // TODO: Re-enable when backend is ready
-    logger.log("Answer saved (skipped):", { questionId, answer, responseId });
-    //return true;
-    
-    /* COMMENTED OUT - RE-ENABLE LATER */
-    if (!responseId) {
-      console.error("No response ID available");
-      logger.log("Session data:", sessionData);
-      toast.error("No response ID available");
-      return false;
-    }
+  const saveAnswer = useCallback(
+    async (questionId, answer) => {
+      // TODO: Re-enable when backend is ready
+      logger.log("Answer saved (skipped):", { questionId, answer, responseId });
+      //return true;
 
-    try {
-      logger.log("Saving answer:", { questionId, answer, responseId });
-      
-      const response = await fetch(`/api/quizzes/responses/${responseId}/answers`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ questionId, answer }),
-      });
-
-      const result = await response.json();
-      logger.log("Save answer response:", result);
-      
-      if (!response.ok || !result.success) {
-        console.error("Save answer failed:", result);
-        throw new Error(result.error || result.details || "Failed to save answer");
+      /* COMMENTED OUT - RE-ENABLE LATER */
+      if (!responseId) {
+        console.error("No response ID available");
+        logger.log("Session data:", sessionData);
+        toast.error("No response ID available");
+        return false;
       }
 
-      logger.log("Answer saved successfully");
-      return true;
-    } catch (error) {
-      console.error("Error saving answer:", error);
-      toast.error(`Failed to save answer: ${error.message}`);
-      return false;
-    }
-    
-  }, [responseId, sessionData]);
+      try {
+        logger.log("Saving answer:", { questionId, answer, responseId });
+
+        const response = await fetch(
+          `/api/quizzes/responses/${responseId}/answers`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ questionId, answer }),
+          }
+        );
+
+        const result = await response.json();
+        logger.log("Save answer response:", result);
+
+        if (!response.ok || !result.success) {
+          console.error("Save answer failed:", result);
+          throw new Error(
+            result.error || result.details || "Failed to save answer"
+          );
+        }
+
+        logger.log("Answer saved successfully");
+        return true;
+      } catch (error) {
+        console.error("Error saving answer:", error);
+        toast.error(`Failed to save answer: ${error.message}`);
+        return false;
+      }
+    },
+    [responseId, sessionData]
+  );
 
   // Handle answer change
   const handleAnswerChange = useCallback((answer) => {
@@ -92,7 +138,7 @@ export default function QuizRenderer({ quizData, sessionData, onComplete }) {
     logger.log("Question:", currentStep.title || currentStep.text);
     logger.log("Question ID:", currentStep.id);
     logger.log("Answer:", currentAnswer);
-    
+
     const saved = await saveAnswer(questionId, { value: currentAnswer });
 
     if (!saved) {
@@ -107,16 +153,25 @@ export default function QuizRenderer({ quizData, sessionData, onComplete }) {
     };
     setAnswers(updatedAnswers);
     logger.log("All answers collected:", updatedAnswers);
-    
+
     // Log matching flow rules for this question
-    const matchingRules = quizData.flow?.filter(rule => rule.from.questionId === currentStep.id);
+    const matchingRules = quizData.flow?.filter(
+      (rule) => rule.from.questionId === currentStep.id
+    );
     logger.log("Flow rules for this question:", matchingRules);
+
+    // Extract actual answer value for branching logic
+    const answerValue =
+      currentAnswer?.answer !== undefined
+        ? currentAnswer.answer
+        : currentAnswer;
+    logger.log("Answer value for branching:", answerValue);
 
     // Determine next step using branching logic
     const nextStepIndex = getBranchingLogic(
       quizData,
       currentStepIndex,
-      currentAnswer,
+      answerValue,
       updatedAnswers
     );
     logger.log("Next step index from branching logic:", nextStepIndex);
@@ -127,19 +182,28 @@ export default function QuizRenderer({ quizData, sessionData, onComplete }) {
     } else {
       setCurrentStepIndex(nextStepIndex);
       setVisitedSteps([...visitedSteps, nextStepIndex]);
-      setCurrentAnswer(null);
+      // Don't clear currentAnswer here - let the useEffect handle it based on existing answers
     }
 
     setIsSubmitting(false);
-  }, [currentAnswer, currentStep, answers, currentStepIndex, quizData, visitedSteps, saveAnswer]);
+  }, [
+    currentAnswer,
+    currentStep,
+    answers,
+    currentStepIndex,
+    quizData,
+    visitedSteps,
+    saveAnswer,
+  ]);
 
   // Navigate to previous step
   const handleBack = useCallback(() => {
     if (currentStepIndex > 0) {
-      const prevIndex = visitedSteps[visitedSteps.length - 2] || currentStepIndex - 1;
+      const prevIndex =
+        visitedSteps[visitedSteps.length - 2] || currentStepIndex - 1;
       setCurrentStepIndex(prevIndex);
       setVisitedSteps(visitedSteps.slice(0, -1));
-      
+
       // Load previous answer if exists
       const prevQuestionId = steps[prevIndex].id;
       if (answers[prevQuestionId]) {
@@ -151,71 +215,212 @@ export default function QuizRenderer({ quizData, sessionData, onComplete }) {
   }, [currentStepIndex, visitedSteps, steps, answers]);
 
   // Complete quiz
-  const completeQuiz = useCallback(async (finalAnswers) => {
-    try {
-      setIsSubmitting(true);
-      logger.log("Completing quiz with answers:", finalAnswers);
+  const completeQuiz = useCallback(
+    async (finalAnswers) => {
+      try {
+        setIsSubmitting(true);
+        logger.log("Completing quiz with answers:", finalAnswers);
 
-      // Format answers for completion
-      const answersArray = Object.entries(finalAnswers).map(([questionId, answer]) => ({
-        questionId,
-        answer,
-      }));
+        // Format answers for completion
+        const answersArray = Object.entries(finalAnswers).map(
+          ([questionId, answer]) => ({
+            questionId,
+            answer,
+          })
+        );
 
-      const response = await fetch(`/api/quizzes/responses/${responseId}/complete`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+        // ===== USE RULES ENGINE TO GET RECOMMENDATIONS =====
+        logger.log("🔧 Starting Rules Engine Recommendation");
+
+        // Get edges from quiz data
+        logger.log("📦 Quiz Data for Rules Engine:", quizData);
+        logger.log("📊 Quiz Steps:", quizData?.steps);
+        logger.log("📊 Quiz Results:", quizData?.results);
+        const edges = quizData?.logicResults?.edges || [];
+        logger.log("📊 Edges from quizData:", edges);
+
+        // Store matched product and all results in local variables for immediate use
+        let matchedProduct = null;
+        let allResults = quizData.results || [];
+
+        if (edges.length > 0 && quizData.quizDetails.preQuiz === true) {
+          // Generate rules from edges
+          const rules = createRules(edges, quizData);
+          logger.log("📋 Generated Rules:", rules);
+
+          // Match answers against rules
+          logger.log("🎯 Matching answers:", finalAnswers);
+
+          // Find matching rule
+          const matched = rules.find((rule) => {
+            // Check if all rule conditions match the user's answers
+            const ruleKeys = Object.keys(rule).filter(
+              (key) => key !== "result"
+            );
+
+            return ruleKeys.every((questionId) => {
+              const userAnswer = finalAnswers[questionId];
+              const ruleOptionIndex = rule[questionId];
+
+              // Extract answer value
+              const answerValue =
+                userAnswer?.value?.answer !== undefined
+                  ? userAnswer.value.answer
+                  : userAnswer?.value;
+
+              logger.log(
+                `Checking Q${questionId}: User answered "${answerValue}" vs Rule expects option index "${ruleOptionIndex}"`
+              );
+
+              logger.log("result check => ",String(answerValue) === String(ruleOptionIndex));
+              // Check if answer matches rule (answer should be option index)
+              return String(answerValue) === String(ruleOptionIndex);
+            });
+          });
+
+          // Store in state for later use
+          setMatchedRule(matched);
+
+          logger.log("Matched Rule:", matched);
+
+          if (matched) {
+            logger.log("✅ MATCHED RULE:", matched);
+            logger.log("🎁 RECOMMENDED PRODUCT ID:", matched.result);
+
+            // Find product details from results
+            matchedProduct = quizData.results?.find(
+              (result) => String(result.id) === String(matched.result)
+            );
+
+            if (matchedProduct) {
+              setRecommendationProduct(matchedProduct);
+              setTotalResults(allResults);
+              logger.log("🎁 RECOMMENDED PRODUCT DETAILS:", matchedProduct);
+            } else {
+              logger.log(
+                "⚠️ Product not found in results array for ID:",
+                matched.result
+              );
+            }
+          } else {
+            logger.log("❌ No matching rule found for answers");
+          }
+        } else {
+          logger.log("⚠️ No edges found in quizData - cannot generate rules");
+        }
+
+        // ===== END RULES ENGINE =====
+
+        // ===== EXTRACT UPLOADS (CDN URLs) FROM ANSWERS =====
+        const uploads = {};
+        
+        Object.entries(finalAnswers).forEach(([questionId, answerObj]) => {
+          const answerData = answerObj?.value?.answer;
+          
+          if (answerData && typeof answerData === 'object') {
+            // Find all keys ending with "CdnUrl" or "cdnUrl"
+            Object.keys(answerData).forEach(key => {
+              if (key.toLowerCase().endsWith('cdnurl') && answerData[key]) {
+                // Determine type based on the key name
+                let type = 'image'; // Default to image
+                
+                // Map known CDN URL keys to their types
+                const urlTypeMapping = {
+                  'frontPhotoCdnUrl': 'image',
+                  'sidePhotoCdnUrl': 'image',
+                  'topPhotoCdnUrl': 'image',
+                  'idPhotoCdnUrl': 'image',
+                  // Add more mappings here as needed
+                };
+                
+                type = urlTypeMapping[key] || 'image';
+                
+                uploads[key] = {
+                  url: answerData[key],
+                  type: type
+                };
+                
+                logger.log(`📎 Found CDN URL in Q${questionId}: ${key} = ${answerData[key]} (type: ${type})`);
+              }
+            });
+          }
+        });
+        
+        logger.log("📦 Extracted uploads object:", uploads);
+        // ===== END UPLOADS EXTRACTION =====
+
+        const body = {
           answers: answersArray,
           prescriptions: { items: [] },
-        }),
-      });
-
-      const result = await response.json();
-      logger.log("Quiz completion result:", result);
-
-      if (!response.ok || !result.success) {
-        throw new Error(result.error || "Failed to complete quiz");
-      }
-
-      // For ED quiz, attach all products separately for brand/generic merging
-      const isEdQuiz = quizData?.slug?.toLowerCase().includes("ed") && quizData?.quizDetails?.preQuiz;
-      
-      if (isEdQuiz && quizData.results && quizData.results.length > 0) {
-        logger.log("🔵 ED Quiz detected - Attaching all products for transformation");
-        logger.log("📦 Filtered recommendations:", result.data.recommendations?.length || 0);
-        logger.log("📦 All products for merging:", quizData.results.length);
-        
-        const resultWithAllProducts = {
-          ...result.data,
-          allProducts: quizData.results, // All products for brand/generic merging
-          preQuiz: true,
-          mainQuizId: quizData.quizDetails.mainQuiz,
+          uploads: uploads,
         };
-        
-        logger.log("✅ Result with all products attached:", resultWithAllProducts);
-        onComplete(resultWithAllProducts, finalAnswers);
-      } else {
-        onComplete(result.data, finalAnswers);
-      }
-    } catch (error) {
-      console.error("Error completing quiz:", error);
-      toast.error("Failed to complete quiz");
-      setIsSubmitting(false);
-    }
-  }, [responseId, onComplete, quizData]);
 
-  const progress = ((currentStepIndex + 1) / steps.length) * 100;
+        if (!isAuthenticated()) {
+          logger.log("🔓 Starting quiz session with guest user");
+          const { getSessionId } = await import("@/services/sessionService");
+          const sessionId = getSessionId();
+          if (sessionId) {
+            body["cartSessionId"] = sessionId;
+            logger.log("👤 Using sessionId from request:", sessionId);
+          }
+        }
+
+
+        logger.log("Submitting quiz completion with body:", body);
+
+        const response = await fetch(
+          `/api/quizzes/responses/${responseId}/complete`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body),
+          }
+        );
+
+        const result = await response.json();
+        logger.log("Quiz completion result:", result);
+
+        if (!response.ok || !result.success) {
+          throw new Error(result.error || "Failed to complete quiz");
+        }
+
+        // Mock result for testing while API is disabled
+       
+
+
+        logger.log("recommednation Product is ==>", matchedProduct);
+        logger.log("totalResults  is ==>", allResults);
+
+        onComplete(result, finalAnswers, matchedProduct, allResults);
+
+        setIsSubmitting(false);
+
+      } catch (error) {
+        console.error("Error completing quiz:", error);
+        toast.error("Failed to complete quiz");
+        setIsSubmitting(false);
+      }
+    },
+    [responseId, onComplete, quizData]
+  );
+
+  const progress =  currentStepIndex == 0 ? 0 : ((currentStepIndex + 1) / steps.length) * 100;
 
   // Show error if no steps
   if (!steps || steps.length === 0) {
     return (
       <div className="max-w-3xl mx-auto px-4 py-8">
         <div className="bg-red-50 border border-red-200 rounded-lg p-8 text-center">
-          <h2 className="text-2xl font-bold text-red-900 mb-2">No Quiz Steps Found</h2>
-          <p className="text-red-700 mb-4">The quiz data doesn't contain any steps.</p>
+          <h2 className="text-2xl font-bold text-red-900 mb-2">
+            No Quiz Steps Found
+          </h2>
+          <p className="text-red-700 mb-4">
+            The quiz data doesn't contain any steps.
+          </p>
           <details className="text-left mt-4">
-            <summary className="cursor-pointer text-sm text-red-800 font-medium">Debug Info</summary>
+            <summary className="cursor-pointer text-sm text-red-800 font-medium">
+              Debug Info
+            </summary>
             <pre className="mt-2 text-xs bg-white p-4 rounded overflow-auto">
               {JSON.stringify(quizData, null, 2)}
             </pre>
@@ -239,13 +444,21 @@ export default function QuizRenderer({ quizData, sessionData, onComplete }) {
                 : "text-gray-300 cursor-not-allowed"
             }`}
           >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            <svg
+              className="w-6 h-6"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M15 19l-7-7 7-7"
+              />
             </svg>
           </button>
-          
-         <Logo />
-          
+          <Logo />
           <div className="w-10"></div> {/* Spacer for centering */}
         </div>
       </div>
@@ -265,8 +478,10 @@ export default function QuizRenderer({ quizData, sessionData, onComplete }) {
             <StepRenderer
               step={currentStep}
               answer={currentAnswer}
+              allAnswers={answers}
               onAnswerChange={handleAnswerChange}
               onBack={handleBack}
+              onNext={handleNext}
             />
           ) : (
             <div className="text-center text-gray-500">
@@ -280,9 +495,15 @@ export default function QuizRenderer({ quizData, sessionData, onComplete }) {
       <QuizNavigation
         canGoBack={currentStepIndex > 0}
         canGoNext={
-          currentStep?.stepType === 'form'
-            ? currentAnswer && typeof currentAnswer === 'object' && 
-              currentStep.formInputs.every(input => currentAnswer[input.id] && currentAnswer[input.id].toString().trim() !== '')
+          currentStep?.stepType === "form"
+            ? currentAnswer &&
+              typeof currentAnswer === "object" &&
+              currentAnswer.answer &&
+              currentStep.formInputs.every(
+                (input) =>
+                  currentAnswer.answer[input.id] &&
+                  currentAnswer.answer[input.id].toString().trim() !== ""
+              )
             : !!currentAnswer
         }
         isLastStep={currentStepIndex === steps.length - 1}

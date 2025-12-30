@@ -26,7 +26,8 @@ const RecommendationStep = ({
 
   logger.log("RecommendationStep Render:",
     step,
-    selectedProduct);
+    selectedProduct,
+  flowType);
   // Privacy text component
   const PrivacyText = () => (
     <p className="text-xs text-[#353535] my-1 md:my-4">

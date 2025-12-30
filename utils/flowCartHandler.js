@@ -682,7 +682,7 @@ const prepareApiRequest = async (items, isAuthenticated) => {
       logger.log("👤 Using sessionId for guest:", sessionId);
     } else {
       logger.warn("⚠️ No sessionId found for guest user");
-    }
+    } 
   }
 
   return { headers, requestBody };
@@ -1040,22 +1040,84 @@ const handleUnauthenticatedFlow = async (
 
   try {
     // Save products to localStorage for post-login retrieval
-    const savedProductData = {
-      mainProduct,
-      addons,
-      flowType,
-      timestamp: Date.now(),
-      options: { requireConsultation, subscriptionPeriod, varietyPackId },
+    // const savedProductData = {
+    //   mainProduct,
+    //   addons,
+    //   flowType,
+    //   timestamp: Date.now(),
+    //   options: { requireConsultation, subscriptionPeriod, varietyPackId },
+    // };
+
+    // localStorage.setItem(
+    //   STORAGE_KEYS.FLOW_CART_PRODUCTS,
+    //   JSON.stringify(savedProductData)
+    // );
+    
+    // logger.log(
+    //   `Saved ${flowType} flow products to localStorage for post-login processing`
+    // );
+
+
+     // Refresh cart nonce
+    await refreshCartNonce();
+
+    // Prepare cart items
+    const cartItems = await prepareCartItems(mainProduct, addons, flowType, {
+      subscriptionPeriod,
+      varietyPackId,
+    });
+
+    logger.log(
+      `🛒 Prepared ${cartItems.length} items for ${flowType} flow:`,
+      cartItems
+    );
+
+    // Add items to cart one by one (batch endpoint disabled temporarily)
+    logger.log(`🛒 Adding ${cartItems.length} items one by one...`);
+    
+    const results = [];
+    let successCount = 0;
+    let failedCount = 0;
+    
+    for (let i = 0; i < cartItems.length; i++) {
+      try {
+        logger.log(`🛒 Adding item ${i + 1}/${cartItems.length}...`);
+        const itemResult = await addSingleItem(cartItems[i]);
+        results.push(itemResult);
+        
+        if (itemResult.success) {
+          successCount++;
+          logger.log(`✅ Item ${i + 1} added successfully`);
+        } else {
+          failedCount++;
+          logger.error(`❌ Item ${i + 1} failed:`, itemResult.error);
+        }
+      } catch (error) {
+        failedCount++;
+        logger.error(`❌ Item ${i + 1} threw error:`, error);
+        results.push({ success: false, error: error.message });
+      }
+    }
+    
+    // Combine results into single response
+    const cartResult = {
+      success: successCount > 0,
+      added_items: successCount,
+      failed_items: failedCount,
+      total_items: cartItems.length,
+      cart: results[results.length - 1]?.cart, // Use cart from last successful addition
+      results: results,
+      errors: results.filter(r => !r.success).map(r => r.error),
     };
 
-    localStorage.setItem(
-      STORAGE_KEYS.FLOW_CART_PRODUCTS,
-      JSON.stringify(savedProductData)
-    );
-    
-    logger.log(
-      `Saved ${flowType} flow products to localStorage for post-login processing`
-    );
+    logger.log(`🛒 Cart API Response:`, cartResult);
+
+    // Validate result
+    validateCartResult(cartResult, cartItems.length);
+
+    // Add consultation requirements
+    addFlowConsultationRequirements(mainProduct, flowType);
+
 
     // Add consultation requirements
     addFlowConsultationRequirements(mainProduct, flowType);

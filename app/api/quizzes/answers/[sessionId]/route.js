@@ -6,17 +6,17 @@ import { cookies } from "next/headers";
 const BASE_URL = process.env.BASE_URL;
 
 /**
- * POST /api/quizzes/[quizId]/start
- * Start a quiz session for the given quiz ID
+ * GET /api/quizzes/answers/[sessionId]
+ * Fetch existing quiz answers for a given session ID
  */
-export async function POST(request, { params })  {
+export async function GET(request, { params }) {
   try {
     // In Next.js 15, params is a Promise and needs to be awaited
-    const { quizId } = await params;
+    const { sessionId } = await params;
 
-    if (!quizId) {
+    if (!sessionId) {
       return NextResponse.json(
-        { success: false, error: "Quiz ID is required" },
+        { success: false, error: "Session ID is required" },
         { status: 400 }
       );
     }
@@ -35,46 +35,29 @@ export async function POST(request, { params })  {
       Origin: origin,
     };
 
-    // Parse request body if any
-    let requestBody = {};
-    try {
-      requestBody = await request.json();
-    } catch (error) {
-      // No body or invalid JSON, continue with empty object
-      logger.log("No request body provided or invalid JSON");
-    }
-
     if (authToken) {
-      logger.log("🔐 Starting quiz with authenticated user");
+      logger.log("🔐 Fetching answers with authenticated user");
       headers["Authorization"] = `${authToken.value}`;
     } else {
-      logger.log("🔓 Starting quiz with guest user");
-      // Check if sessionId is provided in request body
-      if (requestBody.sessionId) {
-        logger.log("👤 Using sessionId from request:", requestBody.sessionId);
-      } else {
-        logger.warn("⚠️ No sessionId provided in request body for guest user");
-      }
+      logger.log("🔓 Fetching answers with guest user for session:", sessionId);
     }
 
-    logger.log(`🚀 Starting quiz session for quiz ID: ${quizId}`);
+    logger.log(`📥 Fetching existing answers for session ID: ${sessionId}`);
 
     // Use Railway backend URL
     const apiUrl = BASE_URL || "https://rocky-be-production.up.railway.app";
 
-    // Call backend API to start quiz
-    const backendUrl = `${apiUrl}/api/v1/quizzes/${quizId}/start`;
+    // Call backend API to fetch answers
+    const backendUrl = `${apiUrl}/api/v1/quizzes/responses/session/${sessionId}`;
+
+    logger.log("🚀 Making request to backend API with Session", sessionId);
 
     logger.log(`🔗 Backend URL: ${backendUrl}`);
     logger.log(`🔗 API URL: ${apiUrl}`);
 
-    logger.log("Start Quiz with Body:", requestBody);
-    
-
     const response = await fetch(backendUrl, {
-      method: "POST",
+      method: "GET",
       headers: headers,
-      body: JSON.stringify(requestBody),
       cache: "no-store", // Disable caching
     });
 
@@ -94,24 +77,24 @@ export async function POST(request, { params })  {
       );
     }
 
-    const quizSessionData = await response.json();
+    const answersData = await response.json();
 
-    logger.log("✅ Quiz session started successfully:", {
-      quizId: quizId,
-      sessionId: quizSessionData?.session_id || quizSessionData?.sessionId,
+    logger.log("✅ Quiz answers fetched successfully:", {
+      sessionId: sessionId,
+      answersCount: answersData?.data?.answers?.length || 0,
     });
 
     return NextResponse.json({
       success: true,
-      data: quizSessionData,
+      data: answersData.data || answersData,
     });
   } catch (error) {
-    logger.error("❌ Error starting quiz session:", error);
+    logger.error("❌ Error fetching quiz answers:", error);
 
     return NextResponse.json(
       {
         success: false,
-        error: error.message || "Failed to start quiz session",
+        error: error.message || "Failed to fetch quiz answers",
         stack: process.env.NODE_ENV === "development" ? error.stack : undefined,
       },
       { status: 500 }

@@ -3,7 +3,7 @@
 import Logo from "@/components/Navbar/Logo";
 import { useState, useEffect } from "react";
 
-export default function NoCallAcknowledgement({
+export default function PhotoIDUploadWarning({
   step,
   answer,
   onAnswerChange,
@@ -19,12 +19,6 @@ export default function NoCallAcknowledgement({
       };
     }
   }, []);
-
-  const handleRequestCallInstead = () => {
-    if (onBack) {
-      onBack();
-    }
-  };
 
   return (
     <div
@@ -58,23 +52,21 @@ export default function NoCallAcknowledgement({
           </div>
 
           <h3 className="text-[18px] md:text-[20px] text-black mb-8">
-            No Call Acknowledgement
+            Upload Photo ID
           </h3>
 
           <p
             className="text-[16px] md:text-[18px] mb-8 text-[#000000] text-left"
             style={{ fontFamily: "Fellix" }}
           >
-            I hereby acknowledge that by foregoing an appointment with a
-            licensed physician or pharmacist, it is my sole responsibility to
-            ensure I am aware of how to appropriately use the medication
-            requested, furthermore I hereby confirm that I am aware of any
-            potential side effects that may occur through the use of the
-            aforementioned medication and hereby confirm that I do not have any
-            medical questions to ask. I will ensure I have read the relevant
-            product page and FAQ prior to use of the prescribed medication.
-            Should I have any questions to ask, I am aware of how to contact the
-            clinical team at Rocky or get a hold of my primary care provider.
+            Please note this step is mandatory. If you are unable to complete at this time, email your ID to clinicadmin@myrocky.com.
+          </p>
+
+          <p
+            className="text-[16px] md:text-[18px] mb-8 text-[#000000] text-left"
+            style={{ fontFamily: "Fellix" }}
+          >
+            Your questionnaire will not be reviewed without this. As per our T&C's a $45 cancellation fee will be charged if we are unable to verify you.
           </p>
 
           <div className="mb-8">
@@ -138,14 +130,6 @@ export default function NoCallAcknowledgement({
           >
             I Acknowledge
           </button>
-          <p className="mt-4 text-center font-medium text-md text-[#000000]">
-            <button
-              onClick={handleRequestCallInstead}
-              className="underline hover:text-gray-900"
-            >
-              I would like to request the call instead
-            </button>
-          </p>
         </div>
       </div>
     </div>

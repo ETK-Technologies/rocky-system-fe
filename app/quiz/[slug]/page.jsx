@@ -15,6 +15,7 @@ export default function QuizPage({ params }) {
   const slug = resolvedParams.slug;
   const [quizData, setQuizData] = useState(null);
   const [sessionData, setSessionData] = useState(null);
+  const [existingAnswers, setExistingAnswers] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -37,25 +38,28 @@ export default function QuizPage({ params }) {
       logger.log("Recommendation rules:", quiz.recommendationRules);
       logger.log("Quiz requireLogin:", quiz.requireLogin);
       logger.log("Quiz preQuiz:", quiz.preQuiz);
-      
+
       // Check if quiz requires login (main quizzes only)
       if (quiz.requireLogin && !isAuthenticated()) {
         logger.log("Main quiz requires authentication - redirecting to login");
-        const origin = typeof window !== "undefined" ? window.location.origin : "";
+        const origin =
+          typeof window !== "undefined" ? window.location.origin : "";
         const currentUrl = `${origin}/quiz/${slug}`;
         const redirectUrl = encodeURIComponent(currentUrl);
         toast.error("Please login to continue with this consultation");
-        router.push(`/login-register?redirect_to=${redirectUrl}&viewshow=login`);
+        router.push(
+          `/login-register?redirect_to=${redirectUrl}&viewshow=login`
+        );
         return;
       }
-      
+
       // If this is a main quiz (requires login), clear any stored mainQuizId redirect
       // This prevents redirect loops if user creates another order without pre-quiz
       if (quiz.requireLogin) {
         sessionStorage.removeItem("_rocky_main_quiz_redirect");
         logger.log("[SessionStorage] Cleared mainQuizId - starting main quiz");
       }
-      
+
       setQuizData(quiz);
 
       // Step 2: Start quiz session
@@ -64,10 +68,25 @@ export default function QuizPage({ params }) {
         throw new Error("Quiz ID not found in response");
       }
 
+      // Check user authentication again before starting session
+      const Headers = { "Content-Type": "application/json" };
+      const Body = {};
+
+      if (!isAuthenticated()) {
+        logger.log("🔓 Starting quiz session with guest user");
+        const { getSessionId } = await import("@/services/sessionService");
+        const sessionId = getSessionId();
+        if(sessionId) {
+          Body['cartSessionId'] = sessionId;
+          logger.log("👤 Using sessionId from request:", sessionId);
+        }
+      }
+      
+
       const sessionResponse = await fetch(`/api/quizzes/${quizId}/start`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({}),
+        headers: Headers,
+        body: JSON.stringify(Body),
       });
 
       const sessionResult = await sessionResponse.json();
@@ -93,6 +112,46 @@ export default function QuizPage({ params }) {
 
       logger.log("Processed session info:", sessionInfo);
       setSessionData(sessionInfo);
+
+      // Step 3: Fetch existing answers if any
+      try {
+        const sessionIdForAnswers = sessionInfo.sessionId || sessionInfo.session_id;
+        if (sessionIdForAnswers) {
+          logger.log("Fetching existing answers for session:", sessionIdForAnswers);
+          
+          const answersResponse = await fetch(
+            `/api/quizzes/answers/${sessionIdForAnswers}`
+          );
+          
+          if (answersResponse.ok) {
+            const answersResult = await answersResponse.json();
+            
+            if (answersResult.success && answersResult.data?.answers) {
+              logger.log("Existing answers found:", answersResult.data.answers);
+              
+              // Transform answers array to object format {questionId: {value: answer}}
+              const answersObject = {};
+              answersResult.data.answers.forEach(answer => {
+                if (answer.questionId && answer.answer !== undefined) {
+                  answersObject[answer.questionId] = { value: answer.answer };
+                }
+              });
+              
+              logger.log("Transformed answers object:", answersObject);
+              setExistingAnswers(answersObject);
+              toast.info("Resuming your previous progress");
+            } else {
+              logger.log("No existing answers found");
+            }
+          } else {
+            logger.log("No existing answers response:", answersResponse.status);
+          }
+        }
+      } catch (answersErr) {
+        // Don't fail the quiz load if answers fetch fails
+        logger.log("Could not fetch existing answers:", answersErr);
+      }
+
       toast.success("Quiz loaded successfully!");
     } catch (err) {
       logger.log("Quiz initialization error:", err);
@@ -110,14 +169,17 @@ export default function QuizPage({ params }) {
   }, [slug, initializeQuiz]);
 
   const handleQuizComplete = useCallback(
-    (result, finalAnswers) => {
+    (result, finalAnswers, recommendationProduct, totalResults) => {
       logger.log("=== Quiz Completed ===");
-      logger.log("Complete result FULL OBJECT:", JSON.stringify(result, null, 2));
+      logger.log(
+        "Complete result FULL OBJECT:",
+        JSON.stringify(result, null, 2)
+      );
       logger.log("Complete result keys:", Object.keys(result));
       logger.log("Complete result structure:", {
-        hasAnswers: 'answers' in result,
-        hasData: 'data' in result,
-        hasResponse: 'response' in result,
+        hasAnswers: "answers" in result,
+        hasData: "data" in result,
+        hasResponse: "response" in result,
         answerType: typeof result.answers,
         dataType: typeof result.data,
       });
@@ -133,114 +195,65 @@ export default function QuizPage({ params }) {
 
       // Check if this is a main quiz (requireLogin = true and preQuiz = false)
       // Default to pre-quiz (recommendations) if not explicitly marked as main quiz
-      const isMainQuiz = quizData.quizDetails.requireLogin === true && quizData.quizDetails.preQuiz === false;
+      const isMainQuiz =
+        quizData.quizDetails.requireLogin === true &&
+        quizData.quizDetails.preQuiz === false;
       const isPreQuiz = quizData.quizDetails.preQuiz === true || !isMainQuiz;
-
-      
-
-      
 
       // Different flow for pre-quiz vs main quiz
       if (isPreQuiz) {
         // PRE-QUIZ: Show product recommendations
         logger.log("Pre-quiz completed - showing product recommendations");
-        
+
         const responseId =
-          sessionData?.responseId || sessionData?.response_id || sessionData?.id;
-
-        // Process recommendations using the logic engine
-        let recommendations = [];
-        let allProducts = [];
-        
-        // Try to extract answers from various locations
-        const userAnswers = result.answers || 
-                           result.data?.answers || 
-                           result.response?.answers ||
-                           sessionData?.answers ||
-                           {};
-        
-        logger.log("Extracted user answers:", userAnswers);
-        logger.log("User answers keys:", Object.keys(userAnswers));
-        
-        // Check if this is ED quiz
-        const isEdQuiz = slug?.toLowerCase().includes("ed");
-        
-        if (isEdQuiz) {
-          logger.log("🔵 ED Quiz detected in completion handler");
-          logger.log("📦 Backend recommendations:", result.recommendations?.length || 0);
-          logger.log("📦 All products attached:", result.allProducts?.length || 0);
-          
-          // For ED quiz, use all products from quiz config for transformation
-          allProducts = result.allProducts || quizData.results || [];
-          
-          // Try client-side recommendation processing first
-          if (quizData.logicResults && finalAnswers && Object.keys(finalAnswers).length > 0) {
-            logger.log("🔵 ED Quiz: Processing recommendations using logicResults graph");
-            logger.log("Final Answer before sending to logic processor:", finalAnswers);
-            recommendations = processRecommendations(quizData, finalAnswers);
-            logger.log("✅ ED flow - Client-side recommendations:", recommendations.length);
-          }
-          
-          // Fallback to backend recommendations if client-side returns empty
-          if (recommendations.length === 0) {
-            logger.log("🔵 ED Quiz: No client-side recommendations, using backend");
-            recommendations = result.recommendations || [];
-          }
-          
-          logger.log("✅ ED flow - All products for cards:", allProducts.length);
-          logger.log("✅ ED flow - Final recommendations:", recommendations.length);
-        } else {
-          // Try to process recommendations from logicResults graph
-          if (quizData.logicResults && finalAnswers && Object.keys(finalAnswers).length > 0) {
-            logger.log("Processing recommendations using logicResults graph");
-            logger.log("Final Answer before sending to logic processor:", finalAnswers);
-            recommendations = processRecommendations(quizData, finalAnswers);
-            logger.log("Client-side processed recommendations:", recommendations);
-          } else {
-            logger.warn("Cannot process recommendations:", {
-              hasLogicResults: !!quizData.logicResults,
-              hasAnswers: !!userAnswers,
-              answersCount: Object.keys(userAnswers).length
-            });
-          }
-          
-          // Fallback to backend recommendations if client-side processing returns empty
-          if (recommendations.length === 0) {
-            logger.log("No recommendations from logic graph, using backend/static results");
-            recommendations =
-              result.recommendations || result.results || quizData.results || [];
-          }
-        }
-
-        logger.log("Final recommendations to display:", recommendations);
-        logger.log("All products for transformation:", allProducts.length || 0);
+          sessionData?.responseId ||
+          sessionData?.response_id ||
+          sessionData?.id;
 
         // Store mainQuiz ID in sessionStorage for post-checkout redirect
         const mainQuizId = quizData.quizDetails?.mainQuiz;
-        logger.log("[SessionStorage] DEBUG - quizData.mainQuiz value:", mainQuizId);
-        logger.log("[SessionStorage] DEBUG - quizData keys:", Object.keys(quizData));
+        logger.log(
+          "[SessionStorage] DEBUG - quizData.mainQuiz value:",
+          mainQuizId
+        );
+        logger.log(
+          "[SessionStorage] DEBUG - quizData keys:",
+          Object.keys(quizData)
+        );
         logger.log("[SessionStorage] DEBUG - Full quizData:", quizData);
-        
+
         if (mainQuizId) {
-          logger.log("[SessionStorage] Attempting to store mainQuizId:", mainQuizId);
+          logger.log(
+            "[SessionStorage] Attempting to store mainQuizId:",
+            mainQuizId
+          );
           sessionStorage.setItem("_rocky_main_quiz_redirect", mainQuizId);
-          
+
           // Verify it was stored
-          const storedValue = sessionStorage.getItem("_rocky_main_quiz_redirect");
+          const storedValue = sessionStorage.getItem(
+            "_rocky_main_quiz_redirect"
+          );
           logger.log("[SessionStorage] ✅ Verified stored value:", storedValue);
-          
+
           if (storedValue !== mainQuizId) {
-            logger.error("[SessionStorage] ❌ Storage failed! Expected:", mainQuizId, "Got:", storedValue);
+            logger.error(
+              "[SessionStorage] ❌ Storage failed! Expected:",
+              mainQuizId,
+              "Got:",
+              storedValue
+            );
           }
         } else {
-          logger.warn("[SessionStorage] ⚠️ No mainQuizId found in quizData - will not store");
+          logger.warn(
+            "[SessionStorage] ⚠️ No mainQuizId found in quizData - will not store"
+          );
         }
 
         sessionStorage.setItem(
           "quiz-results",
           JSON.stringify({
-            recommendations: recommendations, // Filtered recommendations (user's choice)
-            allProducts: isEdQuiz ? allProducts : (result.allProducts || quizData.results), // All products for transformation
+            recommendations: recommendationProduct, // Filtered recommendations (user's choice)
+            allProducts: totalResults, // All products for transformation
             quizData: quizData,
             sessionId: sessionData?.sessionId || sessionData?.session_id,
             responseId: responseId,
@@ -248,21 +261,20 @@ export default function QuizPage({ params }) {
             completeResult: result,
             preQuiz: true,
             mainQuizId: mainQuizId, // Keep for backwards compatibility
-            answers: userAnswers, // Store answers for debugging
-            flowType: isEdQuiz ? "ed" : null, // Store flow type
+            answers: finalAnswers, // Store answers for debugging
           })
         );
 
         // Navigate to results page with product recommendations
-         router.push(`/quiz/${slug}/results`);
+        router.push(`/quiz/${slug}/results`);
       } else {
         // MAIN QUIZ: Show thank you page (consultation completed)
         logger.log("Main quiz completed - showing thank you page");
-        
+
         // Clear mainQuiz redirect since user completed the main consultation
         sessionStorage.removeItem("_rocky_main_quiz_redirect");
         logger.log("[SessionStorage] Cleared mainQuizId - main quiz completed");
-        
+
         sessionStorage.setItem(
           "quiz-submission",
           JSON.stringify({
@@ -272,7 +284,7 @@ export default function QuizPage({ params }) {
             completedAt: new Date().toISOString(),
           })
         );
-        
+
         // Navigate to thank you page
         router.push(`/quiz/${slug}/thank-you`);
       }
@@ -318,6 +330,7 @@ export default function QuizPage({ params }) {
         <QuizRenderer
           quizData={quizData}
           sessionData={sessionData}
+          existingAnswers={existingAnswers}
           onComplete={handleQuizComplete}
         />
       </div>

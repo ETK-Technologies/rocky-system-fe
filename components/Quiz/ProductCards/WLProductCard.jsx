@@ -16,34 +16,22 @@ const WLProductCard = ({ product, onSelect, isSelected }) => {
 
   if (!product) return null;
 
-  // Extract data from productData if available
-  const productData = product.productData || product;
-  const variant = product.variant || productData.variants?.[0];
   
   // Get image from various possible sources
-  const imageUrl = variant?.imageUrl || 
-                   productData.images?.[0]?.url || 
-                   product.image ||
-                   '';
+  const imageUrl = product.image;
   
   // Get product name - handle both formats
-  const productName = product.title || product.name || productData.name || '';
-  const showRegistered = product.id !== "490537" && productName !== "Rybelsus";
+  const productName = product.name;
+  const showRegistered = productName !== "Rybelsus";
   
   // Get description/tagline
-  const description = product.description || 
-                     product.product_tagline ||
-                     productData.shortDescription ||
-                     '';
+  const description = product.description;
   
   // Get price
-  const price = variant?.price || 
-               productData.basePrice ||
-               product.price ||
-               null;
+  const price = product.price;
   
   // Check if product is available (default to true if not specified)
-  const isAvailable = product.supplyAvailable !== false && product.available !== false;
+  const isAvailable = true;
 
   return (
     <>
@@ -95,9 +83,9 @@ const WLProductCard = ({ product, onSelect, isSelected }) => {
           )}
         </h2>
         
-        <p className="text-sm md:text-base text-[#212121]">
+        {/* <p className="text-sm md:text-base text-[#212121]">
           {description}
-        </p>
+        </p> */}
         
         {price && (
           <p className="text-lg font-semibold text-[#000000] mt-2">
@@ -129,18 +117,7 @@ const WLProductCard = ({ product, onSelect, isSelected }) => {
           <p className="text-sm text-[#212121] mt-1">{product.details}</p>
         )}
 
-        {/* Show popup trigger for Rybelsus (oral semaglutide) */}
-        {(product.id === "490537" || productName === "Rybelsus") && (
-          <p
-            className="text-[#AE7E56] text-sm underline text-center mt-2 cursor-pointer"
-            onClick={(e) => {
-              e.stopPropagation();
-              setShowMobilePopup(true);
-            }}
-          >
-            See why people are switching to oral.
-          </p>
-        )}
+        
       </div>
 
       {/* Oral Semaglutide Popup */}

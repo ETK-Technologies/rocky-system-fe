@@ -1,40 +1,98 @@
 "use client";
 
 import { useState, useRef } from "react";
+import { uploadPhotos } from "@/utils/uploadService";
+import { logger } from "@/utils/devLogger";
 
 export default function VerifyIdentity({ step, answer, onAnswerChange, onBack }) {
   const [photoIdFile, setPhotoIdFile] = useState(answer?.idPhoto || null);
+  const [idPhotoCdnUrl, setIdPhotoCdnUrl] = useState(answer?.idPhotoCdnUrl || null);
   const [firstName, setFirstName] = useState(answer?.firstName || "");
   const [lastName, setLastName] = useState(answer?.lastName || "");
+  const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef(null);
 
   const handleTapToUpload = () => {
-    fileInputRef.current?.click();
+    if (!uploading) {
+      fileInputRef.current?.click();
+    }
   };
 
-  const handlePhotoIdFileSelect = (e) => {
+  const handlePhotoIdFileSelect = async (e) => {
     const file = e.target.files[0];
     if (file) {
       setPhotoIdFile(file);
-      const newData = { idPhoto: file, firstName, lastName };
-      onAnswerChange(newData);
+      setUploading(true);
+      
+      // Upload to backend
+      logger.log("📤 Uploading ID photo...");
+      const result = await uploadPhotos(file);
+      setUploading(false);
+      
+      if (result.success && result.files && result.files.length > 0) {
+        const cdnUrl = result.files[0].cdnUrl;
+        setIdPhotoCdnUrl(cdnUrl);
+        logger.log("✅ ID photo uploaded:", cdnUrl);
+        
+        // Save CDN URL with answer
+        const newData = {
+          answerType: "img",
+          answer: {
+            idPhoto: file, 
+            idPhotoCdnUrl: cdnUrl,
+            firstName, 
+            lastName
+          }
+        };
+        onAnswerChange(newData);
+      } else {
+        logger.error("❌ ID photo upload failed:", result.error);
+        alert(`Upload failed: ${result.error || 'Unknown error'}`);
+      }
     }
   };
 
   const handleFirstNameChange = (value) => {
     setFirstName(value);
-    const newData = { idPhoto: photoIdFile, firstName: value, lastName };
+    const newData = {
+      answerType: "file",
+      answer: {
+        idPhoto: photoIdFile, 
+        idPhotoCdnUrl,
+        firstName: value, 
+        lastName
+      }
+    };
     onAnswerChange(newData);
   };
 
   const handleLastNameChange = (value) => {
     setLastName(value);
-    const newData = { idPhoto: photoIdFile, firstName, lastName: value };
+    const newData = {
+      answerType: "file",
+      answer: {
+        idPhoto: photoIdFile, 
+        idPhotoCdnUrl,
+        firstName, 
+        lastName: value
+      }
+    };
     onAnswerChange(newData);
   };
 
   return (
     <div className="px-4 pt-6 pb-4">
+      {uploading && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded-lg shadow-xl">
+            <div className="flex items-center space-x-3">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#C19A6B]"></div>
+              <span className="text-lg">Uploading ID photo...</span>
+            </div>
+          </div>
+        </div>
+      )}
+      
       <h1 className="text-3xl text-center text-[#AE7E56] font-bold mb-6">
         Verify your Identity
       </h1>
@@ -53,11 +111,12 @@ export default function VerifyIdentity({ step, answer, onAnswerChange, onBack })
           accept="image/jpeg,image/jpg,image/png,image/heif,image/heic"
           className="hidden"
           onChange={handlePhotoIdFileSelect}
+          disabled={uploading}
         />
 
         <div
           onClick={handleTapToUpload}
-          className="w-full md:w-[80%] max-w-lg h-40 flex items-center justify-center border-2 border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 mb-6 mx-auto"
+          className={`w-full md:w-[80%] max-w-lg h-40 flex items-center justify-center border-2 border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 mb-6 mx-auto ${uploading ? 'opacity-50 cursor-not-allowed' : ''}`}
         >
           {!photoIdFile ? (
             <div className="flex flex-col items-center">
@@ -82,12 +141,17 @@ export default function VerifyIdentity({ step, answer, onAnswerChange, onBack })
               </span>
             </div>
           ) : (
-            <img
-              id="photo-id-preview"
-              src={photoIdFile ? URL.createObjectURL(photoIdFile) : null}
-              alt="ID Preview"
-              className="max-w-full max-h-36 object-contain"
-            />
+            <div className="flex flex-col items-center">
+              <img
+                id="photo-id-preview"
+                src={photoIdFile ? URL.createObjectURL(photoIdFile) : null}
+                alt="ID Preview"
+                className="max-w-full max-h-36 object-contain"
+              />
+              {idPhotoCdnUrl && (
+                <span className="text-green-600 text-sm mt-2">✅ Photo uploaded successfully</span>
+              )}
+            </div>
           )}
         </div>
 
@@ -108,6 +172,7 @@ export default function VerifyIdentity({ step, answer, onAnswerChange, onBack })
                 value={firstName}
                 onChange={(e) => handleFirstNameChange(e.target.value)}
                 required
+                disabled={uploading}
               />
             </div>
 
@@ -126,6 +191,7 @@ export default function VerifyIdentity({ step, answer, onAnswerChange, onBack })
                 value={lastName}
                 onChange={(e) => handleLastNameChange(e.target.value)}
                 required
+                disabled={uploading}
               />
             </div>
 

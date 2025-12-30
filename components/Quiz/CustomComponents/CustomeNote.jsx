@@ -6,7 +6,7 @@ import CustomImage from "../../utils/CustomImage";
 export default function CustomeNote({ step, answer, onAnswerChange, onBack }) {
   const handleContinue = () => {
     if (onAnswerChange) {
-      onAnswerChange({ acknowledged: true });
+      onAnswerChange({ answerType: "text", answer: { acknowledged: true } });
     }
     if (onBack) {
       onBack();

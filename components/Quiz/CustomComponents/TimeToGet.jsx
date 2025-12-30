@@ -7,7 +7,7 @@ export default function TimeToGet({ step, answer, onAnswerChange }) {
   useEffect(() => {
     const timer = setTimeout(() => {
       if (onAnswerChange) {
-        onAnswerChange({ acknowledged: true });
+        onAnswerChange({ answerType: "text", answer: { acknowledged: true } });
       }
     }, 2000);
 
