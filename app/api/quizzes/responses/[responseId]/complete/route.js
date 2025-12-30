@@ -36,11 +36,12 @@ export async function POST(request, { params }) {
     };
 
     const body = await request.json();
-    const { answers, prescriptions, sessionId } = body;
+    const { answers, prescriptions, sessionId, uploads } = body;
 
     const RequestBody = {
       answers,
       prescriptions: prescriptions || { items: [] },
+      uploads: uploads || {},
     };
 
     if (authToken) {

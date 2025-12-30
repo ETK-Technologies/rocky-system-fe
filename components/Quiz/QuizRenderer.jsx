@@ -211,7 +211,7 @@ export default function QuizRenderer({ quizData, sessionData, onComplete }) {
         let matchedProduct = null;
         let allResults = quizData.results || [];
 
-        if (edges.length > 0) {
+        if (edges.length > 0 && quizData.quizDetails.preQuiz === true) {
           // Generate rules from edges
           const rules = createRules(edges, quizData);
           logger.log("📋 Generated Rules:", rules);
@@ -279,9 +279,48 @@ export default function QuizRenderer({ quizData, sessionData, onComplete }) {
 
         // ===== END RULES ENGINE =====
 
+        // ===== EXTRACT UPLOADS (CDN URLs) FROM ANSWERS =====
+        const uploads = {};
+        
+        Object.entries(finalAnswers).forEach(([questionId, answerObj]) => {
+          const answerData = answerObj?.value?.answer;
+          
+          if (answerData && typeof answerData === 'object') {
+            // Find all keys ending with "CdnUrl" or "cdnUrl"
+            Object.keys(answerData).forEach(key => {
+              if (key.toLowerCase().endsWith('cdnurl') && answerData[key]) {
+                // Determine type based on the key name
+                let type = 'image'; // Default to image
+                
+                // Map known CDN URL keys to their types
+                const urlTypeMapping = {
+                  'frontPhotoCdnUrl': 'image',
+                  'sidePhotoCdnUrl': 'image',
+                  'topPhotoCdnUrl': 'image',
+                  'idPhotoCdnUrl': 'image',
+                  // Add more mappings here as needed
+                };
+                
+                type = urlTypeMapping[key] || 'image';
+                
+                uploads[key] = {
+                  url: answerData[key],
+                  type: type
+                };
+                
+                logger.log(`📎 Found CDN URL in Q${questionId}: ${key} = ${answerData[key]} (type: ${type})`);
+              }
+            });
+          }
+        });
+        
+        logger.log("📦 Extracted uploads object:", uploads);
+        // ===== END UPLOADS EXTRACTION =====
+
         const body = {
           answers: answersArray,
           prescriptions: { items: [] },
+          uploads: uploads,
         };
 
         if (!isAuthenticated()) {
@@ -293,6 +332,9 @@ export default function QuizRenderer({ quizData, sessionData, onComplete }) {
             logger.log("👤 Using sessionId from request:", sessionId);
           }
         }
+
+
+        logger.log("Submitting quiz completion with body:", body);
 
         const response = await fetch(
           `/api/quizzes/responses/${responseId}/complete`,

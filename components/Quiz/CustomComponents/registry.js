@@ -38,6 +38,7 @@ import EDBPMedicationWarning from "./EDBPMedicationWarning";
 import EDCardiovascularSymptomWarning from "./EDCardiovascularSymptomWarning";
 import EDMedicationInteractionWarning from "./EDMedicationInteractionWarning";
 import EDNoAppointmentAcknowledgement from "./EDNoAppointmentAcknowledgement";
+import BodyPhotosUpload from "./BodyPhotosUpload";
 
 // Component registry with metadata
 export const COMPONENT_REGISTRY = {
@@ -281,40 +282,28 @@ export const COMPONENT_REGISTRY = {
   },
 
   // High Blood Pressure Warning variants
-  "HighBloodPressureWarning": {
+  "HighBloodPressure": {
     component: HighBloodPressureWarning,
     name: "High Blood Pressure Warning",
     description: "Warning for high blood pressure (141/91 to 179/99)",
   },
-  "High Blood Pressure Warning": {
-    component: HighBloodPressureWarning,
-    name: "High Blood Pressure Warning",
-    description: "Warning for high blood pressure (141/91 to 179/99)",
-  },
+  
 
   // Very High Blood Pressure Warning variants
-  "VeryHighBloodPressureWarning": {
+  "VeryHighBloodPressure": {
     component: VeryHighBloodPressureWarning,
     name: "Very High Blood Pressure Warning",
     description: "Disqualification for very high blood pressure (>180/100)",
   },
-  "Very High Blood Pressure Warning": {
-    component: VeryHighBloodPressureWarning,
-    name: "Very High Blood Pressure Warning",
-    description: "Disqualification for very high blood pressure (>180/100)",
-  },
+  
 
   // Unknown Blood Pressure Warning variants
-  "UnknownBloodPressureWarning": {
+  "UnknownBloodPressure": {
     component: UnknownBloodPressureWarning,
     name: "Unknown Blood Pressure Warning",
     description: "Disqualification for unknown blood pressure",
   },
-  "Unknown Blood Pressure Warning": {
-    component: UnknownBloodPressureWarning,
-    name: "Unknown Blood Pressure Warning",
-    description: "Disqualification for unknown blood pressure",
-  },
+
 
   // Photo ID Upload Warning variants
   "PhotoIDUploadWarning": {
@@ -471,6 +460,14 @@ export const COMPONENT_REGISTRY = {
     name: "ED No Appointment Acknowledgement",
     description: "Legal waiver for foregoing ED consultation appointment",
   },
+
+  // Body Photos Upload variants
+  "FrontSideViews": {
+    component: BodyPhotosUpload,
+    name: "Body Photos Upload",
+    description: "Upload front and side body photos for WL consultation",
+  },
+  
 };
 
 /**

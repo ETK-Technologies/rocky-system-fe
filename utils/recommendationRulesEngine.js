@@ -9,9 +9,20 @@ import { logger } from "./devLogger";
 export function createRules(edges, quizData) {
   const rules = [];
 
-  edges.forEach((edge, index) => {
-    logger.log(`🔍 Processing edge ${index + 1}/${edges.length}:`, edge);
-    rules.push(buildTheRule(edge, edges));
+  // Filter out invalid edges before processing
+  const validEdges = edges.filter((edge) => {
+    const isValid = edge && edge.source && edge.sourceHandle && edge.target;
+    if (!isValid) {
+      logger.warn("⚠️ Skipping invalid edge:", edge);
+    }
+    return isValid;
+  });
+
+  logger.log(`📊 Total edges: ${edges.length}, Valid edges: ${validEdges.length}`);
+
+  validEdges.forEach((edge, index) => {
+    logger.log(`🔍 Processing edge ${index + 1}/${validEdges.length}:`, edge);
+    rules.push(buildTheRule(edge, validEdges));
   });
 
   // Rename IDs to human-readable text if quiz data provided
@@ -23,6 +34,12 @@ export function createRules(edges, quizData) {
 }
 
 function buildTheRule(startEdge, edges, rule = {}) {
+  // Validate edge structure
+  if (!startEdge || !startEdge.source || !startEdge.sourceHandle) {
+    logger.error("❌ Invalid edge structure:", startEdge);
+    return rule;
+  }
+
   // Extract question ID and option index from current edge
   var fromQId = startEdge.source.split("-")[1];
   var optionIndex = startEdge.sourceHandle.split("-")[1];
@@ -119,9 +136,9 @@ export function transformProductDataForCard(product, flowType) {
         }
       return {};
     case "hair":
-      return product;
+      return transformHairProduct(product);
     case "wl":
-      return product;
+      return transformWLProduct(product);
     default:
       return product;
   }
@@ -159,6 +176,7 @@ function mergeGenericAndBrandProduct(brandData, genericData, brandProductDetails
     const transformed = {};
 
     transformed.id = brandData.id;
+    transformed.genericId = genericData ? genericData.id : null;
     transformed.name = brandData.name;
     transformed.image = genericData?.image || '';
     transformed.tagline = brandData.shortDescription;
@@ -287,9 +305,31 @@ function mergePackPillOptions(prod1Options, prod2Options) {
 
 function transformWLProduct(product) {  
 
+    var transformed = {};
 
+    transformed.id = product.productData.id;
+    transformed.name = product.productData.name;
+    transformed.image = product.productData.images?.[0]?.url || '';
+    transformed.description = product.productData.description || '';
+    transformed.price = product.productData.variants.find((variant) => variant.status === "PUBLISHED")?.price || null;
+    transformed.variationId = product.productData.variants.find((variant) => variant.status === "PUBLISHED")?.id || null;
+    transformed.isSubscription = true;
+    transformed.requireConsultation = true;
+    transformed.subscriptionPeriod =  product.productData.variants.find((variant) => variant.status === "PUBLISHED")?.subscriptionPeriod || null;
+    return transformed;
 }
 
 function transformHairProduct(product) {  
+   var transformed = {};
 
+    transformed.id = product.productData.id;
+    transformed.name = product.productData.name;
+    transformed.image = product.productData.images?.[0]?.url || '';
+    transformed.description = product.productData.shortDescription || '';
+    transformed.price = product.productData.variants.find((variant) => variant.status === "PUBLISHED")?.price || null;
+    transformed.variationId = product.productData.variants.find((variant) => variant.status === "PUBLISHED")?.id || null;
+    transformed.isSubscription = true;
+    transformed.requireConsultation = true;
+    transformed.subscriptionPeriod =  product.productData.variants.find((variant) => variant.status === "PUBLISHED")?.subscriptionPeriod || null;
+    return transformed;
 }

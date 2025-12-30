@@ -166,8 +166,8 @@ export default function QuizResultsPage({ params }) {
       
       // Prepare product data for cart addition
       const productForCart = {
-        id: selectedProduct.productId,
-        productId: selectedProduct.productId,
+        id: selectedProduct.id,
+        productId: selectedProduct.id,
         variationId: selectedProduct.variationId,
         quantity: 1,
         name: selectedProduct.name || selectedProduct.title,
@@ -177,6 +177,9 @@ export default function QuizResultsPage({ params }) {
         subscriptionPeriod: selectedProduct.subscriptionPeriod,
         requireConsultation: selectedProduct.requireConsultation,
       };
+
+
+      logger.log("product for the cart:", productForCart);
 
       logger.log(`🛒 Quiz Results (${slug}) - Preparing to add to cart`, productForCart);
 

@@ -9,36 +9,23 @@ const HairProductCard = ({ product, isRecommended = false, onSelect, isSelected 
   logger.log("Rendering HairProductCard with product:", product);
 
   // Extract data from productData if available
-  const productData = product.productData || product;
-  const variant = product.variant || productData.variants?.[0];
+ 
+  
   
   // Get image from various possible sources
-  const imageUrl = variant?.imageUrl || 
-                   productData.images?.[0]?.url || 
-                   product.image ||
-                   '';
+  const imageUrl = product.image;
   
   // Get product name/title
-  const productName = product.pills || 
-                     product.title || 
-                     product.name || 
-                     productData.name ||
-                     '';
+  const productName = product.name;
   
   // Get description/tagline
-  const description = product.description || 
-                     product.product_tagline ||
-                     productData.shortDescription ||
-                     '';
+  const description = product.description;
   
   // Get price
-  const price = variant?.price || 
-               productData.basePrice ||
-               product.price ||
-               null;
+  const price = product.price;
   
   // Get additional details
-  const tooltip = product.tooltip || product.details || '';
+  const tooltip = '';
   const badge = product.badge || "https://myrocky.b-cdn.net/WP%20Images/Hair%20Loss/satisfaction-guarantee.png";
 
   const handleSelect = () => {
@@ -84,12 +71,14 @@ const HairProductCard = ({ product, isRecommended = false, onSelect, isSelected 
 
           {/* Product Image */}
           <div className="flex justify-center items-center w-[200px] h-[140px]">
-            <CustomContainImage
+            {imageUrl ? (
+              <CustomContainImage
               src={imageUrl}
               alt={productName}
               fill
               className="w-full h-full object-contain"
             />
+            ) : (<div className="rounded-md w-[200px] h-[140px] bg-gray-100 flex items-center justify-center text-gray-400 text-xs">No Image Available</div>)}
           </div>
         </div>
 
@@ -107,7 +96,7 @@ const HairProductCard = ({ product, isRecommended = false, onSelect, isSelected 
           </p>
           {/* Product Description */}
           <p className="text-[#212121] text-[14px] font-normal leading-[140%] mb-3">
-            {tooltip}
+            {tooltip || ""}
           </p>
           <div className="w-full ">
             <span

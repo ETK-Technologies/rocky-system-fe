@@ -165,6 +165,8 @@ const EDProductCard = ({
         ? selectedPills.variationId
         : selectedPills.brandVariationId;
 
+    const Id = selectedPreference === "generic" ? product.genericId : product.id;
+
     if (!price) {
       console.error("Price is null for selected preference:", {
         selectedPreference,
@@ -196,7 +198,7 @@ const EDProductCard = ({
 
     // Prepare product data in the format expected by addToCartDirectly
     const mainProduct = {
-      id: id,
+      id: Id,
       name: name,
       price: price,
       quantity: 1,
@@ -204,6 +206,9 @@ const EDProductCard = ({
       isSubscription: selectedFrequency === "quarterly-supply",
       subscriptionPeriod: selectedFrequency === "quarterly-supply" ? "3_month" : "1_month",
     };
+
+
+    logger.log("Adding product to cart:", mainProduct);
 
     const result = await addToCartDirectly(mainProduct, [], "ed");
 
