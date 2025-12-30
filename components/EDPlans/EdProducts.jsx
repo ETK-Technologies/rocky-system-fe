@@ -10,20 +10,33 @@ import EdComparisonTable from "../Sex/EdComparisonTable";
 import { transformEdFlowProducts, filterEdFlowProducts } from "@/utils/transformEdFlowProducts";
 import { logger } from "@/utils/devLogger";
 
-const EdProducts = ({ showonly }) => {
+const EdProducts = ({ showonly, initialProducts = null }) => {
   const scrollContainerRef = useRef(null);
-  const [products, setProducts] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [products, setProducts] = useState(() => {
+    // If initial products are provided (from server), use them immediately
+    if (initialProducts) {
+      const transformed = transformEdFlowProducts(initialProducts);
+      logger.log(`[ED Products] Using ${transformed.length} product(s) from server`);
+      return transformed;
+    }
+    return [];
+  });
+  const [loading, setLoading] = useState(!initialProducts); // Only loading if no initial products
   const [error, setError] = useState(null);
 
-  // Fetch products from API on mount
+  // Fetch products from API on mount only if not provided initially
   useEffect(() => {
+    // Skip fetching if we already have initial products from server
+    if (initialProducts) {
+      return;
+    }
+
     const fetchProducts = async () => {
       try {
         setLoading(true);
         setError(null);
 
-        logger.log("[ED Products] Fetching products from API");
+        logger.log("[ED Products] Fetching products from API (client-side)");
 
         const response = await fetch("/api/products/ed-flow");
 
@@ -58,7 +71,7 @@ const EdProducts = ({ showonly }) => {
     };
 
     fetchProducts();
-  }, []);
+  }, [initialProducts]);
 
   // Filter products based on the showonly parameter
   const getFilteredProducts = () => {

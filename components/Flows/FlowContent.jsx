@@ -1,10 +1,12 @@
+"use client";
+
 import { useSearchParams } from "next/navigation";
 import EdProducts from "../EDPlans/EdProducts";
 import EdFaqs from "./EdFaqs";
 import HairProducts from "../Hair/HairProducts";
 import HairFaqs from "./HairFaqs";
 
-const FlowContent = ({ flowType = "ED", pageType = null }) => {
+const FlowContent = ({ flowType = "ED", pageType = null, initialProducts = null }) => {
   switch (flowType) {
     case "ED":
       // Get the query parameters from the URL
@@ -16,8 +18,8 @@ const FlowContent = ({ flowType = "ED", pageType = null }) => {
             {/* Main Content */}
             <main className="flex-grow bg-white">
               <div className="max-w-[1184px] mx-auto px-5 py-10">
-                {/* ED Products Section - Pass the filter parameter */}
-                <EdProducts showonly={showonly} />
+                {/* ED Products Section - Pass the filter parameter and initial products */}
+                <EdProducts showonly={showonly} initialProducts={initialProducts} />
 
                 {/* FAQs Section */}
                 <EdFaqs></EdFaqs>

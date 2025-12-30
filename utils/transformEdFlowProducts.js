@@ -70,7 +70,8 @@ const normalizePillOptions = (pillOptions) => {
         count: option.count,
         genericPrice: option.genericPrice,
         brandPrice: option.brandPrice,
-        // Map genericVariationId to variationId for EdProductCard compatibility
+        // Keep both genericVariationId (for EdProductCards) and variationId (for EdProductCard)
+        genericVariationId: option.genericVariationId || option.variationId,
         variationId: option.genericVariationId || option.variationId,
         brandVariationId: option.brandVariationId,
       };
