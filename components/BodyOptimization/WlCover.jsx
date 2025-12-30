@@ -27,7 +27,7 @@ const wlCoverData = {
   buttons: [
     {
       text: "Am I Eligible?",
-      href: "/wl-pre-consultation/",
+      href: "/quiz/wlprecons",
       primary: true,
       ariaLabel: "Opt1",
       width: "md:w-[310px]",

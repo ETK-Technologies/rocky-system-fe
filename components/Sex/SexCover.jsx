@@ -38,7 +38,7 @@ const SexCoverData = {
     },
     {
       text: "Find What's Best For Me",
-      href: "/ed-pre-consultation-quiz/",
+      href: "/quiz/ed-pre-consultation/",
       primary: false,
       ariaLabel: "Opt2",
       width: "208px",

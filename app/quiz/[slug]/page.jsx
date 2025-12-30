@@ -139,7 +139,7 @@ export default function QuizPage({ params }) {
               
               logger.log("Transformed answers object:", answersObject);
               setExistingAnswers(answersObject);
-              toast.info("Resuming your previous progress");
+              // toast.info("Resuming your previous progress");
             } else {
               logger.log("No existing answers found");
             }
@@ -152,7 +152,7 @@ export default function QuizPage({ params }) {
         logger.log("Could not fetch existing answers:", answersErr);
       }
 
-      toast.success("Quiz loaded successfully!");
+      // toast.success("Quiz loaded successfully!");
     } catch (err) {
       logger.log("Quiz initialization error:", err);
       setError(err.message);
@@ -191,7 +191,7 @@ export default function QuizPage({ params }) {
       logger.log("Is pre-quiz:", quizData.preQuiz);
       logger.log("User answers direct:", finalAnswers);
 
-      toast.success("Quiz completed successfully!");
+      // toast.success("Quiz completed successfully!");
 
       // Check if this is a main quiz (requireLogin = true and preQuiz = false)
       // Default to pre-quiz (recommendations) if not explicitly marked as main quiz

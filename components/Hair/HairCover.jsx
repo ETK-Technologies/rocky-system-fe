@@ -25,7 +25,7 @@ const HairCoverData = {
   buttons: [
     {
       text: "Take the quiz",
-      href: "/hair-pre-consultation-quiz/",
+      href: "/quiz/hair-pre-consultation-quiz",
       primary: true,
       ariaLabel: "Opt1",
       width: "w-full md:w-[170px]",
