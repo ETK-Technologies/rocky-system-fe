@@ -9,20 +9,21 @@ import { logger } from "./devLogger";
 export function createRules(edges, quizData) {
   const rules = [];
 
-  // Filter out invalid edges before processing
-  const validEdges = edges.filter((edge) => {
+  // Separate question edges (have sourceHandle) from result edges (no sourceHandle)
+  const questionEdges = edges.filter((edge) => {
     const isValid = edge && edge.source && edge.sourceHandle && edge.target;
-    if (!isValid) {
-      logger.warn("⚠️ Skipping invalid edge:", edge);
+    if (!isValid && edge) {
+      logger.log("⚠️ Skipping non-question edge (might be result-to-result):", edge);
     }
     return isValid;
   });
 
-  logger.log(`📊 Total edges: ${edges.length}, Valid edges: ${validEdges.length}`);
+  logger.log(`📊 Total edges: ${edges.length}, Question edges: ${questionEdges.length}`);
 
-  validEdges.forEach((edge, index) => {
-    logger.log(`🔍 Processing edge ${index + 1}/${validEdges.length}:`, edge);
-    rules.push(buildTheRule(edge, validEdges));
+  questionEdges.forEach((edge, index) => {
+    logger.log(`🔍 Processing edge ${index + 1}/${questionEdges.length}:`, edge);
+    // Pass ALL edges (including result-to-result) for alternative extraction
+    rules.push(buildTheRule(edge, edges));
   });
 
   // Rename IDs to human-readable text if quiz data provided
@@ -57,11 +58,55 @@ function buildTheRule(startEdge, edges, rule = {}) {
       return buildTheRule(nextEdge, edges, rule);
     }
   } else {
+    // Extract main result ID (first part after "result-")
     rule["result"] = startEdge.target.split("-")[1];
+    
+    // Extract alternative results by following result-to-result chains
+    const alternatives = extractAlternativeResults(startEdge.target, edges);
+    rule["alternativeProds"] = alternatives;
+    
+    logger.log(`🔗 Result ${rule["result"]} has ${alternatives.length} alternatives:`, alternatives);
   }
 
   // Base case: reached a result or no more edges
   return rule;
+}
+
+/**
+ * Extract alternative result IDs by following result-to-result chains
+ * @param {string} resultNode - The result node ID (e.g., "result-1-1765829705967")
+ * @param {Array} edges - All edges in the quiz flow
+ * @returns {Array} List of alternative result IDs
+ */
+function extractAlternativeResults(resultNode, edges) {
+  const alternatives = [];
+  let currentNode = resultNode;
+
+  // Follow the chain of result-to-result edges
+  while (true) {
+    // Find edge where current result is the source
+    const nextEdge = edges.find(edge => 
+      edge.source === currentNode && edge.target.startsWith("result-")
+    );
+
+    if (!nextEdge) {
+      // No more chained results
+      break;
+    }
+
+    // Extract the result ID from the target (format: "result-{id}-{timestamp}")
+    const targetParts = nextEdge.target.split("-");
+    if (targetParts.length >= 2) {
+      const alternativeId = targetParts[1];
+      alternatives.push(alternativeId);
+      logger.log(`📎 Found alternative result: ${alternativeId} from chain`);
+    }
+
+    // Move to next node in chain
+    currentNode = nextEdge.target;
+  }
+
+  return alternatives;
 }
 
 function getNext(to, edges) {
@@ -123,6 +168,12 @@ function getAnswerText(answers, selectedOne) {
 }
 
 export function transformProductDataForCard(product, flowType) {
+  // Null safety check
+  if (!product) {
+    logger.warn("⚠️ transformProductDataForCard: product is null or undefined");
+    return null;
+  }
+
   // ed, wl, hair
   switch (flowType) {
     case "ed":
@@ -146,6 +197,11 @@ export function transformProductDataForCard(product, flowType) {
 
 function transformEdGenericBrandProduct(product) {
     logger.log("Transforming ED product:", product);
+
+    if (!product?.productData || !Array.isArray(product.productData)) {
+      logger.error("❌ Invalid product data structure for ED product:", product);
+      return null;
+    }
 
     const BrandProductDetails = product.productData[0];
     const GenericProductDetails = product.productData[1] || null;
@@ -243,6 +299,11 @@ function extractPillOptions(Product) {
 function transformEdPackProduct(product) {
     logger.log("Transforming ED Pack products:", product);
 
+    if (!product?.productData || !Array.isArray(product.productData) || product.productData.length < 4) {
+      logger.error("❌ Invalid product data structure for ED pack (needs 4 products):", product);
+      return null;
+    }
+
     var BrandProd1 = extractEDProductData(product.productData[0]);
     var GenericProd1 = extractEDProductData(product.productData[1]);
 
@@ -267,7 +328,9 @@ function transformEdPackProduct(product) {
             "monthly-supply": "One Month",
             "quarterly-supply": "Three Months",
         },
-        pillOptions: mergePackPillOptions(Prod1.pillOptions, Prod2.pillOptions)
+        pillOptions: mergePackPillOptions(Prod1.pillOptions, Prod2.pillOptions),
+        id: Prod1.id + "," + Prod2.id,
+        genericId: (Prod1.genericId ? Prod1.genericId : '') + "," + (Prod2.genericId ? Prod2.genericId : ''),
     };
 
     return varietyPackProduct;
@@ -304,6 +367,10 @@ function mergePackPillOptions(prod1Options, prod2Options) {
 
 
 function transformWLProduct(product) {  
+    if (!product?.productData) {
+      logger.error("❌ Invalid product data structure for WL product:", product);
+      return null;
+    }
 
     var transformed = {};
 
@@ -320,7 +387,12 @@ function transformWLProduct(product) {
 }
 
 function transformHairProduct(product) {  
-   var transformed = {};
+    if (!product?.productData) {
+      logger.error("❌ Invalid product data structure for Hair product:", product);
+      return null;
+    }
+
+    var transformed = {};
 
     transformed.id = product.productData.id;
     transformed.name = product.productData.name;

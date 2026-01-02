@@ -13,12 +13,31 @@ export default function FormStep({ step, answer, onAnswerChange }) {
   // Sync formData with answer prop when it changes
   useEffect(() => {
     if (answer) {
-      const answerValue = typeof answer === 'object' && answer.answer ? answer.answer : answer;
+      // Extract the actual answer from nested structure
+      let answerValue;
+      
+      if (typeof answer === 'object') {
+        // Check if answer has value.answer structure (from backend)
+        if (answer.value && answer.value.answer) {
+          answerValue = answer.value.answer;
+        }
+        // Check if answer has answer property directly (from UI interaction)
+        else if (answer.answer) {
+          answerValue = answer.answer;
+        }
+        // Otherwise use answer as is
+        else {
+          answerValue = answer;
+        }
+      } else {
+        answerValue = answer;
+      }
+      
       setFormData(answerValue || {});
     } else {
       setFormData({});
     }
-  }, [answer]);
+  }, [JSON.stringify(answer)]);
 
   const handleInputChange = (inputId, value) => {
     const updated = { ...formData, [inputId]: value };

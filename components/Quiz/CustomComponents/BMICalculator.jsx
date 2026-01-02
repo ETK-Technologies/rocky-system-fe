@@ -1,14 +1,48 @@
 import React, { useEffect, useState } from "react";
 
 export default function BMICalculator({ step, answer, onAnswerChange }) {
-  const [userData, setUserData] = useState({
-    weight: answer?.weight || "",
-    height: {
-      feet: answer?.height?.feet || "",
-      inches: answer?.height?.inches || "",
-    },
-    bmi: answer?.bmi || "",
-  });
+  // Extract the actual answer data from nested structure
+  const getInitialAnswer = () => {
+    if (!answer) return { weight: "", height: { feet: "", inches: "" }, bmi: "" };
+    
+    let answerData;
+    if (typeof answer === 'object') {
+      // Check if answer has value.answer structure (from backend)
+      if (answer.value && answer.value.answer) {
+        answerData = answer.value.answer;
+      }
+      // Check if answer has answer property directly (from UI interaction)
+      else if (answer.answer) {
+        answerData = answer.answer;
+      }
+      // Otherwise use answer as is
+      else {
+        answerData = answer;
+      }
+    } else {
+      answerData = answer;
+    }
+    
+    return {
+      weight: answerData?.weight || "",
+      height: {
+        feet: answerData?.height?.feet || "",
+        inches: answerData?.height?.inches || "",
+      },
+      bmi: answerData?.bmi || "",
+    };
+  };
+
+  const [userData, setUserData] = useState(getInitialAnswer());
+
+  // Sync userData with answer prop when it changes (for loading existing answers)
+  useEffect(() => {
+    if (answer) {
+      const initialData = getInitialAnswer();
+      setUserData(initialData);
+      console.log("✅ BMICalculator: Loaded existing answer:", initialData);
+    }
+  }, [JSON.stringify(answer)]);
 
   const { weight: weightPounds, height = {}, bmi } = userData || {};
   const { feet: heightFeet = "", inches: heightInches = "" } = height;

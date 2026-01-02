@@ -39,9 +39,18 @@ import EDCardiovascularSymptomWarning from "./EDCardiovascularSymptomWarning";
 import EDMedicationInteractionWarning from "./EDMedicationInteractionWarning";
 import EDNoAppointmentAcknowledgement from "./EDNoAppointmentAcknowledgement";
 import BodyPhotosUpload from "./BodyPhotosUpload";
+import AllIncluded from "./AllIncluded";
 
 // Component registry with metadata
 export const COMPONENT_REGISTRY = {
+
+
+  AllIncluded: {
+    component: AllIncluded,
+    name: "All Included",
+    description: "Display all included features",
+  },
+
   // BMI Calculator variants
   BMICalculator: {
     component: BMICalculator,

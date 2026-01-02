@@ -6,9 +6,23 @@ export default function DropdownQuestion({ step, answer, onAnswerChange }) {
   };
 
   // Extract answer value if it's an object
-  const selectedValue = answer && typeof answer === 'object' && !Array.isArray(answer) && answer.answer 
-    ? answer.answer 
-    : answer;
+  let selectedValue;
+  if (answer && typeof answer === 'object' && !Array.isArray(answer)) {
+    // Check if answer has value.answer structure (from backend)
+    if (answer.value && answer.value.answer) {
+      selectedValue = answer.value.answer;
+    }
+    // Check if answer has answer property directly (from UI interaction)
+    else if (answer.answer) {
+      selectedValue = answer.answer;
+    }
+    // Otherwise use answer as is
+    else {
+      selectedValue = answer;
+    }
+  } else {
+    selectedValue = answer;
+  }
 
   return (
     <div>
