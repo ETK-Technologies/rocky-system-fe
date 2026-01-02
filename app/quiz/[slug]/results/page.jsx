@@ -22,6 +22,7 @@ export default function QuizResultsPage({ params }) {
   const [showCrossSellModal, setShowCrossSellModal] = useState(false);
   const [initialCartData, setInitialCartData] = useState(null);
   const [currentResult, setCurrentResult] = useState(null);
+  const [alternativeProds, setAlternativeProds] = useState([]);
 
   // Flow type mapping
   const FLOW_TYPES = {
@@ -85,6 +86,26 @@ export default function QuizResultsPage({ params }) {
       // Find the matching result for the selected product (will be set after product selection)
       if (parsedResults?.recommendations) {
         setCurrentResult(transformProductDataForCard(parsedResults?.recommendations, flowType));
+      }
+
+      logger.log("🔷 [ALTERNATIVES] Step 9: Loading from parsedResults:", parsedResults?.AlternativeProds);
+      logger.log("🔷 [ALTERNATIVES] Step 10: Raw array length:", parsedResults?.AlternativeProds?.length || 0);
+      
+      if(parsedResults?.AlternativeProds){
+        var parsedAlternativeProds = [];
+        logger.log("🔷 [ALTERNATIVES] Step 11: Starting transformation with flowType:", flowType);
+        parsedResults.AlternativeProds.forEach((prod, index)=>{
+          logger.log(`🔷 [ALTERNATIVES] Step 12.${index + 1}: Transforming product:`, prod);
+          const transformed = transformProductDataForCard(prod, flowType);
+          logger.log(`🔷 [ALTERNATIVES] Step 13.${index + 1}: Transformed result:`, transformed);
+          parsedAlternativeProds.push(transformed);
+        });
+
+        logger.log("🔷 [ALTERNATIVES] Step 14: Setting alternativeProds state:", parsedAlternativeProds);
+        setAlternativeProds(parsedAlternativeProds);
+        logger.log("🔷 [ALTERNATIVES] Step 15: State set successfully with count:", parsedAlternativeProds.length);
+      } else {
+        logger.log("🔷 [ALTERNATIVES] Step 11: No AlternativeProds found in parsedResults");
       }
 
 
@@ -207,7 +228,7 @@ export default function QuizResultsPage({ params }) {
         toast.success(`${selectedProduct.name || selectedProduct.title} added to cart`);
         
         // Check if we should show cross-sell modal
-        if (false) {
+        if (hasAddons) {
           logger.log(`🎁 Showing cross-sell modal with ${currentResult.productsData.length} addons`);
           setTimeout(() => {
             setIsAddingToCart(false);
@@ -270,12 +291,21 @@ export default function QuizResultsPage({ params }) {
   const { recommendations, quizData } = results;
 
   
+  logger.log("🔷 [ALTERNATIVES] Step 16: Final check before rendering - alternativeProds state:", alternativeProds);
+  logger.log("🔷 [ALTERNATIVES] Step 17: Alternatives count being passed to RecommendationStep:", alternativeProds?.length || 0);
+  
   const stepData = {
     title: "Your treatment plan",
     description: `Based on your quiz responses for ${quizData?.name || "your health goals"}`,
     recommended: currentResult,
-    alternatives: []
+    alternatives: alternativeProds,
+    // Pass component info if result has a component
+    hasComponent: results?.recommendations?.hasComponent || false,
+    componentPath: results?.recommendations?.description || null,
+    selectedComponentId: results?.recommendations?.selectedComponentId || null
   };
+  
+  logger.log("🔷 [ALTERNATIVES] Step 18: stepData.alternatives:", stepData.alternatives);
 
   // Create a custom setSelectedProduct handler that works with ED product selections
   const handleProductSelection = (product, options) => {
@@ -310,11 +340,12 @@ export default function QuizResultsPage({ params }) {
         setSelectedProduct={handleProductSelection}
         onContinue={handleContinue}
         ProductCard={ProductCard}
-        showAlternatives={false}
+        showAlternatives={alternativeProds.length > 0}
         variations={[]}
         showIncluded={true}
         isLoading={isAddingToCart}
         flowType={flowType}
+        
       />
 
       {/* Cross-Sell Modal */}

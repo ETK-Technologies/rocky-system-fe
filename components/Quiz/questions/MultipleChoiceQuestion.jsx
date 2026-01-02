@@ -1,9 +1,59 @@
 import { useState, useEffect } from "react";
 
 export default function MultipleChoiceQuestion({ step, answer, onAnswerChange }) {
-  const [selectedOptions, setSelectedOptions] = useState(
-    answer ? (Array.isArray(answer) ? answer : [answer]) : []
-  );
+  // Helper function to extract answer from nested structure
+  const extractAnswer = (answer) => {
+    console.log("🔍 MultipleChoice extractAnswer - RAW INPUT:", answer);
+    
+    if (!answer) return [];
+    
+    let answerValue;
+    
+    // If answer is already an array, check if it contains objects that need extraction
+    if (Array.isArray(answer)) {
+      console.log("📦 Answer is already an array:", answer);
+      // Check if first item has nested structure
+      if (answer[0] && typeof answer[0] === 'object' && answer[0].value) {
+        answerValue = answer[0].value.answer;
+      } else {
+        answerValue = answer;
+      }
+    } else if (typeof answer === 'object') {
+      // Check for triple-nested value.value.value.answer structure (from backend)
+      if (answer.value?.value?.value?.answer) {
+        console.log("🔑🔑🔑 Found answer.value.value.value.answer (triple nested):", answer.value.value.value.answer);
+        answerValue = answer.value.value.value.answer;
+      }
+      // Check for double-nested value.value.answer structure
+      else if (answer.value?.value?.answer) {
+        console.log("🔑🔑 Found answer.value.value.answer (double nested):", answer.value.value.answer);
+        answerValue = answer.value.value.answer;
+      }
+      // Check if answer has value.answer structure (from backend)
+      else if (answer.value && answer.value.answer) {
+        console.log("🔑 Found answer.value.answer:", answer.value.answer);
+        answerValue = answer.value.answer;
+      }
+      // Check if answer has answer property directly (from UI interaction)
+      else if (answer.answer) {
+        console.log("🔑 Found answer.answer:", answer.answer);
+        answerValue = answer.answer;
+      }
+      // Otherwise use answer as is
+      else {
+        console.log("⚠️ Using answer as is");
+        answerValue = answer;
+      }
+    } else {
+      answerValue = answer;
+    }
+    
+    const result = Array.isArray(answerValue) ? answerValue : [answerValue];
+    console.log("✅ MultipleChoice extractAnswer - RESULT:", result);
+    return result;
+  };
+
+  const [selectedOptions, setSelectedOptions] = useState(extractAnswer(answer));
   const [showTooltip, setShowTooltip] = useState(null);
   const [zoomState, setZoomState] = useState({ show: false, image: null, x: 0, y: 0 });
   const [textareaValues, setTextareaValues] = useState({});
@@ -12,14 +62,10 @@ export default function MultipleChoiceQuestion({ step, answer, onAnswerChange })
 
   // Sync selectedOptions with answer prop when it changes
   useEffect(() => {
-    if (answer) {
-      const answerValue = typeof answer === 'object' && answer.answer ? answer.answer : answer;
-      const answerArray = Array.isArray(answerValue) ? answerValue : [answerValue];
-      setSelectedOptions(answerArray);
-    } else {
-      setSelectedOptions([]);
-    }
-  }, [answer]);
+    const answerArray = extractAnswer(answer);
+    setSelectedOptions(answerArray);
+    console.log("🎯 MultipleChoice selectedOptions updated to:", answerArray);
+  }, [JSON.stringify(answer)]);
 
   const handleOptionToggle = (option) => {
     const optionText = option.text;

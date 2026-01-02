@@ -12,11 +12,34 @@ import { isAuthenticated } from "@/services/userDataService";
 import { createRules } from "@/utils/recommendationRulesEngine";
 
 export default function QuizRenderer({ quizData, sessionData, existingAnswers, onComplete }) {
-  const [currentStepIndex, setCurrentStepIndex] = useState(0);
+  // Find last answered question index when resuming
+  const getInitialStepIndex = () => {
+    if (!existingAnswers || Object.keys(existingAnswers).length === 0) {
+      return 0; // Start from beginning if no existing answers
+    }
+
+    const steps = quizData?.steps || [];
+    let lastAnsweredIndex = 0;
+
+    // Find the last question that has an answer
+    for (let i = steps.length - 1; i >= 0; i--) {
+      const questionId = String(steps[i].id);
+      if (existingAnswers[questionId]) {
+        lastAnsweredIndex = i;
+        break;
+      }
+    }
+
+    logger.log("📍 Resuming quiz at step index:", lastAnsweredIndex);
+    return lastAnsweredIndex;
+  };
+
+  const initialStepIndex = getInitialStepIndex();
+  const [currentStepIndex, setCurrentStepIndex] = useState(initialStepIndex);
   const [answers, setAnswers] = useState(existingAnswers || {});
   const [currentAnswer, setCurrentAnswer] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [visitedSteps, setVisitedSteps] = useState([0]);
+  const [visitedSteps, setVisitedSteps] = useState([initialStepIndex]);
 
   const [matchedRule, setMatchedRule] = useState(null);
   const [recommendationProduct, setRecommendationProduct] = useState(null);
@@ -236,12 +259,15 @@ export default function QuizRenderer({ quizData, sessionData, existingAnswers, o
         logger.log("📦 Quiz Data for Rules Engine:", quizData);
         logger.log("📊 Quiz Steps:", quizData?.steps);
         logger.log("📊 Quiz Results:", quizData?.results);
+        logger.log("🔷 [ALTERNATIVES] DEBUG: All result IDs in quizData.results:", quizData?.results?.map(r => r.id));
         const edges = quizData?.logicResults?.edges || [];
         logger.log("📊 Edges from quizData:", edges);
+        logger.log("🔷 [ALTERNATIVES] DEBUG: All edge targets:", edges.map(e => e.target));
 
         // Store matched product and all results in local variables for immediate use
         let matchedProduct = null;
         let allResults = quizData.results || [];
+        let AlternativeProds = [];
 
         if (edges.length > 0 && quizData.quizDetails.preQuiz === true) {
           // Generate rules from edges
@@ -255,7 +281,7 @@ export default function QuizRenderer({ quizData, sessionData, existingAnswers, o
           const matched = rules.find((rule) => {
             // Check if all rule conditions match the user's answers
             const ruleKeys = Object.keys(rule).filter(
-              (key) => key !== "result"
+              (key) => key !== "result" && key !== "alternativeProds"
             );
 
             return ruleKeys.every((questionId) => {
@@ -292,10 +318,28 @@ export default function QuizRenderer({ quizData, sessionData, existingAnswers, o
               (result) => String(result.id) === String(matched.result)
             );
 
+            // Get alternative products using the alternativeProds array
+            logger.log("🔷 [ALTERNATIVES] Step 1: Checking matched.alternativeProds:", matched.alternativeProds);
+            if (matched.alternativeProds && matched.alternativeProds.length > 0) {
+              logger.log("🔷 [ALTERNATIVES] Step 2: Filtering from quizData.results (total:", quizData.results?.length, ")");
+              AlternativeProds = quizData.results?.filter(
+                (result) => {
+                  const isMatch = matched.alternativeProds.includes(String(result.id));
+                  logger.log("🔷 [ALTERNATIVES] Checking result ID:", result.id, "- Match:", isMatch);
+                  return isMatch;
+                }
+              ) || [];
+              logger.log("🔷 [ALTERNATIVES] Step 3: Filtered products count:", AlternativeProds.length);
+              logger.log("🔷 [ALTERNATIVES] Step 4: Final AlternativeProds array:", AlternativeProds);
+            } else {
+              logger.log("🔷 [ALTERNATIVES] Step 2: No alternativeProds in matched rule or empty array");
+            }
+
             if (matchedProduct) {
               setRecommendationProduct(matchedProduct);
               setTotalResults(allResults);
               logger.log("🎁 RECOMMENDED PRODUCT DETAILS:", matchedProduct);
+              logger.log("📦 ALTERNATIVE PRODUCTS COUNT:", AlternativeProds.length);
             } else {
               logger.log(
                 "⚠️ Product not found in results array for ID:",
@@ -391,7 +435,7 @@ export default function QuizRenderer({ quizData, sessionData, existingAnswers, o
         logger.log("recommednation Product is ==>", matchedProduct);
         logger.log("totalResults  is ==>", allResults);
 
-        onComplete(result, finalAnswers, matchedProduct, allResults);
+        onComplete(result, finalAnswers, matchedProduct, allResults, AlternativeProds);
 
         setIsSubmitting(false);
 

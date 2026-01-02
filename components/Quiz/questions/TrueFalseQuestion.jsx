@@ -8,9 +8,23 @@ export default function TrueFalseQuestion({ step, answer, onAnswerChange }) {
   };
 
   // Extract answer text if answer is an object
-  const selectedAnswer = answer && typeof answer === 'object' && !Array.isArray(answer) && answer.answer 
-    ? answer.answer 
-    : answer;
+  let selectedAnswer;
+  if (answer && typeof answer === 'object' && !Array.isArray(answer)) {
+    // Check if answer has value.answer structure (from backend)
+    if (answer.value && answer.value.answer) {
+      selectedAnswer = answer.value.answer;
+    }
+    // Check if answer has answer property directly (from UI interaction)
+    else if (answer.answer) {
+      selectedAnswer = answer.answer;
+    }
+    // Otherwise use answer as is
+    else {
+      selectedAnswer = answer;
+    }
+  } else {
+    selectedAnswer = answer;
+  }
 
   return (
     <div>

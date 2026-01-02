@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import CustomContainImage from "../../utils/CustomContainImage";
 import { logger } from "@/utils/devLogger";
 import { addToCartDirectly } from "@/utils/flowCartHandler";
+import DosageSelectionPopup from "../DosageSelectionPopup/DosageSelectionPopup";
 
 const EDProductCard = ({
   product,
@@ -26,6 +27,9 @@ const EDProductCard = ({
   const [selectedPreference, setSelectedPreference] = useState(preferences[0] || "generic");
   const [selectedFrequency, setSelectedFrequency] = useState("monthly-supply");
   const [selectedPills, setSelectedPills] = useState(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedDosage, setSelectedDosage] = useState("");
+  const [isAddingToCart, setIsAddingToCart] = useState(false);
 
   // Frequency labels - can come from product or use defaults
   const frequencies = product.frequencies || {
@@ -104,6 +108,13 @@ const EDProductCard = ({
     }
   }, []);
 
+  // Set default dosage based on product strengths
+  useEffect(() => {
+    if (strengths && strengths.length > 0 && !selectedDosage) {
+      setSelectedDosage(strengths[0]);
+    }
+  }, [strengths]);
+
   // Update selected pills when frequency or preference changes
   useEffect(() => {
     const availableOptions = getAvailablePillOptions();
@@ -148,7 +159,7 @@ const EDProductCard = ({
     }
   }, [selectedPreference, selectedFrequency, selectedPills, isSelected]);
 
-  // Handle card selection and add to cart
+  // Handle card selection and open dosage modal
   const handleCardSelect = async () => {
     if (!selectedPills) {
       logger.log("No pill option selected");
@@ -164,8 +175,6 @@ const EDProductCard = ({
       selectedPreference === "generic"
         ? selectedPills.variationId
         : selectedPills.brandVariationId;
-
-    const Id = selectedPreference === "generic" ? product.genericId : product.id;
 
     if (!price) {
       console.error("Price is null for selected preference:", {
@@ -185,7 +194,7 @@ const EDProductCard = ({
       return;
     }
 
-    logger.log("✅ Selecting product with options:", {
+    logger.log("✅ Opening dosage selection modal with options:", {
       preference: selectedPreference,
       frequency: selectedFrequency,
       pills: selectedPills,
@@ -194,6 +203,43 @@ const EDProductCard = ({
       variationId: variationId,
       productId: id,
       productName: name,
+    });
+
+    // Open the dosage selection modal
+    setIsModalOpen(true);
+  };
+
+  // Handle continue from dosage modal - add to cart
+  const handleContinueFromModal = async () => {
+    if (!selectedPills || !selectedDosage) {
+      logger.log("No pill option or dosage selected");
+      return;
+    }
+
+    setIsAddingToCart(true);
+
+    const price =
+      selectedPreference === "generic"
+        ? selectedPills.genericPrice
+        : selectedPills.brandPrice;
+
+    const variationId =
+      selectedPreference === "generic"
+        ? selectedPills.variationId
+        : selectedPills.brandVariationId;
+
+    const Id = selectedPreference === "generic" ? product.genericId : product.id;
+
+    logger.log("✅ Adding product to cart with dosage:", {
+      preference: selectedPreference,
+      frequency: selectedFrequency,
+      pills: selectedPills,
+      pillCount: selectedPills.count,
+      price: price,
+      variationId: variationId,
+      productId: id,
+      productName: name,
+      selectedDosage: selectedDosage,
     });
 
     // Prepare product data in the format expected by addToCartDirectly
@@ -207,10 +253,11 @@ const EDProductCard = ({
       subscriptionPeriod: selectedFrequency === "quarterly-supply" ? "3_month" : "1_month",
     };
 
-
     logger.log("Adding product to cart:", mainProduct);
 
     const result = await addToCartDirectly(mainProduct, [], "ed");
+
+    setIsAddingToCart(false);
 
     if (result.success) {
       logger.log("Product added to cart successfully:", result);
@@ -385,6 +432,17 @@ const EDProductCard = ({
           })()}
         </button>
       </div>
+
+      <DosageSelectionPopup
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        product={product}
+        availableDosages={strengths}
+        selectedDose={selectedDosage}
+        setSelectedDose={setSelectedDosage}
+        onContinue={handleContinueFromModal}
+        isLoading={isAddingToCart}
+      />
     </div>
   );
 };
