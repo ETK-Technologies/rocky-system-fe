@@ -157,13 +157,33 @@ const EdProductCard = ({ product }) => {
       }
 
       // Create main product data
+      // For variety pack: productIds is comma-separated variation IDs (handled in prepareMultipleCartItems)
+      // For single products: Need parent product ID + variation ID
+      // 
+      // CRITICAL: The backend API expects:
+      // - productId: Parent/variable product ID
+      // - variantId: Specific variation ID (only if different from productId)
+      //
+      // The transformed product.id should be the parent product ID
+      // The variation ID comes from selectedPillOption (genericVariationId or brandVariationId)
+      const variationId = productIds; // The selected variation ID
+      
+      // Get parent product ID - this should be the variable product ID, not the variation ID
+      // For transformed products, product.id is the parent product ID from primaryProduct
+      const parentProductId = product.id || product.productId;
+
       const mainProduct = {
-        id: productIds,
+        // Use parent product ID from transformed product
+        // extractProductId will use this as the main productId
+        id: parentProductId,
+        productId: parentProductId,
         name: selectedProductData.name,
         price: selectedProductData.price,
         image: selectedProductData.image || product.image,
         isSubscription: selectedProductData.frequency === "monthly-supply",
-        variationId: productIds,
+        // Variation ID from selected pill option - this is the specific variation to add
+        variationId: variationId,
+        variantId: variationId, // Alternative field name for API
         isVarietyPack: isVarietyPack,
         varietyPackId: varietyPackId,
         // Add variation data for display
@@ -184,28 +204,50 @@ const EdProductCard = ({ product }) => {
         ],
       };
 
+      logger.log("🛒 ED Flow - Product data being sent to cart:", {
+        parentProductId: parentProductId,
+        productId: mainProduct.productId,
+        variationId: mainProduct.variationId,
+        variantId: mainProduct.variantId,
+        isVarietyPack: mainProduct.isVarietyPack,
+        originalProduct: { 
+          id: product.id, 
+          productId: product.productId,
+          name: product.name 
+        },
+        selectedPillOption: {
+          variationId: selectedPillOption.variationId,
+          brandVariationId: selectedPillOption.brandVariationId,
+          count: selectedPillOption.count,
+        },
+      });
+
       logger.log("🛒 ED Flow - Adding product to cart early:", mainProduct);
 
-      // Add product to cart early (before cross-sell popup)
+      // Add product to cart early (before checkout redirect)
       const result = await addToCartEarly(mainProduct, "ed", {
         requireConsultation: true,
         varietyPackId: varietyPackId,
       });
 
       if (result.success) {
-        logger.log("✅ Product added to cart, opening cross-sell popup");
-        // Store the cart data to pass to the modal
-        if (result.cartData) {
-          setInitialCartData(result.cartData);
-        }
-
+        logger.log("✅ Product added to cart, redirecting to checkout");
+        
         // Close dosage modal
         setDosageModalOpen(false);
 
-        // Small delay before opening cross-sell modal
-        await new Promise((resolve) => setTimeout(resolve, 300));
+        // Small delay for UI cleanup
+        await new Promise((resolve) => setTimeout(resolve, 150));
 
-        setCrossSellModalOpen(true);
+        // Generate checkout URL and redirect directly (skip cross-sell popup)
+        // finalizeFlowCheckout will handle authentication check internally
+        // For authenticated users, it goes to checkout; for guests, it goes to login
+        // Check auth status from cartService (same as flowCartHandler uses)
+        const { isAuthenticated } = await import("@/lib/cart/cartService");
+        const isUserAuthenticated = isAuthenticated();
+        const checkoutUrl = finalizeFlowCheckout("ed", isUserAuthenticated);
+        logger.log("🎯 ED Flow - Redirecting to checkout:", checkoutUrl);
+        router.push(checkoutUrl);
       } else {
         logger.error("❌ Failed to add product to cart:", result.error);
         alert(

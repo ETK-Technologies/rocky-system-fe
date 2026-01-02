@@ -75,7 +75,7 @@ const DosageSelectionModal = ({
             not be seen.
           </p>
 
-          {product.name === "Viagra" && (
+          {(product.name === "Viagra" || product.name === "Sildenafil") && (
             <div className="flex flex-col gap-4">
               <p>
                 If this is your first time trying this medication, we recommend
@@ -116,7 +116,7 @@ const DosageSelectionModal = ({
             </div>
           )}
 
-          {(product.name === "Cialis" || product.name === "Chewalis") && (
+          {(product.name === "Cialis" || product.name === "Tadalafil" || product.name === "Chewalis") && (
             <div className="flex flex-col gap-4">
               <p>
                 If this is your first time trying this medication, we recommend

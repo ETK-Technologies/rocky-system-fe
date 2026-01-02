@@ -21,12 +21,8 @@ import { addToCartEarly, finalizeFlowCheckout } from "@/utils/flowCartHandler";
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 
-import {
-  cialisProduct,
-  viagraProduct,
-  varietyPackProduct,
-} from "./productData";
 import FaqsSection from "../FaqsSection";
+import { transformEdFlowProducts } from "@/utils/transformEdFlowProducts";
 
 const EDPreConsultationQuiz = () => {
   const router = useRouter();
@@ -45,6 +41,11 @@ const EDPreConsultationQuiz = () => {
   const [isBackNavigation, setIsBackNavigation] = useState(false);
   const [isCheckoutLoading, setIsCheckoutLoading] = useState(false);
   const [initialCartData, setInitialCartData] = useState(null);
+  
+  // Products fetched from API
+  const [products, setProducts] = useState([]);
+  const [productsLoading, setProductsLoading] = useState(true);
+  const [productsError, setProductsError] = useState(null);
 
   const maxPage = 6;
   const progress = Math.max(10, Math.ceil((currentPage / maxPage) * 100));
@@ -52,6 +53,65 @@ const EDPreConsultationQuiz = () => {
   const toggleMoreOptions = () => {
     setShowMoreOptions(!showMoreOptions);
   };
+
+  // Fetch products from API on mount
+  useEffect(() => {
+    const fetchProducts = async () => {
+      try {
+        setProductsLoading(true);
+        setProductsError(null);
+
+        logger.log("[ED PreConsultation] Fetching products from API");
+
+        const response = await fetch("/api/products/ed-flow");
+
+        if (!response.ok) {
+          throw new Error(`Failed to fetch products: ${response.statusText}`);
+        }
+
+        const data = await response.json();
+
+        if (!data.products || data.products.length === 0) {
+          throw new Error("No products returned from API");
+        }
+
+        logger.log(`[ED PreConsultation] Received ${data.products.length} product(s) from API`);
+
+        // Transform products to expected format
+        const transformed = transformEdFlowProducts(data.products);
+
+        if (!transformed || transformed.length === 0) {
+          throw new Error("Failed to transform products");
+        }
+
+        logger.log(`[ED PreConsultation] Transformed ${transformed.length} product(s)`);
+
+        setProducts(transformed);
+      } catch (err) {
+        logger.error("[ED PreConsultation] Error fetching products:", err);
+        setProductsError(err.message || "Failed to load products");
+      } finally {
+        setProductsLoading(false);
+      }
+    };
+
+    fetchProducts();
+  }, []);
+
+  // Helper to get products by name
+  const getProductByName = (name) => {
+    return products.find(
+      (p) => 
+        p.name === name || 
+        p.name.toLowerCase() === name.toLowerCase() ||
+        (name === "Cialis + Viagra" && (p.isPack || p.slug === "variety-pack"))
+    );
+  };
+
+  // Get individual products
+  const cialisProduct = getProductByName("Cialis");
+  const viagraProduct = getProductByName("Viagra");
+  const varietyPackProduct = getProductByName("Cialis + Viagra") || products.find(p => p.isPack || p.slug === "variety-pack");
 
   useEffect(() => {
     if (showDosagePopup) {
@@ -187,9 +247,23 @@ const EDPreConsultationQuiz = () => {
 
   useEffect(() => {
     if (currentPage === 6) {
+      // Wait for products to load before showing recommendations
+      if (productsLoading || products.length === 0) {
+        setIsLoading(true);
+        return;
+      }
+
       setIsLoading(true);
       setTimeout(() => {
         const product = getRecommendedProduct();
+        
+        if (!product) {
+          logger.error("[ED PreConsultation] Failed to get recommended product");
+          setError("Failed to load product recommendations. Please try again.");
+          setIsLoading(false);
+          return;
+        }
+
         setRecommendedProduct(product);
 
         // Instead of just setting selectedProduct, we need to properly select it
@@ -224,7 +298,7 @@ const EDPreConsultationQuiz = () => {
         setIsLoading(false);
       }, 2000);
     }
-  }, [currentPage]);
+  }, [currentPage, products, productsLoading]);
 
   // Function to check if Continue button should be enabled
   const isContinueEnabled = selectedProduct !== null;
@@ -238,18 +312,23 @@ const EDPreConsultationQuiz = () => {
 
     let product = null;
 
+    // Make sure products are loaded
+    if (!cialisProduct || !viagraProduct || !varietyPackProduct) {
+      return null;
+    }
+
     if (takenBefore === "No") {
-      product = varietyPackProduct;
+      product = { ...varietyPackProduct };
     } else {
       if (frequency === "4 or more times a week" && preference === "Daily") {
-        product = cialisProduct;
+        product = { ...cialisProduct };
         product.selectedPreference = "generic";
       } else {
         if (duration === "Long-lasting") {
-          product = cialisProduct;
+          product = { ...cialisProduct };
           product.selectedPreference = brandType?.toLowerCase() || "generic";
         } else if (duration === "Short-lasting") {
-          product = viagraProduct;
+          product = { ...viagraProduct };
           product.selectedPreference = brandType?.toLowerCase() || "generic";
         }
       }
@@ -258,7 +337,48 @@ const EDPreConsultationQuiz = () => {
     return product;
   };
 
-  if (showProducts && recommendedProduct) {
+  // Show loading state while fetching products
+  if (productsLoading && currentPage === 6) {
+    return (
+      <div className="flex flex-col min-h-screen bg-white subheaders-font font-medium">
+        <QuestionnaireNavbar
+          onBackClick={handleBackClick}
+          currentPage={currentPage}
+        />
+        <div className="flex items-center justify-center min-h-[400px]">
+          <div className="text-center">
+            <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mb-4"></div>
+            <p className="text-gray-600">Loading products...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Show error state if products failed to load
+  if (productsError && currentPage === 6) {
+    return (
+      <div className="flex flex-col min-h-screen bg-white subheaders-font font-medium">
+        <QuestionnaireNavbar
+          onBackClick={handleBackClick}
+          currentPage={currentPage}
+        />
+        <div className="flex items-center justify-center min-h-[400px]">
+          <div className="text-center">
+            <p className="text-red-600 mb-4">Error loading products: {productsError}</p>
+            <button
+              onClick={() => window.location.reload()}
+              className="px-4 py-2 bg-black text-white rounded-full hover:bg-gray-800"
+            >
+              Retry
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (showProducts && recommendedProduct && cialisProduct && viagraProduct && varietyPackProduct) {
     return (
       <div className="flex flex-col min-h-screen bg-white subheaders-font font-medium">
         <ToastContainer
@@ -303,23 +423,23 @@ const EDPreConsultationQuiz = () => {
               </div>
             </div>
 
-            {showMoreOptions && (
+            {showMoreOptions && cialisProduct && viagraProduct && varietyPackProduct && (
               <div className="flex flex-col gap-4 my-6 w-[380px]">
-                {recommendedProduct.name !== "Cialis" && (
+                {recommendedProduct.name !== "Cialis" && cialisProduct && (
                   <EdProductCards
                     product={cialisProduct}
                     onSelect={handleProductSelect}
                     isSelected={selectedProduct?.name === cialisProduct.name}
                   />
                 )}
-                {recommendedProduct.name !== "Viagra" && (
+                {recommendedProduct.name !== "Viagra" && viagraProduct && (
                   <EdProductCards
                     product={viagraProduct}
                     onSelect={handleProductSelect}
                     isSelected={selectedProduct?.name === viagraProduct.name}
                   />
                 )}
-                {recommendedProduct.name !== "Cialis + Viagra" && (
+                {recommendedProduct.name !== "Cialis + Viagra" && recommendedProduct.name !== "Variety Pack" && varietyPackProduct && (
                   <EdProductCards
                     product={varietyPackProduct}
                     onSelect={handleProductSelect}
