@@ -25,7 +25,9 @@ export const handleLogout = async (router) => {
     const data = await response.json();
 
     if (response.ok && data.success) {
-      logger.log("Logout API call successful");
+      logger.log("Logout API call successful", {
+        hasPatientPortalUrl: !!data.patientPortalUrl,
+      });
 
       // Clear ALL cached and saved data (comprehensive cleanup)
       clearAllCache();
@@ -64,33 +66,36 @@ export const handleLogout = async (router) => {
 
       logger.log("All client-side data cleared and events dispatched");
 
-      // Show success message
-      toast.success("You have been logged out successfully");
-
       // Trigger Patient Portal logout via hidden iframe (SSO-style logout)
       // This ensures Patient Portal cookies are cleared in the user's browser
-      const patientPortalUrl = process.env.NEXT_PUBLIC_PATIENT_PORTAL_URL;
+      // MUST happen BEFORE navigation to ensure it executes
+      try {
+        // Get Patient Portal URL from API response (more reliable than env var)
+        const patientPortalUrl =
+          data.patientPortalUrl || process.env.NEXT_PUBLIC_PATIENT_PORTAL_URL;
 
-      logger.log("Patient Portal URL check:", {
-        exists: !!patientPortalUrl,
-        url: patientPortalUrl,
-        envVars: Object.keys(process.env).filter((k) => k.includes("PATIENT")),
-      });
+        logger.log("Patient Portal URL check:", {
+          fromAPI: !!data.patientPortalUrl,
+          fromEnv: !!process.env.NEXT_PUBLIC_PATIENT_PORTAL_URL,
+          url: patientPortalUrl,
+          type: typeof patientPortalUrl,
+        });
 
-      if (patientPortalUrl) {
-        try {
+        if (patientPortalUrl) {
           logger.log("Creating Patient Portal logout iframe...");
           const iframe = document.createElement("iframe");
           iframe.style.display = "none";
+          iframe.width = "0";
+          iframe.height = "0";
           iframe.src = `${patientPortalUrl}/api/logout`;
 
           // Log when iframe loads
           iframe.onload = () => {
-            logger.log("Patient Portal logout iframe loaded successfully");
+            logger.log("✅ Patient Portal logout iframe loaded successfully");
           };
 
           iframe.onerror = (error) => {
-            logger.error("Patient Portal logout iframe error:", error);
+            logger.error("❌ Patient Portal logout iframe error:", error);
           };
 
           document.body.appendChild(iframe);
@@ -98,21 +103,28 @@ export const handleLogout = async (router) => {
 
           // Remove iframe after logout completes (2 seconds should be enough)
           setTimeout(() => {
-            if (iframe.parentNode) {
-              iframe.remove();
-              logger.log("Patient Portal logout iframe removed");
+            try {
+              if (iframe && iframe.parentNode) {
+                iframe.remove();
+                logger.log("Patient Portal logout iframe removed");
+              }
+            } catch (e) {
+              logger.warn("Error removing iframe:", e);
             }
           }, 2000);
 
-          logger.log("Patient Portal logout iframe triggered");
-        } catch (iframeError) {
-          logger.error("Error creating logout iframe:", iframeError);
+          logger.log("✅ Patient Portal logout iframe triggered");
+        } else {
+          logger.warn(
+            "⚠️ NEXT_PUBLIC_PATIENT_PORTAL_URL not found - Patient Portal logout skipped"
+          );
         }
-      } else {
-        logger.warn(
-          "NEXT_PUBLIC_PATIENT_PORTAL_URL not found - Patient Portal logout skipped"
-        );
+      } catch (iframeError) {
+        logger.error("❌ Error in Patient Portal logout setup:", iframeError);
       }
+
+      // Show success message
+      toast.success("You have been logged out successfully");
 
       // Use Next.js router for smooth navigation to home
       if (router) {
