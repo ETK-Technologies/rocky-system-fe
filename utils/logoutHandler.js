@@ -70,24 +70,48 @@ export const handleLogout = async (router) => {
       // Trigger Patient Portal logout via hidden iframe (SSO-style logout)
       // This ensures Patient Portal cookies are cleared in the user's browser
       const patientPortalUrl = process.env.NEXT_PUBLIC_PATIENT_PORTAL_URL;
+
+      logger.log("Patient Portal URL check:", {
+        exists: !!patientPortalUrl,
+        url: patientPortalUrl,
+        envVars: Object.keys(process.env).filter((k) => k.includes("PATIENT")),
+      });
+
       if (patientPortalUrl) {
         try {
+          logger.log("Creating Patient Portal logout iframe...");
           const iframe = document.createElement("iframe");
           iframe.style.display = "none";
           iframe.src = `${patientPortalUrl}/api/logout`;
+
+          // Log when iframe loads
+          iframe.onload = () => {
+            logger.log("Patient Portal logout iframe loaded successfully");
+          };
+
+          iframe.onerror = (error) => {
+            logger.error("Patient Portal logout iframe error:", error);
+          };
+
           document.body.appendChild(iframe);
+          logger.log("Patient Portal logout iframe appended to DOM");
 
           // Remove iframe after logout completes (2 seconds should be enough)
           setTimeout(() => {
             if (iframe.parentNode) {
               iframe.remove();
+              logger.log("Patient Portal logout iframe removed");
             }
           }, 2000);
 
           logger.log("Patient Portal logout iframe triggered");
         } catch (iframeError) {
-          logger.warn("Error creating logout iframe:", iframeError);
+          logger.error("Error creating logout iframe:", iframeError);
         }
+      } else {
+        logger.warn(
+          "NEXT_PUBLIC_PATIENT_PORTAL_URL not found - Patient Portal logout skipped"
+        );
       }
 
       // Use Next.js router for smooth navigation to home
