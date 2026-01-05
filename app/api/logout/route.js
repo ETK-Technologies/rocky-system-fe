@@ -61,10 +61,54 @@ export async function POST(req) {
       }
     }
 
-    // Note: Patient Portal logout is handled client-side via hidden iframe
-    // Server-side calls cannot clear cookies in the user's browser due to browser security restrictions
-    // The client-side logout handler (utils/logoutHandler.js) creates a hidden iframe
-    // that loads Patient Portal's logout endpoint, allowing Patient Portal to clear its own cookies
+    // Step 2: Call Patient Portal logout API (independent of backend logout)
+    if (token) {
+      try {
+        const patientPortalUrl = process.env.NEXT_PUBLIC_PATIENT_PORTAL_URL;
+        logger.log(
+          "Patient Portal URL from env:",
+          patientPortalUrl ? "✓ Found" : "✗ Not Found",
+          patientPortalUrl
+        );
+
+        if (patientPortalUrl) {
+          logger.log("Calling Patient Portal logout endpoint...", {
+            url: `${patientPortalUrl}/api/logout`,
+            hasToken: !!token,
+          });
+
+          await axios.post(
+            `${patientPortalUrl}/api/logout`,
+            {},
+            {
+              headers: {
+                "Content-Type": "application/json",
+                accept: "application/json",
+                Authorization: `Bearer ${token}`,
+              },
+              // Set a timeout to avoid hanging if Patient Portal is unreachable
+              timeout: 5000,
+            }
+          );
+          logger.log("Patient Portal logout successful");
+        } else {
+          logger.warn(
+            "NEXT_PUBLIC_PATIENT_PORTAL_URL not configured, skipping Patient Portal logout"
+          );
+        }
+      } catch (ppError) {
+        // Log detailed error for debugging
+        logger.error("Patient Portal logout error:", {
+          message: ppError.message,
+          code: ppError.code,
+          status: ppError.response?.status,
+          statusText: ppError.response?.statusText,
+          data: ppError.response?.data,
+          url: ppError.config?.url,
+        });
+        // Don't fail the logout - Patient Portal logout is best effort
+      }
+    }
 
     // Clear all user-related cookies using unified service
     clearUserDataFromCookies(cookieStore);
@@ -79,13 +123,9 @@ export async function POST(req) {
     logger.log("All cookies cleared and cache clear flag set");
 
     // Return JSON response for client-side handling
-    // Include Patient Portal URL so client can trigger iframe logout
-    const patientPortalUrl = process.env.NEXT_PUBLIC_PATIENT_PORTAL_URL;
-
     return NextResponse.json({
       success: true,
       message: "Logout successful",
-      patientPortalUrl: patientPortalUrl || null, // Include URL for client-side iframe logout
     });
   } catch (error) {
     logger.error("Error in logout route:", error.message);
