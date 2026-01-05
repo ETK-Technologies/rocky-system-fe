@@ -79,9 +79,13 @@ export async function POST(req) {
     logger.log("All cookies cleared and cache clear flag set");
 
     // Return JSON response for client-side handling
+    // Include Patient Portal URL so client can trigger iframe logout
+    const patientPortalUrl = process.env.NEXT_PUBLIC_PATIENT_PORTAL_URL;
+
     return NextResponse.json({
       success: true,
       message: "Logout successful",
+      patientPortalUrl: patientPortalUrl || null, // Include URL for client-side iframe logout
     });
   } catch (error) {
     logger.error("Error in logout route:", error.message);
