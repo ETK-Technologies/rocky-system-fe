@@ -24,13 +24,6 @@ export const handleLogout = async (router) => {
 
     const data = await response.json();
 
-    logger.log("🔍 Logout API Response:", {
-      success: data.success,
-      hasPatientPortalUrl: !!data.patientPortalUrl,
-      patientPortalUrl: data.patientPortalUrl,
-      fullData: data,
-    });
-
     if (response.ok && data.success) {
       logger.log("Logout API call successful");
 
@@ -71,115 +64,12 @@ export const handleLogout = async (router) => {
 
       logger.log("All client-side data cleared and events dispatched");
 
-      // Trigger Patient Portal logout via hidden iframe (SSO-style logout)
-      // This ensures Patient Portal cookies are cleared in the user's browser
-      // MUST happen BEFORE navigation to ensure it executes
-      logger.log("🔍 About to trigger Patient Portal logout...");
-
-      try {
-        // Get Patient Portal URL from API response (more reliable than env var)
-        const patientPortalUrl =
-          data.patientPortalUrl || process.env.NEXT_PUBLIC_PATIENT_PORTAL_URL;
-
-        logger.log("🔍 Inside Patient Portal logout try block");
-
-        logger.log("Patient Portal URL check:", {
-          fromAPI: !!data.patientPortalUrl,
-          fromEnv: !!process.env.NEXT_PUBLIC_PATIENT_PORTAL_URL,
-          url: patientPortalUrl,
-          type: typeof patientPortalUrl,
-        });
-
-        if (patientPortalUrl) {
-          logger.log("Creating Patient Portal logout iframe...");
-
-          // Create hidden iframe with a name (required for form targeting)
-          const iframeName = "patient-portal-logout-iframe-" + Date.now();
-          const iframe = document.createElement("iframe");
-          iframe.name = iframeName;
-          iframe.id = iframeName;
-          iframe.style.display = "none";
-          iframe.width = "0";
-          iframe.height = "0";
-
-          // Log when iframe loads
-          iframe.onload = () => {
-            logger.log("✅ Patient Portal logout iframe loaded");
-
-            // Remove iframe after a short delay
-            setTimeout(() => {
-              try {
-                if (iframe && iframe.parentNode) {
-                  iframe.remove();
-                  logger.log("Patient Portal logout iframe removed");
-                }
-              } catch (e) {
-                logger.warn("Error removing iframe:", e);
-              }
-            }, 2000);
-          };
-
-          iframe.onerror = (error) => {
-            logger.error("❌ Patient Portal logout iframe error:", error);
-          };
-
-          // Append iframe to DOM first
-          document.body.appendChild(iframe);
-          logger.log("Patient Portal logout iframe appended to DOM", {
-            iframeName: iframeName,
-          });
-
-          // Wait a tiny bit for iframe to be ready, then submit form
-          setTimeout(() => {
-            try {
-              // Create a form that will POST to Patient Portal
-              const form = document.createElement("form");
-              form.method = "POST";
-              form.action = `${patientPortalUrl}/api/logout`;
-              form.target = iframeName; // Target the iframe by name
-              form.style.display = "none";
-
-              // Append form, submit, then remove
-              document.body.appendChild(form);
-              logger.log("Form created and appended, submitting...", {
-                action: form.action,
-                target: form.target,
-              });
-
-              form.submit();
-              logger.log("✅ Patient Portal logout form submitted (POST)");
-
-              // Remove form after submission
-              setTimeout(() => {
-                try {
-                  if (form.parentNode) {
-                    form.remove();
-                    logger.log("Form removed");
-                  }
-                } catch (e) {
-                  // Ignore
-                }
-              }, 100);
-            } catch (formError) {
-              logger.error("Form POST failed:", formError);
-              // Fallback: Use GET request (Patient Portal should support GET for logout)
-              logger.warn("Falling back to GET request...");
-              iframe.src = `${patientPortalUrl}/api/logout`;
-            }
-          }, 50); // Small delay to ensure iframe is ready
-
-          logger.log("✅ Patient Portal logout iframe triggered");
-        } else {
-          logger.warn(
-            "⚠️ NEXT_PUBLIC_PATIENT_PORTAL_URL not found - Patient Portal logout skipped"
-          );
-        }
-      } catch (iframeError) {
-        logger.error("❌ Error in Patient Portal logout setup:", iframeError);
-      }
-
       // Show success message
       toast.success("You have been logged out successfully");
+
+      // Note: Backend logout API already invalidates the token for both Store Frontend and Patient Portal
+      // No need to redirect to Patient Portal - user stays on Store Frontend
+      // Patient Portal will be logged out automatically when user tries to access it (token is invalidated)
 
       // Use Next.js router for smooth navigation to home
       if (router) {
