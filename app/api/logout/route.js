@@ -3,7 +3,10 @@ import axios from "axios";
 import { cookies } from "next/headers";
 import { logger } from "@/utils/devLogger";
 import { getOrigin } from "@/lib/utils/getOrigin";
-import { clearUserDataFromCookies, getUserDataFromCookies } from "@/services/userDataService";
+import {
+  clearUserDataFromCookies,
+  getUserDataFromCookies,
+} from "@/services/userDataService";
 
 const BASE_URL = process.env.BASE_URL;
 
@@ -39,7 +42,7 @@ export async function POST(req) {
               accept: "application/json",
               "X-App-Key": process.env.NEXT_PUBLIC_APP_KEY,
               "X-App-Secret": process.env.NEXT_PUBLIC_APP_SECRET,
-              "Origin": origin,
+              Origin: origin,
               Authorization: `Bearer ${token}`,
             },
           }
@@ -51,7 +54,12 @@ export async function POST(req) {
         const patientPortalUrl = process.env.NEXT_PUBLIC_PATIENT_PORTAL_URL;
         if (patientPortalUrl) {
           try {
-            logger.log("Calling Patient Portal logout endpoint...");
+            logger.log("Calling Patient Portal logout endpoint...", {
+              url: `${patientPortalUrl}/api/logout`,
+              hasToken: !!token,
+            });
+
+            // Use the same headers as backend call for consistency
             await axios.post(
               `${patientPortalUrl}/api/logout`,
               {},
@@ -59,20 +67,37 @@ export async function POST(req) {
                 headers: {
                   "Content-Type": "application/json",
                   accept: "application/json",
+                  "X-App-Key": process.env.NEXT_PUBLIC_APP_KEY,
+                  "X-App-Secret": process.env.NEXT_PUBLIC_APP_SECRET,
+                  Origin: origin,
                   Authorization: `Bearer ${token}`,
                 },
                 // Set a timeout to avoid hanging if Patient Portal is unreachable
                 timeout: 5000,
+                // Don't follow redirects
+                maxRedirects: 0,
+                // Validate status - accept 2xx and 3xx
+                validateStatus: (status) => status >= 200 && status < 400,
               }
             );
             logger.log("Patient Portal logged out successfully");
           } catch (ppError) {
-            // Log error but don't fail the logout - Patient Portal logout is best effort
-            logger.warn(
-              "Error calling Patient Portal logout (continuing with Store Frontend logout):",
-              ppError.response?.data || ppError.message
-            );
+            // Log detailed error for debugging
+            logger.error("Error calling Patient Portal logout:", {
+              message: ppError.message,
+              code: ppError.code,
+              status: ppError.response?.status,
+              statusText: ppError.response?.statusText,
+              data: ppError.response?.data,
+              url: ppError.config?.url,
+            });
+            // Don't fail the logout - Patient Portal logout is best effort
+            // The backend token is already invalidated, so Patient Portal will require re-login on next request
           }
+        } else {
+          logger.warn(
+            "NEXT_PUBLIC_PATIENT_PORTAL_URL not configured, skipping Patient Portal logout"
+          );
         }
       } catch (error) {
         // Log error but continue with local cleanup
