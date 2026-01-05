@@ -67,9 +67,28 @@ export const handleLogout = async (router) => {
       // Show success message
       toast.success("You have been logged out successfully");
 
-      // Note: Backend logout API already invalidates the token for both Store Frontend and Patient Portal
-      // No need to redirect to Patient Portal - user stays on Store Frontend
-      // Patient Portal will be logged out automatically when user tries to access it (token is invalidated)
+      // Trigger Patient Portal logout via hidden iframe (SSO-style logout)
+      // This ensures Patient Portal cookies are cleared in the user's browser
+      const patientPortalUrl = process.env.NEXT_PUBLIC_PATIENT_PORTAL_URL;
+      if (patientPortalUrl) {
+        try {
+          const iframe = document.createElement("iframe");
+          iframe.style.display = "none";
+          iframe.src = `${patientPortalUrl}/api/logout`;
+          document.body.appendChild(iframe);
+
+          // Remove iframe after logout completes (2 seconds should be enough)
+          setTimeout(() => {
+            if (iframe.parentNode) {
+              iframe.remove();
+            }
+          }, 2000);
+
+          logger.log("Patient Portal logout iframe triggered");
+        } catch (iframeError) {
+          logger.warn("Error creating logout iframe:", iframeError);
+        }
+      }
 
       // Use Next.js router for smooth navigation to home
       if (router) {

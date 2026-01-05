@@ -19,16 +19,19 @@ export async function POST(req) {
     const cookieStore = await cookies();
     const userData = getUserDataFromCookies(cookieStore);
 
-    // Call the new logout API if we have an auth token
+    // Extract auth token for logout calls
+    let token = null;
     if (userData?.auth?.accessToken) {
-      try {
-        // Extract Bearer token if present
-        const authToken = userData.auth.accessToken;
-        const token = authToken.startsWith("Bearer ")
-          ? authToken.substring(7)
-          : authToken;
+      const authToken = userData.auth.accessToken;
+      token = authToken.startsWith("Bearer ")
+        ? authToken.substring(7)
+        : authToken;
+    }
 
-        logger.log("Logging out user with new auth API");
+    // Step 1: Call backend logout API (if we have a token)
+    if (token) {
+      try {
+        logger.log("Logging out user with backend API");
 
         // Get origin for Origin header (required for backend domain whitelist)
         const origin = getOrigin(req);
@@ -48,58 +51,20 @@ export async function POST(req) {
           }
         );
 
-        logger.log("User logged out successfully from backend API");
-
-        // Also call Patient Portal logout endpoint to ensure both apps are logged out
-        const patientPortalUrl = process.env.NEXT_PUBLIC_PATIENT_PORTAL_URL;
-        if (patientPortalUrl) {
-          try {
-            logger.log("Calling Patient Portal logout endpoint...", {
-              url: `${patientPortalUrl}/api/logout`,
-              hasToken: !!token,
-            });
-
-            // Call Patient Portal logout with only the required headers
-            await axios.post(
-              `${patientPortalUrl}/api/logout`,
-              {},
-              {
-                headers: {
-                  "Content-Type": "application/json",
-                  accept: "application/json",
-                  Authorization: `Bearer ${token}`,
-                },
-                // Set a timeout to avoid hanging if Patient Portal is unreachable
-                timeout: 5000,
-              }
-            );
-            logger.log("Patient Portal logged out successfully");
-          } catch (ppError) {
-            // Log detailed error for debugging
-            logger.error("Error calling Patient Portal logout:", {
-              message: ppError.message,
-              code: ppError.code,
-              status: ppError.response?.status,
-              statusText: ppError.response?.statusText,
-              data: ppError.response?.data,
-              url: ppError.config?.url,
-            });
-            // Don't fail the logout - Patient Portal logout is best effort
-            // The backend token is already invalidated, so Patient Portal will require re-login on next request
-          }
-        } else {
-          logger.warn(
-            "NEXT_PUBLIC_PATIENT_PORTAL_URL not configured, skipping Patient Portal logout"
-          );
-        }
+        logger.log("Backend logout successful");
       } catch (error) {
-        // Log error but continue with local cleanup
+        // Log error but continue with other logout steps
         logger.error(
-          "Error calling logout API (continuing with local cleanup):",
+          "Backend logout error (continuing with other logout steps):",
           error.response?.data || error.message
         );
       }
     }
+
+    // Note: Patient Portal logout is handled client-side via hidden iframe
+    // Server-side calls cannot clear cookies in the user's browser due to browser security restrictions
+    // The client-side logout handler (utils/logoutHandler.js) creates a hidden iframe
+    // that loads Patient Portal's logout endpoint, allowing Patient Portal to clear its own cookies
 
     // Clear all user-related cookies using unified service
     clearUserDataFromCookies(cookieStore);
