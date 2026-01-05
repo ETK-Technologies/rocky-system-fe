@@ -92,35 +92,67 @@ export const handleLogout = async (router) => {
 
         if (patientPortalUrl) {
           logger.log("Creating Patient Portal logout iframe...");
+
+          // Create hidden iframe
           const iframe = document.createElement("iframe");
           iframe.style.display = "none";
           iframe.width = "0";
           iframe.height = "0";
-          iframe.src = `${patientPortalUrl}/api/logout`;
 
           // Log when iframe loads
           iframe.onload = () => {
-            logger.log("✅ Patient Portal logout iframe loaded successfully");
+            logger.log("✅ Patient Portal logout iframe loaded");
+
+            // Remove iframe after a short delay
+            setTimeout(() => {
+              try {
+                if (iframe && iframe.parentNode) {
+                  iframe.remove();
+                  logger.log("Patient Portal logout iframe removed");
+                }
+              } catch (e) {
+                logger.warn("Error removing iframe:", e);
+              }
+            }, 2000);
           };
 
           iframe.onerror = (error) => {
             logger.error("❌ Patient Portal logout iframe error:", error);
           };
 
+          // Append iframe to DOM
           document.body.appendChild(iframe);
           logger.log("Patient Portal logout iframe appended to DOM");
 
-          // Remove iframe after logout completes (2 seconds should be enough)
-          setTimeout(() => {
-            try {
-              if (iframe && iframe.parentNode) {
-                iframe.remove();
-                logger.log("Patient Portal logout iframe removed");
+          // Try POST via form submission (works for cross-domain cookie clearing)
+          try {
+            // Create a form that will POST to Patient Portal
+            const form = document.createElement("form");
+            form.method = "POST";
+            form.action = `${patientPortalUrl}/api/logout`;
+            form.target = "patient-portal-logout-iframe";
+            form.style.display = "none";
+
+            // Append form, submit, then remove
+            document.body.appendChild(form);
+            form.submit();
+            logger.log("✅ Patient Portal logout form submitted (POST)");
+
+            // Remove form after submission
+            setTimeout(() => {
+              try {
+                if (form.parentNode) {
+                  form.remove();
+                }
+              } catch (e) {
+                // Ignore
               }
-            } catch (e) {
-              logger.warn("Error removing iframe:", e);
-            }
-          }, 2000);
+            }, 100);
+          } catch (formError) {
+            logger.warn("Form POST failed, trying GET fallback:", formError);
+            // Fallback: Use GET request (Patient Portal should support GET for logout)
+            iframe.src = `${patientPortalUrl}/api/logout`;
+          }
 
           logger.log("✅ Patient Portal logout iframe triggered");
         } else {
