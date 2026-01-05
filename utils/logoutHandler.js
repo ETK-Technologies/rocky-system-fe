@@ -24,10 +24,15 @@ export const handleLogout = async (router) => {
 
     const data = await response.json();
 
+    logger.log("🔍 Logout API Response:", {
+      success: data.success,
+      hasPatientPortalUrl: !!data.patientPortalUrl,
+      patientPortalUrl: data.patientPortalUrl,
+      fullData: data,
+    });
+
     if (response.ok && data.success) {
-      logger.log("Logout API call successful", {
-        hasPatientPortalUrl: !!data.patientPortalUrl,
-      });
+      logger.log("Logout API call successful");
 
       // Clear ALL cached and saved data (comprehensive cleanup)
       clearAllCache();
@@ -69,10 +74,14 @@ export const handleLogout = async (router) => {
       // Trigger Patient Portal logout via hidden iframe (SSO-style logout)
       // This ensures Patient Portal cookies are cleared in the user's browser
       // MUST happen BEFORE navigation to ensure it executes
+      logger.log("🔍 About to trigger Patient Portal logout...");
+
       try {
         // Get Patient Portal URL from API response (more reliable than env var)
         const patientPortalUrl =
           data.patientPortalUrl || process.env.NEXT_PUBLIC_PATIENT_PORTAL_URL;
+
+        logger.log("🔍 Inside Patient Portal logout try block");
 
         logger.log("Patient Portal URL check:", {
           fromAPI: !!data.patientPortalUrl,
