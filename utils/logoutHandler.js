@@ -70,7 +70,7 @@ export const handleLogout = async (router) => {
       // Note: Backend logout API already invalidates the token for both Store Frontend and Patient Portal
       // No need to redirect to Patient Portal - user stays on Store Frontend
       // Patient Portal will be logged out automatically when user tries to access it (token is invalidated)
-      
+
       // Use Next.js router for smooth navigation to home
       if (router) {
         // Small delay to show toast and allow UI updates
