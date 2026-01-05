@@ -45,7 +45,35 @@ export async function POST(req) {
           }
         );
 
-        logger.log("User logged out successfully from API");
+        logger.log("User logged out successfully from backend API");
+
+        // Also call Patient Portal logout endpoint to ensure both apps are logged out
+        const patientPortalUrl = process.env.NEXT_PUBLIC_PATIENT_PORTAL_URL;
+        if (patientPortalUrl) {
+          try {
+            logger.log("Calling Patient Portal logout endpoint...");
+            await axios.post(
+              `${patientPortalUrl}/api/logout`,
+              {},
+              {
+                headers: {
+                  "Content-Type": "application/json",
+                  accept: "application/json",
+                  Authorization: `Bearer ${token}`,
+                },
+                // Set a timeout to avoid hanging if Patient Portal is unreachable
+                timeout: 5000,
+              }
+            );
+            logger.log("Patient Portal logged out successfully");
+          } catch (ppError) {
+            // Log error but don't fail the logout - Patient Portal logout is best effort
+            logger.warn(
+              "Error calling Patient Portal logout (continuing with Store Frontend logout):",
+              ppError.response?.data || ppError.message
+            );
+          }
+        }
       } catch (error) {
         // Log error but continue with local cleanup
         logger.error(
