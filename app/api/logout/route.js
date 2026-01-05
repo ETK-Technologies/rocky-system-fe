@@ -59,7 +59,7 @@ export async function POST(req) {
               hasToken: !!token,
             });
 
-            // Use the same headers as backend call for consistency
+            // Call Patient Portal logout with only the required headers
             await axios.post(
               `${patientPortalUrl}/api/logout`,
               {},
@@ -67,17 +67,10 @@ export async function POST(req) {
                 headers: {
                   "Content-Type": "application/json",
                   accept: "application/json",
-                  "X-App-Key": process.env.NEXT_PUBLIC_APP_KEY,
-                  "X-App-Secret": process.env.NEXT_PUBLIC_APP_SECRET,
-                  Origin: origin,
                   Authorization: `Bearer ${token}`,
                 },
                 // Set a timeout to avoid hanging if Patient Portal is unreachable
                 timeout: 5000,
-                // Don't follow redirects
-                maxRedirects: 0,
-                // Validate status - accept 2xx and 3xx
-                validateStatus: (status) => status >= 200 && status < 400,
               }
             );
             logger.log("Patient Portal logged out successfully");
