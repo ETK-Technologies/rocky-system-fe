@@ -8,6 +8,7 @@ export default function PhotoIDUploadWarning({
   answer,
   onAnswerChange,
   onBack,
+  onNext,
 }) {
   const [isChecked, setIsChecked] = useState(false);
 
@@ -120,7 +121,9 @@ export default function PhotoIDUploadWarning({
             onClick={() => {
               if (isChecked) {
                 onAnswerChange({ answerType: "text", answer: "acknowledged" });
-                onBack();
+                if (onNext) {
+                  onNext();
+                }
               }
             }}
             disabled={!isChecked}

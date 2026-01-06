@@ -178,7 +178,7 @@ const RecommendationStep = ({
   }
 
   return (
-    <div ref={containerRef} className="w-full md:w-[520px] mx-auto px-5 md:px-0 flex flex-col min-h-screen relative">
+    <div ref={containerRef} className="w-full md:w-[520px] mx-auto md:px-0 flex flex-col min-h-screen relative">
       {/* Full-screen loading overlay */}
       {isLoading && (
         <div className="fixed inset-0 z-[999999] flex items-center justify-center bg-black bg-opacity-30">
@@ -223,10 +223,9 @@ const RecommendationStep = ({
       )}
 
       {/* Progress indicator */}
-      <div className="mb-6">
+      <div>
         <div className="w-full md:w-[520px] mx-auto">
           <Logo />
-          <br />
           <div className="progress-indicator mb-2 text-[#A7885A] font-medium">
             <span className="text-sm">Here's what we recommended</span>
           </div>
@@ -241,7 +240,7 @@ const RecommendationStep = ({
 
       <div className="flex-grow">
         {/* Title */}
-        <h2 className="text-2xl font-semibold text-start text-[#000000] my-6">
+        <h2 className="text-[26px] md:text-[32px] my-4 text-center font-medium">
           {title || "Your treatment plan"}
         </h2>
 

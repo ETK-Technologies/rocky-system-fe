@@ -68,13 +68,13 @@ const DosageSelectionModal = ({
   };
 
   return (
-    <div className="fixed w-screen h-screen m-auto bg-[#FFFFFF] z-[9999] top-[0] left-[0] flex flex-col tracking-tight">
+    <div className="fixed w-screen h-screen m-auto bg-[#F5F4EF] z-[9999] top-[0] left-[0] flex flex-col tracking-tight">
       <div className="w-[100%] p-5 mt-5 min-h-fit mx-auto pb-4 flex flex-col items-center h-full overflow-y-scroll">
         <div className="w-full max-w-[500px] p-2">
-          <p className="mb-4 text-3xl lg:text-5xl font-bold headers-font">
+          <p className="text-[26px] md:text-[32px] mb-4 text-left font-medium">
             Select preferred dose
           </p>
-          <p className="text-sm mb-10 text-[#00000073]">
+          <p className="text-sm mb-10 text-[#000000] max-w-lg text-left leading-relaxed font-medium">
             Please note this is only a request. The prescription remains at the
             clinician's discretion. If you already have a prescription with us,
             please message your clinician for changes as selections here will
@@ -83,7 +83,7 @@ const DosageSelectionModal = ({
 
           {availableDosages.length > 0 && (
             <div className="flex flex-col gap-4">
-              <p>
+              <p className=" text-base text-left text-[#A0693B]">
                 If this is your first time trying this medication, we recommend
                 the following dosage strength:
               </p>
@@ -104,7 +104,7 @@ const DosageSelectionModal = ({
 
               {availableDosages.length > 1 && (
                 <>
-                  <p className="mt-5">
+                  <p className="mt-5 text-base text-left text-[#A0693B]">
                     If you've used the medication before, you can request the
                     following dosage strength
                     {availableDosages.length > 2 ? "s" : ""}:
@@ -143,11 +143,13 @@ const DosageSelectionModal = ({
             </p>
           )}
 
-          <div className="w-full flex justify-center">
+
+    
+          <div className="fixed bottom-0 left-0 right-0 md:left-auto md:right-auto px-5 md:px-0 md:w-[520px]  pb-4 flex items-center justify-center z-50">
             <button
               onClick={onContinue}
               disabled={isLoading}
-              className="bg-[#814B00] p-[13px] px-[60px] rounded-lg text-white font-bold mt-[46px] disabled:bg-gray-400 flex items-center justify-center gap-2"
+              className=" w-full py-3 bg-black text-white rounded-full font-medium disabled:bg-gray-400 flex items-center justify-center gap-2"
             >
               {isLoading ? (
                 <>
@@ -161,13 +163,9 @@ const DosageSelectionModal = ({
           </div>
         </div>
       </div>
-
-      <button
-        onClick={onClose}
-        className="leading-[21px] font-bold new-popup-dialog-close-button absolute top-[5px] right-[5px] md:top-[20px] md:right-[40px] z-[99999] cursor-pointer border border-gray-400 border-solid rounded-[25px] w-[25px] h-[25px] text-center text-black"
-      >
-        x
-      </button>
+      
+     
+     
     </div>
   );
 };

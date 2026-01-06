@@ -8,13 +8,14 @@ export default function PleaseKeepInMind({
   answer,
   onAnswerChange,
   onBack,
+  onNext,
 }) {
   const [isChecked, setIsChecked] = useState(false);
 
   const handleContinue = () => {
     if (!isChecked) return;
-    if (onBack) {
-      onBack();
+    if (onNext) {
+      onNext();
     }
   };
 

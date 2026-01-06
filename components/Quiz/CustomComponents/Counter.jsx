@@ -4,13 +4,11 @@ import { logger } from "@/utils/devLogger";
 import React, { useState, useEffect } from "react";
 
 const Counter = ({ step, answer, onAnswerChange }) => {
-  logger.log("Counter Component - step:", step);
-  logger.log("Counter Component - answer:", answer);
   // Get configuration from step or use defaults
   const seconds = 3;
   const texts = [
-    "Your height is {height}",
-    "Your weight is {weight}",
+    `Your height is ${answer.height.feet},${answer.height.inches}"`,
+    `Your weight is ${answer.weight} lbs`,
     "Calculating based on clinical data",
   ];
   const title = "Calculating your potential weight loss";
@@ -20,42 +18,28 @@ const Counter = ({ step, answer, onAnswerChange }) => {
   const [completed, setCompleted] = useState(false);
 
   useEffect(() => {
-    const timer = setInterval(() => {
-      setCount((prevCount) => prevCount - 1);
-    }, 1000);
-    return () => clearInterval(timer);
-  }, []);
-
-  useEffect(() => {
-    if (count <= 0 && !completed) {
-      setCompleted(true);
-      // Save answer when countdown completes
-      const timeout = setTimeout(() => {
-        if (onAnswerChange) {
-          onAnswerChange({
-            answerType: "text",
-            answer: {
-              completed: true,
-              timestamp: new Date().toISOString(),
-              duration: seconds,
-            },
-          });
+    if (count > 0) {
+      const timer = setTimeout(() => {
+        setCount(count - 1);
+        if (visibleTextIndex < texts.length - 1) {
+          setVisibleTextIndex(visibleTextIndex + 1);
         }
-      }, 500); // 500ms delay
-      return () => clearTimeout(timeout);
+      }, 1000);
+      return () => clearTimeout(timer);
+    } else if (!completed) {
+      setCompleted(true);
+      if (onAnswerChange) {
+        onAnswerChange({
+          answerType: "text",
+          answer: {
+            completed: true,
+            timestamp: new Date().toISOString(),
+            duration: seconds,
+          },
+        });
+      }
     }
-  }, [count, completed, onAnswerChange, seconds]);
-
-  useEffect(() => {
-    if (!texts || texts.length === 0) return;
-    if (visibleTextIndex < texts.length - 1) {
-      const interval = (seconds * 1000) / texts.length;
-      const textTimer = setTimeout(() => {
-        setVisibleTextIndex((prev) => prev + 1);
-      }, interval);
-      return () => clearTimeout(textTimer);
-    }
-  }, [visibleTextIndex, texts, seconds]);
+  }, [count, visibleTextIndex, completed, onAnswerChange, texts.length, seconds]);
 
   const size = 150;
   const strokeWidth = 8;

@@ -40,9 +40,17 @@ import EDMedicationInteractionWarning from "./EDMedicationInteractionWarning";
 import EDNoAppointmentAcknowledgement from "./EDNoAppointmentAcknowledgement";
 import BodyPhotosUpload from "./BodyPhotosUpload";
 import AllIncluded from "./AllIncluded";
+import FaqsSection from "./EDFaqs";
 
 // Component registry with metadata
 export const COMPONENT_REGISTRY = {
+
+
+  FaqsEdRecommedation: {
+    component: FaqsSection,
+    name: "FaqsEdRecommedation",
+    description: "Frequently Asked Questions section",
+  },
 
 
   AllIncluded: {
