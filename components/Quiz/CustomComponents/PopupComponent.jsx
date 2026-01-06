@@ -20,7 +20,7 @@ export default function PopupComponent({
 
   return (
     <div
-      className="fixed inset-0 bg-white !z-[999999] flex flex-col"
+      className="fixed inset-0 bg-[#F5F4EF] !z-[999999] flex flex-col"
       style={{
         animation: "fadeIn 0.3s ease-in-out",
       }}
@@ -38,28 +38,24 @@ export default function PopupComponent({
 
       <div className="flex-1 flex flex-col overflow-y-auto pb-[80px] md:pb-[100px]">
         <div className="w-full md:w-[520px] max-w-xl mx-auto px-5 md:px-0 py-4 relative flex flex-col">
-          <div className="relative flex items-center justify-center py-4 px-4">
-            <button
-              onClick={onBack}
-              className="absolute left-4 text-2xl text-black"
-              aria-label="Go back"
-            >
-              ‹
-            </button>
+          <div className="relative flex items-center justify-center  px-4">
             <Logo />
           </div>
 
-          <h3 className="text-[18px] md:text-[20px] text-black mb-8">
-           Sorry, you are not eligible for our weight loss program
+          <h3 className=" headers-font text-[26px] md:text-[32px] leading-[120%] mb-[16px] text-center">
+            Sorry, you are not eligible for our weight loss program
           </h3>
-
-          <p
-            className="text-[16px] md:text-[18px] mb-8 text-[#000000] text-left"
-            style={{ fontFamily: "Fellix" }}
-          >
-           Based on your answers, GLP-1 therapy through our online program would not be a good fit. Your health is very important to us, and some conditions/medications require more personalized, in-person support to ensure the best and safest care. We recommend you visit your usual doctor.
-
-          </p>
+          <div className="text-[14px] md:text-[16px] leading-[140%] mb-[24px] rounded-lg p-[16px]">
+            <p className="">
+              <center>
+                Based on your answers, GLP-1 therapy through our online program
+                would not be a good fit. Your health is very important to us,
+                and some conditions/medications require more personalized,
+                in-person support to ensure the best and safest care. We
+                recommend you visit your usual doctor.
+              </center>
+            </p>
+          </div>
         </div>
       </div>
 
@@ -67,7 +63,6 @@ export default function PopupComponent({
         <div className="flex flex-col items-center justify-center max-w-md mx-auto">
           <button
             onClick={() => {
-              
               onBack();
             }}
             className="w-full py-4 px-4 rounded-full text-white font-medium text-lg bg-black"

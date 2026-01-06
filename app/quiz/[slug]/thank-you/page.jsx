@@ -4,6 +4,9 @@ import { useState, useEffect, use } from "react";
 import { useRouter } from "next/navigation";
 import { logger } from "@/utils/devLogger";
 import { FaCheckCircle, FaFacebook, FaInstagram, FaTwitter } from "react-icons/fa";
+import EDThankYou from "@/components/Quiz/ThankYouPages/EDThankYou";
+import HairThankYou from "@/components/Quiz/ThankYouPages/HairThankYou";
+import WLThankYou from "@/components/Quiz/ThankYouPages/WLThankYou";
 
 export default function QuizThankYouPage({ params }) {
   const router = useRouter();
@@ -49,6 +52,31 @@ export default function QuizThankYouPage({ params }) {
     return null;
   }
 
+  // Determine quiz type from slug
+  const getQuizType = () => {
+    const slugLower = slug.toLowerCase();
+    if (slugLower.includes('ed')) return 'ed';
+    if (slugLower.includes('hair')) return 'hair';
+    if (slugLower.includes('wl') || slugLower.includes('weight')) return 'wl';
+    return 'default';
+  };
+
+  const quizType = getQuizType();
+
+  // Render specific thank you page based on quiz type
+  if (quizType === 'ed') {
+    return <EDThankYou />;
+  }
+
+  if (quizType === 'hair') {
+    return <HairThankYou />;
+  }
+
+  if (quizType === 'wl') {
+    return <WLThankYou />;
+  }
+
+  // Default thank you page
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
       <div className="max-w-2xl w-full bg-white rounded-lg shadow-lg p-8 md:p-12">

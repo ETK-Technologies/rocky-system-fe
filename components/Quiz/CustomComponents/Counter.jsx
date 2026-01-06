@@ -6,9 +6,14 @@ import React, { useState, useEffect } from "react";
 const Counter = ({ step, answer, onAnswerChange }) => {
   // Get configuration from step or use defaults
   const seconds = 3;
+  
+  // Default values if answer is undefined or missing properties
+  const height = answer?.height || { feet: 3, inches: 3 };
+  const weight = answer?.weight || 150;
+  
   const texts = [
-    `Your height is ${answer.height.feet},${answer.height.inches}"`,
-    `Your weight is ${answer.weight} lbs`,
+    `Your height is ${height.feet}'${height.inches}"`,
+    `Your weight is ${weight} lbs`,
     "Calculating based on clinical data",
   ];
   const title = "Calculating your potential weight loss";

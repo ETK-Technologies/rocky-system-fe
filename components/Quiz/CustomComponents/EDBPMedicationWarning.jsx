@@ -99,7 +99,7 @@ export default function EDBPMedicationWarning({
                 checked={isChecked}
                 onChange={(e) => setIsChecked(e.target.checked)}
               />
-              <span className="text-[16px] md:text-[18px]  subheaders-font pb-4">
+              <span className="text-xl subheaders-font pb-4">
                 I hereby understand and consent to the above waiver
               </span>
             </label>

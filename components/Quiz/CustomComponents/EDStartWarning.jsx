@@ -22,10 +22,7 @@ export default function EDStartWarning({
 
   return (
     <div
-      className="fixed inset-0 bg-white !z-[999999] flex flex-col"
-      style={{
-        animation: "fadeIn 0.3s ease-in-out",
-      }}
+      className=" fixed inset-0 bg-[#F5F4EF] !z-[999999] flex flex-col"
     >
       <style jsx>{`
         @keyframes fadeIn {
@@ -51,13 +48,13 @@ export default function EDStartWarning({
             <Logo />
           </div>
 
-          <h3 className="text-[18px] md:text-[20px] text-black mb-8">
+          <h3 className="text-[26px] md:text-[32px] text-[#C19A6B] font-semibold mb-8">
             Please Read
           </h3>
 
           <p
-            className="text-[16px] md:text-[18px] mb-8 text-[#000000] text-left"
-            style={{ fontFamily: "Fellix" }}
+            className="text-[20px] md:text-[24px] mb-8 text-[#000000] text-left"
+            
           >
             ED can have a variety of underlying causes, some of which may require treatment. We recommend you schedule an appointment with your doctor to discuss this further and arrange any necessary tests. For now, let Rocky do some of the work for you.
           </p>
@@ -99,7 +96,7 @@ export default function EDStartWarning({
                 checked={isChecked}
                 onChange={(e) => setIsChecked(e.target.checked)}
               />
-              <span className="text-[16px] md:text-[18px]  subheaders-font pb-4">
+              <span className="text-xl subheaders-font pb-4">
                 I hereby understand and consent to the above waiver
               </span>
             </label>

@@ -609,7 +609,7 @@ export default function QuizRenderer({
               <StepRenderer
                 step={currentStep}
                 answer={currentAnswer}
-                allAnswers={answers}
+                allAnswers={answers && Object.keys(answers).length > 0 ? answers : existingAnswers}
                 onAnswerChange={handleAnswerChange}
                 onBack={handleBack}
                 onNext={handleNext}
