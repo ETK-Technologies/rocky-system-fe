@@ -350,12 +350,14 @@ export default function QuizPage({ params }) {
         }
       `}</style>
       <div className="min-h-screen">
-        <QuizRenderer
-          quizData={quizData}
-          sessionData={sessionData}
-          existingAnswers={existingAnswers}
-          onComplete={handleQuizComplete}
-        />
+        <div className="w-full md:w-[520px] px-5 md:px-0 mx-auto">
+          <QuizRenderer
+            quizData={quizData}
+            sessionData={sessionData}
+            existingAnswers={existingAnswers}
+            onComplete={handleQuizComplete}
+          />
+        </div>
       </div>
     </>
   );

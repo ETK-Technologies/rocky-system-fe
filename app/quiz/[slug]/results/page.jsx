@@ -334,19 +334,21 @@ export default function QuizResultsPage({ params }) {
 
   return (
     <>
-      <RecommendationStep
-        step={stepData}
-        selectedProduct={selectedProduct}
-        setSelectedProduct={handleProductSelection}
-        onContinue={handleContinue}
-        ProductCard={ProductCard}
-        showAlternatives={alternativeProds.length > 0}
-        variations={[]}
-        showIncluded={true}
-        isLoading={isAddingToCart}
-        flowType={flowType}
-        
-      />
+      <div className="w-full md:max-w-[520px] px-5 md:px-0 mx-auto">
+        <RecommendationStep
+          step={stepData}
+          selectedProduct={selectedProduct}
+          setSelectedProduct={handleProductSelection}
+          onContinue={handleContinue}
+          ProductCard={ProductCard}
+          showAlternatives={alternativeProds.length > 0}
+          variations={[]}
+          showIncluded={true}
+          isLoading={isAddingToCart}
+          flowType={flowType}
+          
+        />
+      </div>
 
       {/* Cross-Sell Modal */}
       {showCrossSellModal && selectedProduct && currentResult?.productsData && (

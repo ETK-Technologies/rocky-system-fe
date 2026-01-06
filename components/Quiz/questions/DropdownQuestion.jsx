@@ -1,3 +1,5 @@
+import QuestionTitle from "./Shared/QuestionTitle";
+
 export default function DropdownQuestion({ step, answer, onAnswerChange }) {
   const { title, description, options } = step;
 
@@ -26,10 +28,7 @@ export default function DropdownQuestion({ step, answer, onAnswerChange }) {
 
   return (
     <div>
-      <h2 className="subheaders-font text-[26px] md:text-[32px] font-medium leading-[120%] text-gray-900 mb-2">{title}</h2>
-      {description && (
-        <p className="text-gray-600 mb-6">{description}</p>
-      )}
+      <QuestionTitle title={title} description={description} />
 
       <select
         value={selectedValue || ""}

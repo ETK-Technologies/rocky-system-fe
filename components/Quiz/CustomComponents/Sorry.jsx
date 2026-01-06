@@ -3,7 +3,7 @@
 import Logo from "@/components/Navbar/Logo";
 import { useState, useEffect } from "react";
 
-export default function Sorry({ step, answer, onAnswerChange, onBack }) {
+export default function Sorry({ step, answer, onAnswerChange, onBack, onNext }) {
   const [isChecked, setIsChecked] = useState(false);
 
   useEffect(() => {
@@ -109,8 +109,8 @@ export default function Sorry({ step, answer, onAnswerChange, onBack }) {
         <div className="flex flex-col items-center justify-center max-w-md mx-auto">
           <button
             onClick={() => {
-              if (isChecked && onBack) {
-                onBack();
+              if (isChecked && onNext) {
+                onNext();
               }
             }}
             disabled={!isChecked}
