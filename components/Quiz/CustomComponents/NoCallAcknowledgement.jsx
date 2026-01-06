@@ -27,12 +27,7 @@ export default function NoCallAcknowledgement({
   };
 
   return (
-    <div
-      className="fixed inset-0 bg-white !z-[999999] flex flex-col"
-      style={{
-        animation: "fadeIn 0.3s ease-in-out",
-      }}
-    >
+    <div className="fixed inset-0 bg-[#F5F4EF] !z-[999999] flex flex-col">
       <style jsx>{`
         @keyframes fadeIn {
           from {
@@ -61,10 +56,7 @@ export default function NoCallAcknowledgement({
             No Call Acknowledgement
           </h3>
 
-          <p
-            className="text-[16px] md:text-[18px] mb-8 text-[#000000] text-left"
-            style={{ fontFamily: "Fellix" }}
-          >
+          <p className="text-[20px] md:text-[24px] mb-8 text-[#000000] text-left">
             I hereby acknowledge that by foregoing an appointment with a
             licensed physician or pharmacist, it is my sole responsibility to
             ensure I am aware of how to appropriately use the medication
@@ -114,7 +106,7 @@ export default function NoCallAcknowledgement({
                 checked={isChecked}
                 onChange={(e) => setIsChecked(e.target.checked)}
               />
-              <span className="text-[16px] md:text-[18px]  subheaders-font pb-4">
+              <span className="text-xl subheaders-font pb-4">
                 I hereby understand and consent to the above waiver
               </span>
             </label>

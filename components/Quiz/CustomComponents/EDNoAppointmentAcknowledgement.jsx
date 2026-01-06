@@ -8,6 +8,7 @@ export default function EDNoAppointmentAcknowledgement({
   answer,
   onAnswerChange,
   onBack,
+  onNext,
 }) {
   const [isChecked, setIsChecked] = useState(false);
 
@@ -21,18 +22,15 @@ export default function EDNoAppointmentAcknowledgement({
   }, []);
 
   const handleRequestCallInstead = () => {
-    if (onBack) {
+    if (onNext) {
+      onNext();
+    } else {
       onBack();
     }
   };
 
   return (
-    <div
-      className="fixed inset-0 bg-white !z-[999999] flex flex-col"
-      style={{
-        animation: "fadeIn 0.3s ease-in-out",
-      }}
-    >
+    <div className="fixed inset-0 bg-[#F5F4EF] !z-[999999] flex flex-col">
       <style jsx>{`
         @keyframes fadeIn {
           from {
@@ -57,14 +55,11 @@ export default function EDNoAppointmentAcknowledgement({
             <Logo />
           </div>
 
-          <h3 className="text-[18px] md:text-[20px] text-black mb-8">
+          <h3 className="text-[26px] md:text-[32px] text-[#C19A6B] font-semibold mb-8">
             Acknowledgement
           </h3>
 
-          <p
-            className="text-[16px] md:text-[18px] mb-8 text-[#000000] text-left"
-            style={{ fontFamily: "Fellix" }}
-          >
+          <p className="text-[20px] md:text-[24px] mb-8 text-[#000000] text-left">
             I hereby acknowledge that by foregoing an appointment with a licensed physician or pharmacist, it is my sole responsibility to ensure I am aware of how to appropriately use the medication requested, furthermore I hereby confirm that I am aware of any potential side effects that may occur through the use of the aforementioned medication and hereby confirm that I do not have any medical questions to ask. I will ensure I have read the relevant product page and FAQ prior to use of the prescribed medication. Should I have any questions to ask, I am aware of how to contact the clinical team at Rocky or get a hold of my primary care provider.
           </p>
 
@@ -105,7 +100,7 @@ export default function EDNoAppointmentAcknowledgement({
                 checked={isChecked}
                 onChange={(e) => setIsChecked(e.target.checked)}
               />
-              <span className="text-[16px] md:text-[18px]  subheaders-font pb-4">
+              <span className="text-xl subheaders-font pb-4">
                 I hereby understand and consent to the above waiver
               </span>
             </label>

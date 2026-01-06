@@ -21,12 +21,7 @@ export default function HighBloodPressureWarning({
   }, []);
 
   return (
-    <div
-      className="fixed inset-0 bg-white !z-[999999] flex flex-col"
-      style={{
-        animation: "fadeIn 0.3s ease-in-out",
-      }}
-    >
+    <div className="fixed inset-0 bg-[#F5F4EF] !z-[999999] flex flex-col">
       <style jsx>{`
         @keyframes fadeIn {
           from {
@@ -51,14 +46,11 @@ export default function HighBloodPressureWarning({
             <Logo />
           </div>
 
-          <h3 className="text-[18px] md:text-[20px] text-black mb-8">
+          <h3 className="text-[26px] md:text-[32px] text-[#C19A6B] font-semibold mb-8">
             High Blood Pressure
           </h3>
 
-          <p
-            className="text-[16px] md:text-[18px] mb-8 text-[#000000] text-left"
-            style={{ fontFamily: "Fellix" }}
-          >
+          <p className="text-[20px] md:text-[24px] mb-8 text-[#000000] text-left">
             This is considered high. We'll be able to give you your prescription but please speak to your doctor to discuss your blood pressure.
           </p>
 
@@ -99,7 +91,7 @@ export default function HighBloodPressureWarning({
                 checked={isChecked}
                 onChange={(e) => setIsChecked(e.target.checked)}
               />
-              <span className="text-[16px] md:text-[18px]  subheaders-font pb-4">
+              <span className="text-xl subheaders-font pb-4">
                 I hereby understand and consent to the above waiver
               </span>
             </label>

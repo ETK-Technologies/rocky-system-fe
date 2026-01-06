@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from "react";
+import { getProductConfig } from "@/components/Quiz/Config/productConfig";
+import { logger } from "@/utils/devLogger";
 
 const WLProductCard = ({ product, onSelect, isSelected }) => {
   const [showMobilePopup, setShowMobilePopup] = useState(false);
@@ -16,6 +18,10 @@ const WLProductCard = ({ product, onSelect, isSelected }) => {
 
   if (!product) return null;
 
+  // Get static configuration for this product
+  const productConfig = getProductConfig("weightLoss", product.id);
+
+  logger.log("Rendering WLProductCard for product:", product.id);
   
   // Get image from various possible sources
   const imageUrl = product.image;
@@ -24,8 +30,17 @@ const WLProductCard = ({ product, onSelect, isSelected }) => {
   const productName = product.name;
   const showRegistered = productName !== "Rybelsus";
   
-  // Get description/tagline
-  const description = product.description;
+  // Get description - use config if available, otherwise use product data
+  const description = productConfig?.description || product.description;
+  
+  // Get details from config
+  const details = productConfig?.details || product.details;
+  
+  // Get features from config
+  const features = productConfig?.features || [];
+  
+  // Get badge from config
+  const badge = productConfig?.badge;
   
   // Get price
   const price = product.price;
@@ -49,11 +64,13 @@ const WLProductCard = ({ product, onSelect, isSelected }) => {
         onClick={() => isAvailable && onSelect && onSelect(product)}
       >
         <div className="flex justify-between">
-          {isAvailable ? (
+          
+          {isAvailable && (
             <p className="text-[#047000] w-fit bg-[#D0FDD0] rounded-full py-[2px] px-[10px] font-normal text-sm">
               Supply available
             </p>
-          ) : (
+          )}
+          { !isAvailable && (
             <p className="text-[#C53030] w-fit bg-red-400 rounded-full py-[2px] px-[10px] font-normal text-sm">
               Out of stock
             </p>
@@ -83,15 +100,11 @@ const WLProductCard = ({ product, onSelect, isSelected }) => {
           )}
         </h2>
         
-        {/* <p className="text-sm md:text-base text-[#212121]">
+        <p className="text-sm md:text-base text-[#212121]">
           {description}
-        </p> */}
+        </p>
         
-        {price && (
-          <p className="text-lg font-semibold text-[#000000] mt-2">
-            ${price}
-          </p>
-        )}
+       
         
         {imageUrl && imageUrl.trim() && (
           <div className="w-full h-full mt-2 relative">
@@ -113,8 +126,21 @@ const WLProductCard = ({ product, onSelect, isSelected }) => {
           </div>
         )}
         
-        {product.details && (
-          <p className="text-sm text-[#212121] mt-1">{product.details}</p>
+        {details && (
+          <p className="text-sm text-[#212121] mt-1">{details}</p>
+        )}
+
+        {features && features.length > 0 && (
+          <div className="flex flex-wrap gap-2 mt-3">
+            {features.map((feature, index) => (
+              <div 
+                key={index} 
+                className="inline-flex items-center max-w-max text-[12px] font-normal leading-[140%] bg-[#FBF9F7] border border-[#E2E2E1] px-2 rounded-full py-1"
+              >
+                {feature.title}
+              </div>
+            ))}
+          </div>
         )}
 
         
