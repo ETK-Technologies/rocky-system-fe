@@ -16,6 +16,7 @@ const CartAndPayment = ({
   isPaymentValid,
   paymentValidationMessage,
   onStripeReady, // Callback for Stripe Elements
+  onPaymentMethodSelect, // Callback when payment method is selected
 }) => {
   return (
     <div className="bg-[#f7f7f7] h-full justify-self-start w-full px-4 mt-8 lg:mt-0 lg:pl-[80px] lg:pt-[50px] pb-10 overflow-x-hidden">
@@ -37,6 +38,7 @@ const CartAndPayment = ({
         setFormData={setFormData}
         formData={formData}
         onStripeReady={onStripeReady}
+        onPaymentMethodSelect={onPaymentMethodSelect}
       />
       <button
         onClick={handleSubmit}

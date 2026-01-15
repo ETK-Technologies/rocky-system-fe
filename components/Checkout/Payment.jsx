@@ -1,20 +1,30 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useElements } from "@stripe/react-stripe-js";
 import StripeCardInput from "./StripeCardInput";
+import SavedPaymentMethods from "./SavedPaymentMethods";
 
 const Payment = ({
   setFormData,
   onStripeReady, // Callback for Stripe Elements
   formData, // Get form data to pass customer info
+  onPaymentMethodSelect, // Callback when payment method is selected
 }) => {
   const elements = useElements(); // Get Stripe Elements instance
+  const [selectedPaymentMethodId, setSelectedPaymentMethodId] = useState("new");
 
-  // Call onStripeReady when elements is ready
+  // Call onStripeReady when elements is ready and "new card" is selected
   useEffect(() => {
-    if (elements && onStripeReady) {
+    if (elements && onStripeReady && selectedPaymentMethodId === "new") {
       onStripeReady(elements);
     }
-  }, [elements, onStripeReady]);
+  }, [elements, onStripeReady, selectedPaymentMethodId]);
+
+  const handlePaymentMethodSelect = (paymentMethodId) => {
+    setSelectedPaymentMethodId(paymentMethodId);
+    if (onPaymentMethodSelect) {
+      onPaymentMethodSelect(paymentMethodId);
+    }
+  };
 
   return (
     <div className="bg-white w-full lg:max-w-[512px] p-4 md:p-6 rounded-[16px] shadow-[0px_1px_1px_0px_#E2E2E1] border border-[#E2E2E1] mt-8">
@@ -22,18 +32,29 @@ const Payment = ({
         Payment Method
       </h2>
       <div className="mt-2">
-        <label className="block text-sm font-medium text-[#251F20] mb-2">
-          Card Details
-        </label>
-        <StripeCardInput
-          customerData={{
-            name: `${formData.billing_address.first_name || ""} ${
-              formData.billing_address.last_name || ""
-            }`.trim(),
-            email: formData.billing_address.email || "",
-            phone: formData.billing_address.phone || "",
-          }}
+        <SavedPaymentMethods
+          onSelectPaymentMethod={handlePaymentMethodSelect}
+          selectedPaymentMethodId={selectedPaymentMethodId}
         />
+        
+        {/* Only show Payment Element when "Add new card" is selected */}
+        {selectedPaymentMethodId === "new" && (
+          <>
+            <label className="block text-sm font-medium text-[#251F20] mb-2">
+              Card Details
+            </label>
+            <StripeCardInput
+              customerData={{
+                name: `${formData.billing_address.first_name || ""} ${
+                  formData.billing_address.last_name || ""
+                }`.trim(),
+                email: formData.billing_address.email || "",
+                phone: formData.billing_address.phone || "",
+              }}
+            />
+          </>
+        )}
+        
         <p className="mt-2 text-xs text-gray-600 flex items-center gap-1">
           <svg
             className="w-4 h-4 text-green-600"

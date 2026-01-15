@@ -137,6 +137,7 @@ const CheckoutPageContent = () => {
   // Stripe Elements state (for embedded payment form)
   const [stripeElements, setStripeElements] = useState(null);
   const [stripeReady, setStripeReady] = useState(false);
+  const [selectedPaymentMethodId, setSelectedPaymentMethodId] = useState("new");
 
   // Initialize checkout validation hook
   const {
@@ -196,12 +197,19 @@ const CheckoutPageContent = () => {
   const [paymentValidationMessage, setPaymentValidationMessage] = useState("");
 
   // Validate payment method - Stripe Elements handles validation internally
+  // Also valid if a saved payment method is selected
   useEffect(() => {
-    // For Stripe Elements payments, always consider valid
-    // (Stripe Elements handles validation internally on submit)
-    setIsPaymentValid(true);
-    setPaymentValidationMessage("");
-  }, []);
+    // If a saved payment method is selected (not "new"), payment is valid
+    if (selectedPaymentMethodId && selectedPaymentMethodId !== "new") {
+      setIsPaymentValid(true);
+      setPaymentValidationMessage("");
+    } else {
+      // For Stripe Elements payments, always consider valid
+      // (Stripe Elements handles validation internally on submit)
+      setIsPaymentValid(true);
+      setPaymentValidationMessage("");
+    }
+  }, [selectedPaymentMethodId]);
 
   const [showQuebecPopup, setShowQuebecPopup] = useState(false);
   const [showAgePopup, setShowAgePopup] = useState(false);
@@ -1284,11 +1292,6 @@ const CheckoutPageContent = () => {
         try {
           logger.log("Processing Stripe Elements payment in deferred mode...");
 
-          // Validate Stripe Elements is ready
-          if (!stripeElements) {
-            throw new Error("Stripe payment form not ready. Please try again.");
-          }
-
           // Validate Stripe instance is available
           if (!stripe) {
             throw new Error(
@@ -1296,52 +1299,68 @@ const CheckoutPageContent = () => {
             );
           }
 
-          // Step 1: Submit Payment Element to collect payment method
-          // This happens BEFORE creating the order (deferred mode)
-          logger.log("Collecting payment method from Payment Element...");
-          const { error: submitError } = await stripeElements.submit();
+          let paymentMethodId = null;
 
-          if (submitError) {
-            throw new Error(submitError.message);
-          }
+          // Check if a saved payment method is selected
+          if (selectedPaymentMethodId && selectedPaymentMethodId !== "new") {
+            // Use saved payment method
+            paymentMethodId = selectedPaymentMethodId;
+            logger.log("Using saved payment method:", paymentMethodId);
+          } else {
+            // Create new payment method from Payment Element
+            // Validate Stripe Elements is ready
+            if (!stripeElements) {
+              throw new Error("Stripe payment form not ready. Please try again.");
+            }
 
-          // Step 2: Extract payment method from PaymentElement
-          // We need the payment method ID to use with confirmCardPayment
-          logger.log("Retrieving payment method from PaymentElement...");
-          const paymentElement = stripeElements.getElement("payment");
+            // Step 1: Submit Payment Element to collect payment method
+            // This happens BEFORE creating the order (deferred mode)
+            logger.log("Collecting payment method from Payment Element...");
+            const { error: submitError } = await stripeElements.submit();
 
-          if (!paymentElement) {
-            throw new Error("PaymentElement not found");
-          }
+            if (submitError) {
+              throw new Error(submitError.message);
+            }
 
-          // Create payment method from the PaymentElement
-          const { error: pmError, paymentMethod } =
-            await stripe.createPaymentMethod({
-              elements: stripeElements,
-              params: {
-                billing_details: {
-                  name: `${dataToSend.firstName} ${dataToSend.lastName}`,
-                  email: dataToSend.email,
-                  phone: dataToSend.phone,
-                  address: {
-                    line1: dataToSend.addressOne,
-                    line2: dataToSend.addressTwo || "",
-                    city: dataToSend.city,
-                    state: dataToSend.state,
-                    postal_code: dataToSend.postcode,
-                    country: (dataToSend.country || "CA").toUpperCase(),
+            // Step 2: Extract payment method from PaymentElement
+            // We need the payment method ID to use with confirmCardPayment
+            logger.log("Retrieving payment method from PaymentElement...");
+            const paymentElement = stripeElements.getElement("payment");
+
+            if (!paymentElement) {
+              throw new Error("PaymentElement not found");
+            }
+
+            // Create payment method from the PaymentElement
+            const { error: pmError, paymentMethod } =
+              await stripe.createPaymentMethod({
+                elements: stripeElements,
+                params: {
+                  billing_details: {
+                    name: `${dataToSend.firstName} ${dataToSend.lastName}`,
+                    email: dataToSend.email,
+                    phone: dataToSend.phone,
+                    address: {
+                      line1: dataToSend.addressOne,
+                      line2: dataToSend.addressTwo || "",
+                      city: dataToSend.city,
+                      state: dataToSend.state,
+                      postal_code: dataToSend.postcode,
+                      country: (dataToSend.country || "CA").toUpperCase(),
+                    },
                   },
                 },
-              },
-            });
+              });
 
-          if (pmError || !paymentMethod) {
-            throw new Error(
-              pmError?.message || "Failed to create payment method"
-            );
+            if (pmError || !paymentMethod) {
+              throw new Error(
+                pmError?.message || "Failed to create payment method"
+              );
+            }
+
+            paymentMethodId = paymentMethod.id;
+            logger.log("Payment method created:", paymentMethodId);
           }
-
-          logger.log("Payment method created:", paymentMethod.id);
 
           // Step 3: Create order and get PaymentIntent from new backend API
           logger.log("Creating order via new checkout API...");
@@ -1440,7 +1459,7 @@ const CheckoutPageContent = () => {
 
           const { error: confirmError, paymentIntent } =
             await stripe.confirmCardPayment(payment.clientSecret, {
-              payment_method: paymentMethod.id,
+              payment_method: paymentMethodId,
             });
 
           if (confirmError) {
@@ -1629,6 +1648,7 @@ const CheckoutPageContent = () => {
           isPaymentValid={isPaymentValid}
           paymentValidationMessage={paymentValidationMessage}
           onStripeReady={setStripeElements}
+          onPaymentMethodSelect={setSelectedPaymentMethodId}
         />
       </div>
 

@@ -24,7 +24,7 @@ const PAYMENT_ELEMENT_OPTIONS = {
     googlePay: "auto", // Enable Google Pay wallet if available
     cashapp: "never", // Disable Cash App Pay
     amazonPay: "never", // Disable Amazon Pay
-    link: "auto", // Enable Link as a wallet (not a separate payment method)
+    link: "never", // Disable Link wallet - using saved cards instead
   },
 };
 
