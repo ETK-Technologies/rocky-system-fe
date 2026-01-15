@@ -39,9 +39,41 @@ import EDCardiovascularSymptomWarning from "./EDCardiovascularSymptomWarning";
 import EDMedicationInteractionWarning from "./EDMedicationInteractionWarning";
 import EDNoAppointmentAcknowledgement from "./EDNoAppointmentAcknowledgement";
 import BodyPhotosUpload from "./BodyPhotosUpload";
+import AllIncluded from "./AllIncluded";
+import FaqsSection from "./EDFaqs";
+import YourWeight from "./YourWeight";
+import LongTerm from "./LongTerm";
 
 // Component registry with metadata
 export const COMPONENT_REGISTRY = {
+
+
+
+  LongTermComponent: {
+    component: LongTerm,
+    name: "Long Term",
+    description: "Long term weight management information",
+  },
+
+  YourWeight: {
+    component: YourWeight,
+    name: "Your Weight",
+    description: "Calculate potential weight loss based on weight and height",
+  },
+
+  FaqsEdRecommedation: {
+    component: FaqsSection,
+    name: "FaqsEdRecommedation",
+    description: "Frequently Asked Questions section",
+  },
+
+
+  AllIncluded: {
+    component: AllIncluded,
+    name: "All Included",
+    description: "Display all included features",
+  },
+
   // BMI Calculator variants
   BMICalculator: {
     component: BMICalculator,

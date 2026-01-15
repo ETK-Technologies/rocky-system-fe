@@ -5,6 +5,7 @@ import Loader from "@/components/Loader";
 import Variations from "@/components/SkincareConsultation/components/Variations";
 import Logo from "@/components/Navbar/Logo";
 import { logger } from "@/utils/devLogger";
+import { getComponent } from '@/components/Quiz/CustomComponents/registry';
  
 const RecommendationStep = ({
   step,
@@ -17,17 +18,66 @@ const RecommendationStep = ({
   showIncluded = true,
   isLoading = false,
   flowType, // Flow type to pass to ProductCard
+  
 }) => {
-  const { title, description, recommended, alternatives = [] } = step;
+  const { title, description, recommended, alternatives = [], hasComponent, componentPath, selectedComponentId } = step;
   const [showMoreOptions, setShowMoreOptions] = useState(false);
   const [showLoader, setShowLoader] = useState(true);
   const containerRef = useRef(null);
   const [hasSelectedAlternative, setHasSelectedAlternative] = useState(false);
+  const [DynamicComponent, setDynamicComponent] = useState(null);
+  const [componentLoading, setComponentLoading] = useState(false);
+  const [componentError, setComponentError] = useState(null);
 
   logger.log("RecommendationStep Render:",
     step,
     selectedProduct,
   flowType);
+
+  // Load custom component if present
+  useEffect(() => {
+    if (hasComponent && componentPath) {
+      loadComponent(componentPath);
+    }
+  }, [hasComponent, componentPath]);
+
+  const loadComponent = async (path) => {
+    try {
+      setComponentLoading(true);
+      setComponentError(null);
+      
+      // Clean path and extract component name
+      let cleanPath = path.startsWith('/') ? path.slice(1) : path;
+      cleanPath = cleanPath.replace(/\.(jsx|js|tsx|ts)$/, '');
+      const componentName = cleanPath.split('/').pop();
+      
+      logger.log("Loading recommendation component:", componentName, "from path:", cleanPath);
+      
+      // Look up component in registry
+      const componentEntry = getComponent(componentName);
+      
+      if (!componentEntry) {
+        throw new Error(
+          `Unknown component: ${componentName}. Please add it to components/Quiz/CustomComponents/registry.js`
+        );
+      }
+      
+      const Component = componentEntry.component;
+      
+      if (!Component) {
+        throw new Error(`Component not found: ${componentName}`);
+      }
+      
+      setDynamicComponent(() => Component);
+      setComponentLoading(false);
+      logger.log("✅ Recommendation component loaded successfully:", componentName);
+    } catch (err) {
+      console.error("Failed to load recommendation component:", err);
+      setComponentError(err.message);
+      setComponentLoading(false);
+    }
+  };
+
   // Privacy text component
   const PrivacyText = () => (
     <p className="text-xs text-[#353535] my-1 md:my-4">
@@ -128,7 +178,7 @@ const RecommendationStep = ({
   }
 
   return (
-    <div ref={containerRef} className="w-full md:w-[520px] mx-auto px-5 md:px-0 flex flex-col min-h-screen relative">
+    <div ref={containerRef} className="w-full md:w-[520px] mx-auto md:px-0 flex flex-col min-h-screen relative">
       {/* Full-screen loading overlay */}
       {isLoading && (
         <div className="fixed inset-0 z-[999999] flex items-center justify-center bg-black bg-opacity-30">
@@ -173,10 +223,9 @@ const RecommendationStep = ({
       )}
 
       {/* Progress indicator */}
-      <div className="mb-6">
+      <div>
         <div className="w-full md:w-[520px] mx-auto">
           <Logo />
-          <br />
           <div className="progress-indicator mb-2 text-[#A7885A] font-medium">
             <span className="text-sm">Here's what we recommended</span>
           </div>
@@ -191,7 +240,7 @@ const RecommendationStep = ({
 
       <div className="flex-grow">
         {/* Title */}
-        <h2 className="text-2xl font-semibold text-start text-[#000000] my-6">
+        <h2 className="text-[26px] md:text-[32px] my-4 text-center font-medium">
           {title || "Your treatment plan"}
         </h2>
 
@@ -208,7 +257,7 @@ const RecommendationStep = ({
           />
         </div>
 
-        
+      
 
         {/* Alternative Products */}
         {showAlternatives &&
@@ -227,61 +276,90 @@ const RecommendationStep = ({
               ))}
             </div>
           )}
+
+
+            {/* Custom Component (if present) */}
+        {hasComponent && DynamicComponent && (
+          <div className="mb-6">
+            <DynamicComponent />
+          </div>
+        )}
+        
+        {componentLoading && (
+          <div className="mb-6 text-center text-gray-500">
+            Loading component...
+          </div>
+        )}
+        
+        {componentError && (
+          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+            <p className="text-red-700 text-sm">Failed to load component: {componentError}</p>
+          </div>
+        )}
+
+
+
+
+
         {/* Privacy text */}
         <PrivacyText />
       </div>
 
       {/* Continue Button - Hidden for ED flow since EDProductCard has its own button */}
       {flowType !== "ed" && (
-        <div className="sticky bottom-0 py-4 z-30 bg-white">
-          {/* Show more/less options button */}
-          {showAlternatives && alternatives && alternatives.length > 0 && (
-            <button
-              onClick={handleShowMoreOptions}
-              className="w-full py-3 px-8 rounded-full border border-gray-300 text-black font-medium bg-transparent mb-4"
-            >
-              {showMoreOptions ? "Show less options" : "Show more options"}
-            </button>
-          )}
-          <button
-            className={`w-full py-3 rounded-full font-medium flex items-center justify-center gap-2 ${
-              isContinueEnabled
-                ? "bg-black text-white"
-                : "bg-gray-300 text-gray-500 cursor-not-allowed"
-            }`}
-            onClick={isContinueEnabled ? onContinue : null}
-            disabled={!isContinueEnabled || isLoading}
-          >
-            {isLoading && (
-              <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+        <div className="fixed bottom-0 left-0 right-0 py-4 z-30 bg-white px-5 md:px-0">
+          <div className="w-full md:w-[520px] mx-auto">
+            {/* Show more/less options button */}
+            {showAlternatives && alternatives && alternatives.length > 0 && (
+              <button
+                onClick={handleShowMoreOptions}
+                className="w-full py-3 px-8 rounded-full border border-gray-300 text-black font-medium bg-transparent mb-4"
+              >
+                {showMoreOptions ? "Show less options" : "Show more options"}
+              </button>
             )}
-            {isLoading
-              ? "Adding to cart..."
-              : `Proceed -  ${ `$` + (selectedProduct?.price || "")} →`}
-          </button>
+            <button
+              className={`w-full py-3 rounded-full font-medium flex items-center justify-center gap-2 ${
+                isContinueEnabled
+                  ? "bg-black text-white"
+                  : "bg-gray-300 text-gray-500 cursor-not-allowed"
+              }`}
+              onClick={isContinueEnabled ? onContinue : null}
+              disabled={!isContinueEnabled || isLoading}
+            >
+              {isLoading && (
+                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+              )}
+              {isLoading
+                ? "Adding to cart..."
+                : `Proceed -  ${ `$` + (selectedProduct?.price || "")} →`}
+            </button>
+          </div>
         </div>
       )}
       
       {/* For ED flow, show more options button and loading state */}
       {flowType === "ed" && (
-        <div className="sticky bottom-0 py-4 z-30 bg-white">
-          {/* Show more/less options button for ED */}
-          {showAlternatives && alternatives && alternatives.length > 0 && (
-            <button
-              onClick={handleShowMoreOptions}
-              className="w-full py-3 px-8 rounded-full border border-gray-300 text-black font-medium bg-transparent"
-            >
-              {showMoreOptions ? "Show less options" : "Show more options"}
-            </button>
-          )}
-          
-          {/* Show loading overlay when adding to cart */}
-          {isLoading && (
-            <div className="w-full py-3 rounded-full bg-black text-white font-medium flex items-center justify-center gap-2 mt-4">
-              <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-              Adding to cart...
-            </div>
-          )}
+        <div className="fixed bottom-0 left-0 right-0 py-4 z-30 bg-white px-5 md:px-0">
+          <div className="w-full md:w-[520px] mx-auto">
+            {/* Show more/less options button for ED */}
+            {showAlternatives && alternatives && alternatives.length > 0 && (
+              <button
+                onClick={handleShowMoreOptions}
+                className="w-full py-3 px-8 rounded-full border border-gray-300 text-black font-medium bg-transparent"
+              >
+                {showMoreOptions ? "Show less options" : "Show more options"}
+              </button>
+            )}
+            
+            {/* Show loading overlay when adding to cart */}
+            {isLoading && (
+              <div className="w-full py-3 rounded-full bg-black text-white font-medium flex items-center justify-center gap-2 mt-4">
+                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                Adding to cart...
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>

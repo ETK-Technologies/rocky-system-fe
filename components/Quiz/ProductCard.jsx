@@ -57,7 +57,7 @@ const ProductCard = ({ product, onSelect, isSelected, flowType, isRecommended, .
       );
     
     case "ed":
-      logger.log("📦 Rendering EDProductCard for product:", product.name);
+      logger.log("📦 Rendering EDProductCard for product:", product);
       return (
         <EDProductCard
           product={product}

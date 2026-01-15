@@ -17,6 +17,7 @@ export default function PotentialWeightLoss({
   onAnswerChange,
   onBack,
   onNext,
+  allAnswers
 }) {
   const [isAuth, setIsAuth] = useState(false);
   const [email, setEmail] = useState(answer?.email || "");
@@ -34,6 +35,9 @@ export default function PotentialWeightLoss({
 
   const [hideCounter, setHideCounter] = useState(false);
 
+  logger.log("PotentialWeightLoss Component - answer:", allAnswers["1765827707460"].value.answer);
+
+  logger.log("PotentialWeightLoss Component - step:", step);
   // Set timeout to hide counter after a delay
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -82,7 +86,7 @@ export default function PotentialWeightLoss({
           counterData,
         },
       });
-    }, 6000);
+    }, 4000);
   };
 
   const handleSubmit = async (e) => {
@@ -132,7 +136,7 @@ export default function PotentialWeightLoss({
           <div className="w-full max-w-[520px] px-4">
             <Counter
               step={step}
-              answer={answer?.counterData}
+              answer={allAnswers["1765827707460"].value.answer}
               onAnswerChange={handleCounterComplete}
             />
           </div>

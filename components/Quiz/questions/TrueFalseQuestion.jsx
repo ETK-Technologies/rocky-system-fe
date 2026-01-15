@@ -1,4 +1,5 @@
 import { useState } from "react";
+import QuestionTitle from "./Shared/QuestionTitle";
 
 export default function TrueFalseQuestion({ step, answer, onAnswerChange }) {
   const { title, description, options } = step;
@@ -8,16 +9,27 @@ export default function TrueFalseQuestion({ step, answer, onAnswerChange }) {
   };
 
   // Extract answer text if answer is an object
-  const selectedAnswer = answer && typeof answer === 'object' && !Array.isArray(answer) && answer.answer 
-    ? answer.answer 
-    : answer;
+  let selectedAnswer;
+  if (answer && typeof answer === 'object' && !Array.isArray(answer)) {
+    // Check if answer has value.answer structure (from backend)
+    if (answer.value && answer.value.answer) {
+      selectedAnswer = answer.value.answer;
+    }
+    // Check if answer has answer property directly (from UI interaction)
+    else if (answer.answer) {
+      selectedAnswer = answer.answer;
+    }
+    // Otherwise use answer as is
+    else {
+      selectedAnswer = answer;
+    }
+  } else {
+    selectedAnswer = answer;
+  }
 
   return (
     <div>
-      <h2 className="subheaders-font text-[26px] md:text-[32px] font-medium leading-[120%] text-gray-900 mb-8">{title}</h2>
-      {description && (
-        <p className="text-gray-600 mb-6">{description}</p>
-      )}
+      <QuestionTitle title={title} description={description} />
 
       <div className="space-y-4">
         {options.map((option, index) => {

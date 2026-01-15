@@ -59,7 +59,7 @@ const menuItems = [
       {
         text: "Erectile Dysfunction",
         link: "/sex",
-        quizLink: "/ed-pre-consultation-quiz",
+        quizLink: "/quiz/ed-pre-consultation",
       },
     ],
     medications: [
@@ -94,7 +94,7 @@ const menuItems = [
       {
         text: "Weight Loss",
         link: "/body-optimization",
-        quizLink: "/wl-pre-consultation",
+        quizLink: "/quiz/wlprecons",
       },
     ],
     medications: [
@@ -114,7 +114,7 @@ const menuItems = [
     image: "https://myrocky.b-cdn.net/WP%20Images/Hair%20Loss/hair.webp",
     assessmentText: "Start Your Hair Loss Assessment",
     description: "Stop Hair Loss in Its Tracks",
-    treatments: [{ text: "Hair Loss", link: "/hair", quizLink: "/hair-flow" }],
+    treatments: [{ text: "Hair Loss", link: "/hair", quizLink: "/quiz/hair-pre-consultation-quiz" }],
     medications: [
       {
         text: "Finasteride & Minoxidil Topical Foam",

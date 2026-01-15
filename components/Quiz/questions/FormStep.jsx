@@ -5,6 +5,7 @@ import TextInput from "./inputs/TextInput";
 import TextareaInput from "./inputs/TextareaInput";
 import SelectInput from "./inputs/SelectInput";
 import MultiSelectInput from "./inputs/MultiSelectInput";
+import QuestionTitle from "./Shared/QuestionTitle";
 
 export default function FormStep({ step, answer, onAnswerChange }) {
   const { title, description, formInputs } = step;
@@ -13,12 +14,31 @@ export default function FormStep({ step, answer, onAnswerChange }) {
   // Sync formData with answer prop when it changes
   useEffect(() => {
     if (answer) {
-      const answerValue = typeof answer === 'object' && answer.answer ? answer.answer : answer;
+      // Extract the actual answer from nested structure
+      let answerValue;
+      
+      if (typeof answer === 'object') {
+        // Check if answer has value.answer structure (from backend)
+        if (answer.value && answer.value.answer) {
+          answerValue = answer.value.answer;
+        }
+        // Check if answer has answer property directly (from UI interaction)
+        else if (answer.answer) {
+          answerValue = answer.answer;
+        }
+        // Otherwise use answer as is
+        else {
+          answerValue = answer;
+        }
+      } else {
+        answerValue = answer;
+      }
+      
       setFormData(answerValue || {});
     } else {
       setFormData({});
     }
-  }, [answer]);
+  }, [JSON.stringify(answer)]);
 
   const handleInputChange = (inputId, value) => {
     const updated = { ...formData, [inputId]: value };
@@ -28,10 +48,7 @@ export default function FormStep({ step, answer, onAnswerChange }) {
 
   return (
     <div>
-      <h2 className="subheaders-font text-[26px] md:text-[32px] font-medium leading-[120%] text-gray-900 mb-2">{title}</h2>
-      {description && (
-        <p className="text-gray-600 mb-6">{description}</p>
-      )}
+      <QuestionTitle title={title} description={description} />
 
       <div className="space-y-4">
         {formInputs.map((input) => {

@@ -8,6 +8,7 @@ export default function PhotoIDUploadWarning({
   answer,
   onAnswerChange,
   onBack,
+  onNext,
 }) {
   const [isChecked, setIsChecked] = useState(false);
 
@@ -21,12 +22,7 @@ export default function PhotoIDUploadWarning({
   }, []);
 
   return (
-    <div
-      className="fixed inset-0 bg-white !z-[999999] flex flex-col"
-      style={{
-        animation: "fadeIn 0.3s ease-in-out",
-      }}
-    >
+    <div className="fixed inset-0 bg-[#F5F4EF] !z-[999999] flex flex-col">
       <style jsx>{`
         @keyframes fadeIn {
           from {
@@ -51,21 +47,15 @@ export default function PhotoIDUploadWarning({
             <Logo />
           </div>
 
-          <h3 className="text-[18px] md:text-[20px] text-black mb-8">
+          <h3 className="text-[26px] md:text-[32px] text-[#C19A6B] font-semibold mb-8">
             Upload Photo ID
           </h3>
 
-          <p
-            className="text-[16px] md:text-[18px] mb-8 text-[#000000] text-left"
-            style={{ fontFamily: "Fellix" }}
-          >
+          <p className="text-[20px] md:text-[24px] mb-8 text-[#000000] text-left">
             Please note this step is mandatory. If you are unable to complete at this time, email your ID to clinicadmin@myrocky.com.
           </p>
 
-          <p
-            className="text-[16px] md:text-[18px] mb-8 text-[#000000] text-left"
-            style={{ fontFamily: "Fellix" }}
-          >
+          <p className="text-[20px] md:text-[24px] mb-8 text-[#000000] text-left">
             Your questionnaire will not be reviewed without this. As per our T&C's a $45 cancellation fee will be charged if we are unable to verify you.
           </p>
 
@@ -106,7 +96,7 @@ export default function PhotoIDUploadWarning({
                 checked={isChecked}
                 onChange={(e) => setIsChecked(e.target.checked)}
               />
-              <span className="text-[16px] md:text-[18px]  subheaders-font pb-4">
+              <span className="text-xl subheaders-font pb-4">
                 I hereby understand and consent to the above waiver
               </span>
             </label>
@@ -120,7 +110,9 @@ export default function PhotoIDUploadWarning({
             onClick={() => {
               if (isChecked) {
                 onAnswerChange({ answerType: "text", answer: "acknowledged" });
-                onBack();
+                if (onNext) {
+                  onNext();
+                }
               }
             }}
             disabled={!isChecked}

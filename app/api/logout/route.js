@@ -3,7 +3,10 @@ import axios from "axios";
 import { cookies } from "next/headers";
 import { logger } from "@/utils/devLogger";
 import { getOrigin } from "@/lib/utils/getOrigin";
-import { clearUserDataFromCookies, getUserDataFromCookies } from "@/services/userDataService";
+import {
+  clearUserDataFromCookies,
+  getUserDataFromCookies,
+} from "@/services/userDataService";
 
 const BASE_URL = process.env.BASE_URL;
 
@@ -16,16 +19,19 @@ export async function POST(req) {
     const cookieStore = await cookies();
     const userData = getUserDataFromCookies(cookieStore);
 
-    // Call the new logout API if we have an auth token
+    // Extract auth token for logout calls
+    let token = null;
     if (userData?.auth?.accessToken) {
-      try {
-        // Extract Bearer token if present
-        const authToken = userData.auth.accessToken;
-        const token = authToken.startsWith("Bearer ")
-          ? authToken.substring(7)
-          : authToken;
+      const authToken = userData.auth.accessToken;
+      token = authToken.startsWith("Bearer ")
+        ? authToken.substring(7)
+        : authToken;
+    }
 
-        logger.log("Logging out user with new auth API");
+    // Step 1: Call backend logout API (if we have a token)
+    if (token) {
+      try {
+        logger.log("Logging out user with backend API");
 
         // Get origin for Origin header (required for backend domain whitelist)
         const origin = getOrigin(req);
@@ -39,19 +45,68 @@ export async function POST(req) {
               accept: "application/json",
               "X-App-Key": process.env.NEXT_PUBLIC_APP_KEY,
               "X-App-Secret": process.env.NEXT_PUBLIC_APP_SECRET,
-              "Origin": origin,
+              Origin: origin,
               Authorization: `Bearer ${token}`,
             },
           }
         );
 
-        logger.log("User logged out successfully from API");
+        logger.log("Backend logout successful");
       } catch (error) {
-        // Log error but continue with local cleanup
+        // Log error but continue with other logout steps
         logger.error(
-          "Error calling logout API (continuing with local cleanup):",
+          "Backend logout error (continuing with other logout steps):",
           error.response?.data || error.message
         );
+      }
+    }
+
+    // Step 2: Call Patient Portal logout API (independent of backend logout)
+    if (token) {
+      try {
+        const patientPortalUrl = process.env.NEXT_PUBLIC_PATIENT_PORTAL_URL;
+        logger.log(
+          "Patient Portal URL from env:",
+          patientPortalUrl ? "✓ Found" : "✗ Not Found",
+          patientPortalUrl
+        );
+
+        if (patientPortalUrl) {
+          logger.log("Calling Patient Portal logout endpoint...", {
+            url: `${patientPortalUrl}/api/logout`,
+            hasToken: !!token,
+          });
+
+          await axios.post(
+            `${patientPortalUrl}/api/logout`,
+            {},
+            {
+              headers: {
+                "Content-Type": "application/json",
+                accept: "application/json",
+                Authorization: `Bearer ${token}`,
+              },
+              // Set a timeout to avoid hanging if Patient Portal is unreachable
+              timeout: 5000,
+            }
+          );
+          logger.log("Patient Portal logout successful");
+        } else {
+          logger.warn(
+            "NEXT_PUBLIC_PATIENT_PORTAL_URL not configured, skipping Patient Portal logout"
+          );
+        }
+      } catch (ppError) {
+        // Log detailed error for debugging
+        logger.error("Patient Portal logout error:", {
+          message: ppError.message,
+          code: ppError.code,
+          status: ppError.response?.status,
+          statusText: ppError.response?.statusText,
+          data: ppError.response?.data,
+          url: ppError.config?.url,
+        });
+        // Don't fail the logout - Patient Portal logout is best effort
       }
     }
 

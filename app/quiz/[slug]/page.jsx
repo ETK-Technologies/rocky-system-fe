@@ -62,56 +62,73 @@ export default function QuizPage({ params }) {
 
       setQuizData(quiz);
 
-      // Step 2: Start quiz session
-      const quizId = quiz.id || quiz._id || quiz.quiz_id;
-      if (!quizId) {
-        throw new Error("Quiz ID not found in response");
-      }
+      // Step 2: Check for sessionId in URL query parameters
+      const urlParams = new URLSearchParams(window.location.search);
+      const urlSessionId = urlParams.get('sessionId');
 
-      // Check user authentication again before starting session
-      const Headers = { "Content-Type": "application/json" };
-      const Body = {};
+      let sessionInfo;
 
-      if (!isAuthenticated()) {
-        logger.log("🔓 Starting quiz session with guest user");
-        const { getSessionId } = await import("@/services/sessionService");
-        const sessionId = getSessionId();
-        if(sessionId) {
-          Body['cartSessionId'] = sessionId;
-          logger.log("👤 Using sessionId from request:", sessionId);
+      if (urlSessionId) {
+        // Use sessionId from URL
+        logger.log("📎 Using sessionId from URL:", urlSessionId);
+        sessionInfo = {
+          sessionId: urlSessionId,
+          responseId: urlSessionId, // Assuming responseId is same as sessionId
+        };
+        logger.log("Session info from URL:", sessionInfo);
+        setSessionData(sessionInfo);
+      } else {
+        // Start new quiz session
+        const quizId = quiz.id || quiz._id || quiz.quiz_id;
+        if (!quizId) {
+          throw new Error("Quiz ID not found in response");
         }
+
+        // Check user authentication again before starting session
+        const Headers = { "Content-Type": "application/json" };
+        const Body = {};
+
+        if (!isAuthenticated()) {
+          logger.log("🔓 Starting quiz session with guest user");
+          const { getSessionId } = await import("@/services/sessionService");
+          const sessionId = getSessionId();
+          if(sessionId) {
+            Body['cartSessionId'] = sessionId;
+            logger.log("👤 Using sessionId from request:", sessionId);
+          }
+        }
+        
+
+        const sessionResponse = await fetch(`/api/quizzes/${quizId}/start`, {
+          method: "POST",
+          headers: Headers,
+          body: JSON.stringify(Body),
+        });
+
+        const sessionResult = await sessionResponse.json();
+
+        if (!sessionResponse.ok || !sessionResult.success) {
+          throw new Error(sessionResult.error || "Failed to start quiz session");
+        }
+
+        logger.log("Session data:", sessionResult.data);
+
+        // Extract session ID and response ID from the session data
+        sessionInfo = {
+          sessionId:
+            sessionResult.data.session_id ||
+            sessionResult.data.sessionId ||
+            sessionResult.data.id,
+          responseId:
+            sessionResult.data.response_id ||
+            sessionResult.data.responseId ||
+            sessionResult.data.id,
+          ...sessionResult.data,
+        };
+
+        logger.log("Processed session info:", sessionInfo);
+        setSessionData(sessionInfo);
       }
-      
-
-      const sessionResponse = await fetch(`/api/quizzes/${quizId}/start`, {
-        method: "POST",
-        headers: Headers,
-        body: JSON.stringify(Body),
-      });
-
-      const sessionResult = await sessionResponse.json();
-
-      if (!sessionResponse.ok || !sessionResult.success) {
-        throw new Error(sessionResult.error || "Failed to start quiz session");
-      }
-
-      logger.log("Session data:", sessionResult.data);
-
-      // Extract session ID and response ID from the session data
-      const sessionInfo = {
-        sessionId:
-          sessionResult.data.session_id ||
-          sessionResult.data.sessionId ||
-          sessionResult.data.id,
-        responseId:
-          sessionResult.data.response_id ||
-          sessionResult.data.responseId ||
-          sessionResult.data.id,
-        ...sessionResult.data,
-      };
-
-      logger.log("Processed session info:", sessionInfo);
-      setSessionData(sessionInfo);
 
       // Step 3: Fetch existing answers if any
       try {
@@ -169,8 +186,11 @@ export default function QuizPage({ params }) {
   }, [slug, initializeQuiz]);
 
   const handleQuizComplete = useCallback(
-    (result, finalAnswers, recommendationProduct, totalResults) => {
+    (result, finalAnswers, recommendationProduct, totalResults, AlternativeProds) => {
       logger.log("=== Quiz Completed ===");
+      logger.log("🔷 [ALTERNATIVES] Step 5: Received in handleQuizComplete:", AlternativeProds);
+      logger.log("🔷 [ALTERNATIVES] Step 6: Array length:", AlternativeProds?.length || 0);
+      logger.log("Alternative Prods", AlternativeProds);
       logger.log(
         "Complete result FULL OBJECT:",
         JSON.stringify(result, null, 2)
@@ -249,6 +269,7 @@ export default function QuizPage({ params }) {
           );
         }
 
+        logger.log("🔷 [ALTERNATIVES] Step 7: Storing in sessionStorage:", AlternativeProds);
         sessionStorage.setItem(
           "quiz-results",
           JSON.stringify({
@@ -262,8 +283,10 @@ export default function QuizPage({ params }) {
             preQuiz: true,
             mainQuizId: mainQuizId, // Keep for backwards compatibility
             answers: finalAnswers, // Store answers for debugging
+            AlternativeProds: AlternativeProds
           })
         );
+        logger.log("🔷 [ALTERNATIVES] Step 8: SessionStorage saved successfully");
 
         // Navigate to results page with product recommendations
         router.push(`/quiz/${slug}/results`);
@@ -327,12 +350,14 @@ export default function QuizPage({ params }) {
         }
       `}</style>
       <div className="min-h-screen">
-        <QuizRenderer
-          quizData={quizData}
-          sessionData={sessionData}
-          existingAnswers={existingAnswers}
-          onComplete={handleQuizComplete}
-        />
+        <div className="w-full md:w-[520px] px-5 md:px-0 mx-auto">
+          <QuizRenderer
+            quizData={quizData}
+            sessionData={sessionData}
+            existingAnswers={existingAnswers}
+            onComplete={handleQuizComplete}
+          />
+        </div>
       </div>
     </>
   );
