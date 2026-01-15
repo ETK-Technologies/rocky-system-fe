@@ -1,10 +1,11 @@
 import OrderReceivedPageContent from "@/components/OrderReceived/OrderReceivedPageContent";
 import { Suspense } from "react";
 import { cookies } from "next/headers";
+import { getUserIdFromCookies } from "@/services/userDataService";
 
 const OrderReceivedPage = async ({ params }) => {
   const cookieStore = await cookies();
-  const userId = cookieStore.get("userId")?.value;
+  const userId = getUserIdFromCookies(cookieStore)?.value;
   const { id } = await params;
   const orderId = id || "";
 

@@ -6,13 +6,19 @@ import Navlinks from "./Navbar/Navlinks"; // Changed from MegaMenu to Navlinks, 
 // import MobileMenu from "./Navbar/MobileMenu";
 import { cookies } from "next/headers";
 import HeaderProudPartner from "./Navbar/HeaderProudPartner";
+import {
+  getAuthTokenFromCookies,
+  getUserNameFromCookies,
+  getUserEmailFromCookies,
+  getDisplayNameFromCookies,
+} from "@/services/userDataService";
 
 const Navbar = async ({ className }) => {
   const cookieStore = await cookies();
-  const token = cookieStore.get("authToken")?.value;
-  const userName = cookieStore.get("userName")?.value;
-  const userEmail = cookieStore.get("userEmail")?.value;
-  const displayName = cookieStore.get("displayName")?.value;
+  const token = getAuthTokenFromCookies(cookieStore)?.value;
+  const userName = getUserNameFromCookies(cookieStore)?.value;
+  const userEmail = getUserEmailFromCookies(cookieStore)?.value;
+  const displayName = getDisplayNameFromCookies(cookieStore)?.value;
 
   // Use display name with fallbacks in this order: displayName -> firstName -> userEmail
   let nameToShow;

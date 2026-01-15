@@ -4,7 +4,10 @@
  * SessionId is used for guest cart merging during registration/login
  */
 
-const SESSION_ID_KEY = "rocky-session-id";
+import { getSessionIdKey } from "@/utils/storagePrefix";
+
+// Use project-specific key to avoid conflicts when running multiple projects on same port
+const getSessionKey = () => getSessionIdKey();
 
 /**
  * Generate a unique session ID
@@ -28,11 +31,12 @@ export const getSessionId = () => {
     }
 
     try {
-        let sessionId = localStorage.getItem(SESSION_ID_KEY);
+        const sessionKey = getSessionKey();
+        let sessionId = localStorage.getItem(sessionKey);
 
         if (!sessionId) {
             sessionId = generateSessionId();
-            localStorage.setItem(SESSION_ID_KEY, sessionId);
+            localStorage.setItem(sessionKey, sessionId);
         }
 
         return sessionId;
@@ -52,7 +56,7 @@ export const setSessionId = (sessionId) => {
     }
 
     try {
-        localStorage.setItem(SESSION_ID_KEY, sessionId);
+        localStorage.setItem(getSessionKey(), sessionId);
     } catch (error) {
         console.error("Error setting session ID:", error);
     }
@@ -68,7 +72,7 @@ export const clearSessionId = () => {
     }
 
     try {
-        localStorage.removeItem(SESSION_ID_KEY);
+        localStorage.removeItem(getSessionKey());
     } catch (error) {
         console.error("Error clearing session ID:", error);
     }
@@ -84,7 +88,7 @@ export const hasSessionId = () => {
     }
 
     try {
-        return localStorage.getItem(SESSION_ID_KEY) !== null;
+        return localStorage.getItem(getSessionKey()) !== null;
     } catch (error) {
         console.error("Error checking session ID:", error);
         return false;

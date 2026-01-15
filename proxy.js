@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { logger } from "@/utils/devLogger";
+import { getCookieName } from "@/utils/storagePrefix";
 
 export function proxy(req) {
   try {
@@ -34,7 +35,8 @@ export function proxy(req) {
       return NextResponse.redirect(blockedUrl);
     }
 
-    const authToken = req.cookies.get("authToken")?.value;
+    // Only read prefixed cookies - no fallback to unprefixed to ensure project isolation
+    const authToken = req.cookies.get(getCookieName("authToken"))?.value;
     const isLoginPage = pathname === "/login-register";
     const isPatientPortalLogout =
       req.nextUrl.searchParams.get("pp-logout") === "1";

@@ -3,6 +3,7 @@ import axios from "axios";
 import { logger } from "@/utils/devLogger";
 import { cookies } from "next/headers";
 import { getOrigin } from "@/lib/utils/getOrigin";
+import { getAuthTokenFromCookies } from "@/services/userDataService";
 
 const BASE_URL = process.env.BASE_URL;
 
@@ -16,60 +17,58 @@ const BASE_URL = process.env.BASE_URL;
 export async function POST(req) {
   try {
     const cookieStore = await cookies();
-    const authToken = cookieStore.get("authToken");
+    const authToken = getAuthTokenFromCookies(cookieStore);
 
-    // Get sessionId from query parameters (for guest users)
-    const { searchParams } = new URL(req.url);
-    const sessionId = searchParams.get("sessionId");
-
-    // Validate: Either authToken or sessionId must be provided
-    if (!authToken && !sessionId) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Either authentication token or sessionId is required",
-        },
-        { status: 400 }
-      );
+    // Backend only supports authenticated users for cart validation
+    // Skip validation for guest users (non-authenticated)
+    if (!authToken) {
+      logger.log("Cart validation skipped for guest user (backend requires authentication)");
+      // Return success response for guest users - validation will happen at checkout
+      return NextResponse.json({
+        success: true,
+        valid: true,
+        message: "Validation skipped for guest user - will validate at checkout",
+        skipped: true,
+      });
     }
 
+    // Build URL - backend expects empty body for authenticated users
+    const url = `${BASE_URL}/api/v1/cart/validate`;
+
     try {
-      // Build URL - only add sessionId if user is NOT authenticated
-      // If both authToken and sessionId are provided, prioritize authToken (authenticated user)
-      let url = `${BASE_URL}/api/v1/cart/validate`;
-      const useSessionId = !authToken && sessionId; // Only use sessionId if no authToken
-
-      if (useSessionId) {
-        const encodedSessionId = encodeURIComponent(sessionId);
-        url += `?sessionId=${encodedSessionId}`;
-      }
-
       // Get origin for Origin header (required for backend domain whitelist)
       const origin = getOrigin(req);
 
-      // Prepare headers
+      // Prepare headers - match backend expectations
       const headers = {
+        accept: "*/*", // Backend expects "accept: */*" not "application/json"
         "Content-Type": "application/json",
-        accept: "application/json",
         "X-App-Key": process.env.NEXT_PUBLIC_APP_KEY,
         "X-App-Secret": process.env.NEXT_PUBLIC_APP_SECRET,
         "Origin": origin,
       };
 
-      // Add Authorization header ONLY if user is authenticated
-      // Do NOT send both Authorization and sessionId
+      // Add Authorization header ONLY if user is authenticated (backend expects "Bearer <token>")
       if (authToken) {
-        headers["Authorization"] = authToken.value;
+        headers["Authorization"] = authToken.value; // Already includes "Bearer " prefix
       }
+
+      // Backend expects empty body for authenticated users
+      // For guest users, also try empty body (sessionId is in query string)
+      const requestPayload = {};
 
       logger.log("Validating cart with new API:", {
         url,
         hasAuth: !!authToken,
-        hasSessionId: useSessionId,
         method: "POST",
+        headers: {
+          accept: headers.accept,
+          Authorization: headers.Authorization ? "Present" : "None",
+          "X-App-Key": headers["X-App-Key"] ? "Present" : "None",
+        },
       });
 
-      // Call the validation endpoint
+      // Call validation endpoint - empty body as backend expects (only for authenticated users)
       const response = await axios.post(url, {}, { headers });
 
       logger.log("Cart validation successful:", response.status);
@@ -93,6 +92,7 @@ export async function POST(req) {
         error: errorMessage,
         rawError: errorData,
         status: error.response?.status,
+        url,
       });
 
       // Handle specific error responses from the API

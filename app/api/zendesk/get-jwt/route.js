@@ -2,6 +2,11 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import jwt from "jsonwebtoken";
 import { logger } from "@/utils/devLogger";
+import {
+  getUserIdFromCookies,
+  getUserEmailFromCookies,
+  getUserNameFromCookies,
+} from "@/services/userDataService";
 
 // Zendesk configuration
 const ZENDESK_KEY_ID =
@@ -20,9 +25,9 @@ export async function GET(request) {
   try {
     // Get user data from cookies
     const cookieStore = await cookies();
-    const userId = cookieStore.get("userId");
-    const userEmail = cookieStore.get("userEmail");
-    const userName = cookieStore.get("userName");
+    const userId = getUserIdFromCookies(cookieStore);
+    const userEmail = getUserEmailFromCookies(cookieStore);
+    const userName = getUserNameFromCookies(cookieStore);
 
     // Check if user is authenticated
     if (!userId || !userEmail) {

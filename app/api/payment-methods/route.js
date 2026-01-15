@@ -3,14 +3,15 @@ import axios from "axios";
 import { logger } from "@/utils/devLogger";
 import { cookies } from "next/headers";
 import { getOrigin } from "@/lib/utils/getOrigin";
+import { getAuthTokenFromCookies, getUserIdFromCookies } from "@/services/userDataService";
 
 const BASE_URL = process.env.BASE_URL;
 
 export async function GET(request) {
   try {
     const cookieStore = await cookies();
-    const authToken = cookieStore.get("authToken");
-    const userId = cookieStore.get("userId");
+    const authToken = getAuthTokenFromCookies(cookieStore);
+    const userId = getUserIdFromCookies(cookieStore);
 
     // Check if user is authenticated
     if (!authToken || !userId) {
@@ -82,8 +83,8 @@ export async function GET(request) {
 export async function DELETE(req) {
   try {
     const cookieStore = await cookies();
-    const authToken = cookieStore.get("authToken");
-    const userId = cookieStore.get("userId");
+    const authToken = getAuthTokenFromCookies(cookieStore);
+    const userId = getUserIdFromCookies(cookieStore);
     const { cardId } = await req.json();
 
     if (!authToken || !userId) {
@@ -134,8 +135,8 @@ export async function DELETE(req) {
 export async function PATCH(req) {
   try {
     const cookieStore = await cookies();
-    const authToken = cookieStore.get("authToken");
-    const userId = cookieStore.get("userId");
+    const authToken = getAuthTokenFromCookies(cookieStore);
+    const userId = getUserIdFromCookies(cookieStore);
     const { cardId, makeDefault } = await req.json();
 
     if (!authToken || !userId) {
@@ -192,8 +193,8 @@ export async function PATCH(req) {
 export async function POST(req) {
   try {
     const cookieStore = await cookies();
-    const authToken = cookieStore.get("authToken");
-    const userId = cookieStore.get("userId");
+    const authToken = getAuthTokenFromCookies(cookieStore);
+    const userId = getUserIdFromCookies(cookieStore);
     const { cardId, expiry_month, expiry_year } = await req.json();
 
     if (!authToken || !userId) {

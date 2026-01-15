@@ -2,14 +2,15 @@ import { NextResponse } from "next/server";
 import axios from "axios";
 import { logger } from "@/utils/devLogger";
 import { cookies } from "next/headers";
+import { getAuthTokenFromCookies, getUserIdFromCookies } from "@/services/userDataService";
 
 const BASE_URL = process.env.BASE_URL;
 
 export async function GET(request) {
   try {
     const cookieStore = await cookies();
-    const authToken = cookieStore.get("authToken");
-    const userId = cookieStore.get("userId");
+    const authToken = getAuthTokenFromCookies(cookieStore);
+    const userId = getUserIdFromCookies(cookieStore);
 
     // Check if user is authenticated
     if (!authToken || !userId) {

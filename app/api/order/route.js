@@ -3,6 +3,7 @@ import axios from "axios";
 import { logger } from "@/utils/devLogger";
 import { cookies } from "next/headers";
 import { getOrigin } from "@/lib/utils/getOrigin";
+import { getAuthTokenFromCookies } from "@/services/userDataService";
 
 const BASE_URL = process.env.BASE_URL;
 
@@ -12,7 +13,7 @@ export async function GET(req) {
     const order_key = req.nextUrl.searchParams.get("order_key");
     const cookieStore = await cookies();
 
-    const encodedCredentials = cookieStore.get("authToken");
+    const encodedCredentials = getAuthTokenFromCookies(cookieStore);
 
     if (!encodedCredentials) {
       return NextResponse.json(

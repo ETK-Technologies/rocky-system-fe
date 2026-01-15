@@ -16,6 +16,7 @@ import Link from "next/link";
 import GoogleSignInButton from "./GoogleSignInButton";
 import ReCaptcha from "@/components/shared/ReCaptcha";
 import { getSessionId, clearSessionId } from "@/services/sessionService";
+import { getCookieName } from "@/utils/storagePrefix";
 
 const LoginContent = ({ setActiveTab, loginRef }) => {
   const searchParams = useSearchParams();
@@ -288,8 +289,11 @@ const LoginContent = ({ setActiveTab, loginRef }) => {
         const checkInterval = setInterval(async () => {
           attempts++;
 
-          // Check for authToken cookie
-          const hasAuthToken = document.cookie.includes("authToken=");
+          // Check for authToken cookie using prefixed name
+          const { getCookieName } = await import("@/utils/storagePrefix");
+          const prefixedAuthToken = getCookieName("authToken");
+          // Only check prefixed cookies - no fallback to unprefixed to ensure project isolation
+          const hasAuthToken = document.cookie.includes(`${prefixedAuthToken}=`);
 
           // Also verify by calling the profile API
           let isAuthenticated = false;
@@ -376,7 +380,10 @@ const LoginContent = ({ setActiveTab, loginRef }) => {
       // Check if we just returned from Google OAuth (has authToken cookie)
       // Only check this if we don't have the success flag (to avoid duplicate processing)
       if (!googleAuthSuccess && !googleOAuthProcessing) {
-        const hasAuthToken = document.cookie.includes("authToken=");
+        const { getCookieName } = await import("@/utils/storagePrefix");
+        const prefixedAuthToken = getCookieName("authToken");
+        // Only check prefixed cookies - no fallback to unprefixed to ensure project isolation
+        const hasAuthToken = document.cookie.includes(`${prefixedAuthToken}=`);
 
         if (hasAuthToken) {
           logger.log("Google OAuth callback detected, user authenticated");

@@ -8,6 +8,7 @@ import {
   setUserDataToCookies,
   transformProfileResponse,
   mergeProfileData,
+  getAuthTokenFromCookies,
 } from "@/services/userDataService";
 
 const BASE_URL = process.env.BASE_URL;
@@ -15,7 +16,7 @@ const BASE_URL = process.env.BASE_URL;
 export async function GET(request) {
   try {
     const cookieStore = await cookies();
-    const authToken = cookieStore.get("authToken");
+    const authToken = getAuthTokenFromCookies(cookieStore);
 
     // Check if user is authenticated
     if (!authToken) {

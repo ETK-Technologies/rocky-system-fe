@@ -3,6 +3,7 @@ import axios from "axios";
 import { logger } from "@/utils/devLogger";
 import { cookies } from "next/headers";
 import { getOrigin } from "@/lib/utils/getOrigin";
+import { getAuthTokenFromCookies } from "@/services/userDataService";
 
 const BASE_URL = process.env.BASE_URL;
 
@@ -28,7 +29,7 @@ export async function POST(req) {
     const { code } = await req.json();
     couponCode = code;
     const cookieStore = await cookies();
-    const authToken = cookieStore.get("authToken");
+    const authToken = getAuthTokenFromCookies(cookieStore);
 
     // Get sessionId from query parameters (for guest users)
     const { searchParams } = new URL(req.url);
@@ -194,7 +195,7 @@ export async function DELETE(req) {
       // Body is optional, continue without it
     }
     const cookieStore = await cookies();
-    const authToken = cookieStore.get("authToken");
+    const authToken = getAuthTokenFromCookies(cookieStore);
 
     // Get sessionId from query parameters (for guest users)
     const { searchParams } = new URL(req.url);

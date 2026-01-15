@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { randomBytes } from "crypto";
 import { logger } from "@/utils/devLogger";
 import { getOrigin } from "@/lib/utils/getOrigin";
+import { getAuthTokenFromCookies, getUserIdFromCookies } from "@/services/userDataService";
 
 export async function GET(req) {
   try {
@@ -10,8 +11,8 @@ export async function GET(req) {
 
     // Check if user is logged in
     const cookieStore = await cookies();
-    const authToken = cookieStore.get("authToken")?.value;
-    const userId = cookieStore.get("userId")?.value;
+    const authToken = getAuthTokenFromCookies(cookieStore)?.value;
+    const userId = getUserIdFromCookies(cookieStore)?.value;
 
     if (!authToken || !userId) {
       logger.log(

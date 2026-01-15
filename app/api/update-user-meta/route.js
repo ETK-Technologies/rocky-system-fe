@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import axios from "axios";
 import { logger } from "@/utils/devLogger";
 import { cookies } from "next/headers";
+import { getAuthTokenFromCookies } from "@/services/userDataService";
 
 const BASE_URL = process.env.BASE_URL;
 
@@ -12,7 +13,7 @@ export async function POST(req) {
 
     // Get the auth token from cookies
     const cookieStore = await cookies();
-    const authToken = cookieStore.get("authToken")?.value;
+    const authToken = getAuthTokenFromCookies(cookieStore)?.value;
 
     if (!authToken) {
       return NextResponse.json(

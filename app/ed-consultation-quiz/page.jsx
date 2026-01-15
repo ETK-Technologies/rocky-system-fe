@@ -1,15 +1,22 @@
 import EDConsultationQuiz from "@/components/EdQuestionnaire/EDConsultationQuiz";
 import { cookies } from "next/headers";
 import { logger } from "@/utils/devLogger";
+import {
+  getPhoneFromCookies,
+  getUserNameFromCookies,
+  getUserEmailFromCookies,
+  getProvinceFromCookies,
+  getCookieValue,
+} from "@/services/userDataService";
 
 export default async function EDConsultationQuizPage() {
   const cookieStore = await cookies();
-  const pn = cookieStore.get("pn")?.value;
-  const userName = cookieStore.get("userName")?.value;
-  const userEmail = cookieStore.get("userEmail")?.value;
-  const province = cookieStore.get("province")?.value;
-  const dosageRaw = cookieStore.get("dosages")?.value;
-  const dob = cookieStore.get("dob")?.value;
+  const pn = getPhoneFromCookies(cookieStore)?.value;
+  const userName = getUserNameFromCookies(cookieStore)?.value;
+  const userEmail = getUserEmailFromCookies(cookieStore)?.value;
+  const province = getProvinceFromCookies(cookieStore)?.value;
+  const dosageRaw = getCookieValue(cookieStore, "dosages");
+  const dob = getCookieValue(cookieStore, "dob") || getCookieValue(cookieStore, "DOB");
   let dosage = null;
   if (dosageRaw) {
     try {

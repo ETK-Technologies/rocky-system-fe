@@ -5,9 +5,10 @@
  */
 
 import { logger } from "@/utils/devLogger";
+import { getCookieName, getProjectId } from "@/utils/storagePrefix";
 
-// Cookie names (standardized, consistent naming)
-const COOKIE_NAMES = {
+// Base cookie names (without prefix)
+const BASE_COOKIE_NAMES = {
   // Auth
   AUTH_TOKEN: "authToken",
   REFRESH_TOKEN: "refreshToken",
@@ -30,6 +31,164 @@ const COOKIE_NAMES = {
   DISPLAY_NAME: "displayName", // Maps to userFirstName
   LAST_NAME: "lastName", // Maps to userLastName
   USER_NAME: "userName", // Full name
+};
+
+// Generate prefixed cookie names based on project ID
+// This ensures each project has unique cookies even on the same port
+const generateCookieNames = () => {
+  const names = {};
+  for (const [key, value] of Object.entries(BASE_COOKIE_NAMES)) {
+    names[key] = getCookieName(value);
+  }
+  return names;
+};
+
+// Cookie names with project prefix (e.g., rocky-dev_authToken)
+const COOKIE_NAMES = generateCookieNames();
+
+// Export cookie names for use in other files
+export { COOKIE_NAMES, BASE_COOKIE_NAMES };
+
+/**
+ * SERVER-SIDE: Get a single cookie value (prefixed only, no fallback)
+ * @param {Object} cookieStore - Next.js cookie store from cookies()
+ * @param {string} baseName - Base cookie name (e.g., "authToken", "userId")
+ * @returns {string|null} Cookie value or null
+ */
+export const getCookieValue = (cookieStore, baseName) => {
+  if (!cookieStore) return null;
+  
+  const prefixedName = getCookieName(baseName);
+  // Only read prefixed cookies - no fallback to unprefixed to ensure project isolation
+  return cookieStore.get(prefixedName)?.value || null;
+};
+
+/**
+ * SERVER-SIDE: Set a single cookie with project prefix
+ * @param {Object} cookieStore - Next.js cookie store from cookies()
+ * @param {string} baseName - Base cookie name (e.g., "authToken", "userId")
+ * @param {string} value - Cookie value
+ * @param {Object} options - Cookie options
+ */
+export const setCookieValue = (cookieStore, baseName, value, options = {}) => {
+  if (!cookieStore) return;
+  
+  const prefixedName = getCookieName(baseName);
+  cookieStore.set(prefixedName, value, options);
+};
+
+/**
+ * SERVER-SIDE: Delete a cookie (both prefixed and legacy)
+ * @param {Object} cookieStore - Next.js cookie store from cookies()
+ * @param {string} baseName - Base cookie name (e.g., "authToken", "userId")
+ */
+export const deleteCookieValue = (cookieStore, baseName) => {
+  if (!cookieStore) return;
+  
+  const prefixedName = getCookieName(baseName);
+  try { cookieStore.delete(prefixedName); } catch (e) { /* ignore */ }
+  try { cookieStore.delete(baseName); } catch (e) { /* ignore */ }
+};
+
+/**
+ * SERVER-SIDE: Get auth token from cookies
+ * @param {Object} cookieStore - Next.js cookie store from cookies()
+ * @returns {Object|null} Object with value property or null
+ */
+export const getAuthTokenFromCookies = (cookieStore) => {
+  if (!cookieStore) return null;
+  
+  const value = getCookieValue(cookieStore, "authToken");
+  return value ? { value } : null;
+};
+
+/**
+ * SERVER-SIDE: Get user ID from cookies
+ * @param {Object} cookieStore - Next.js cookie store from cookies()
+ * @returns {Object|null} Object with value property or null
+ */
+export const getUserIdFromCookies = (cookieStore) => {
+  if (!cookieStore) return null;
+  
+  const value = getCookieValue(cookieStore, "userId");
+  return value ? { value } : null;
+};
+
+/**
+ * SERVER-SIDE: Get user email from cookies
+ * @param {Object} cookieStore - Next.js cookie store from cookies()
+ * @returns {Object|null} Object with value property or null
+ */
+export const getUserEmailFromCookies = (cookieStore) => {
+  if (!cookieStore) return null;
+  
+  const value = getCookieValue(cookieStore, "userEmail");
+  return value ? { value } : null;
+};
+
+/**
+ * SERVER-SIDE: Get display name from cookies
+ * @param {Object} cookieStore - Next.js cookie store from cookies()
+ * @returns {Object|null} Object with value property or null
+ */
+export const getDisplayNameFromCookies = (cookieStore) => {
+  if (!cookieStore) return null;
+  
+  const value = getCookieValue(cookieStore, "userFirstName") || 
+                getCookieValue(cookieStore, "displayName");
+  return value ? { value } : null;
+};
+
+/**
+ * SERVER-SIDE: Get last name from cookies
+ * @param {Object} cookieStore - Next.js cookie store from cookies()
+ * @returns {Object|null} Object with value property or null
+ */
+export const getLastNameFromCookies = (cookieStore) => {
+  if (!cookieStore) return null;
+  
+  const value = getCookieValue(cookieStore, "userLastName") || 
+                getCookieValue(cookieStore, "lastName");
+  return value ? { value } : null;
+};
+
+/**
+ * SERVER-SIDE: Get user name (full name) from cookies
+ * @param {Object} cookieStore - Next.js cookie store from cookies()
+ * @returns {Object|null} Object with value property or null
+ */
+export const getUserNameFromCookies = (cookieStore) => {
+  if (!cookieStore) return null;
+  
+  const value = getCookieValue(cookieStore, "userName");
+  return value ? { value } : null;
+};
+
+/**
+ * SERVER-SIDE: Get province from cookies
+ * @param {Object} cookieStore - Next.js cookie store from cookies()
+ * @returns {Object|null} Object with value property or null
+ */
+export const getProvinceFromCookies = (cookieStore) => {
+  if (!cookieStore) return null;
+  
+  const value = getCookieValue(cookieStore, "userProvince") || 
+                getCookieValue(cookieStore, "province");
+  return value ? { value } : null;
+};
+
+/**
+ * SERVER-SIDE: Get phone number from cookies
+ * @param {Object} cookieStore - Next.js cookie store from cookies()
+ * @returns {Object|null} Object with value property or null
+ */
+export const getPhoneFromCookies = (cookieStore) => {
+  if (!cookieStore) return null;
+  
+  const value = getCookieValue(cookieStore, "userPhone") || 
+                getCookieValue(cookieStore, "phone") ||
+                getCookieValue(cookieStore, "pn");
+  return value ? { value } : null;
 };
 
 /**
@@ -121,6 +280,7 @@ export const getUserDataFromCookies = (cookieStore) => {
   }
   
   try {
+    // Only read prefixed cookies - no fallback to unprefixed to ensure project isolation
     const authToken = cookieStore.get(COOKIE_NAMES.AUTH_TOKEN)?.value;
     const refreshToken = cookieStore.get(COOKIE_NAMES.REFRESH_TOKEN)?.value;
     const userId = cookieStore.get(COOKIE_NAMES.USER_ID)?.value;
@@ -146,12 +306,12 @@ export const getUserDataFromCookies = (cookieStore) => {
       },
       profile: {
         phone: cookieStore.get(COOKIE_NAMES.USER_PHONE)?.value || 
-               cookieStore.get("phone")?.value || null, // Legacy support
+               cookieStore.get(getCookieName("phone"))?.value || null,
         province: cookieStore.get(COOKIE_NAMES.USER_PROVINCE)?.value || 
-                  cookieStore.get("province")?.value || null, // Legacy support
+                  cookieStore.get(getCookieName("province"))?.value || null,
         dateOfBirth: cookieStore.get(COOKIE_NAMES.USER_DATE_OF_BIRTH)?.value || 
-                     cookieStore.get("DOB")?.value || 
-                     cookieStore.get("dob")?.value || null, // Legacy support
+                     cookieStore.get(getCookieName("DOB"))?.value ||
+                     cookieStore.get(getCookieName("dob"))?.value || null,
         gender: cookieStore.get(COOKIE_NAMES.USER_GENDER)?.value || null,
       },
     };
@@ -255,17 +415,40 @@ export const clearUserDataFromCookies = (cookieStore) => {
   }
   
   try {
-    // Clear all user-related cookies
+    // Clear all user-related cookies (both prefixed and legacy unprefixed)
     const allCookieNames = [
       ...Object.values(COOKIE_NAMES),
-      // Legacy cookie names for cleanup
+      // Legacy cookie names for cleanup (both prefixed and unprefixed)
+      getCookieName("phone"),
+      getCookieName("province"),
+      getCookieName("DOB"),
+      getCookieName("dob"),
+      getCookieName("pn"),
+      getCookieName("userName"),
+      getCookieName("stripeCustomerId"),
+      // Also try to clean up unprefixed legacy cookies (from before this change)
       "phone",
       "province",
       "DOB",
       "dob",
       "pn",
       "userName",
-      "stripeCustomerId", // Related to user but not part of core user data
+      "stripeCustomerId",
+      // Clean up old unprefixed auth cookies
+      "authToken",
+      "refreshToken",
+      "userId",
+      "userEmail",
+      "userFirstName",
+      "userLastName",
+      "userAvatar",
+      "userRole",
+      "userPhone",
+      "userProvince",
+      "userDateOfBirth",
+      "userGender",
+      "displayName",
+      "lastName",
     ];
     
     allCookieNames.forEach((cookieName) => {
@@ -295,6 +478,7 @@ export const getUserData = () => {
   }
   
   // Check userId (not httpOnly) to determine if authenticated
+  // Only read prefixed cookies - no fallback to unprefixed to ensure project isolation
   const userId = getCookie(COOKIE_NAMES.USER_ID);
   
   if (!userId) {
@@ -316,9 +500,10 @@ export const getUserData = () => {
       role: getCookie(COOKIE_NAMES.USER_ROLE) || null,
     },
     profile: {
-      phone: getCookie(COOKIE_NAMES.USER_PHONE) || getCookie("phone") || null,
-      province: getCookie(COOKIE_NAMES.USER_PROVINCE) || getCookie("province") || null,
-      dateOfBirth: getCookie(COOKIE_NAMES.USER_DATE_OF_BIRTH) || getCookie("DOB") || getCookie("dob") || null,
+      phone: getCookie(COOKIE_NAMES.USER_PHONE) || getCookie(getCookieName("phone")) || null,
+      province: getCookie(COOKIE_NAMES.USER_PROVINCE) || getCookie(getCookieName("province")) || null,
+      dateOfBirth: getCookie(COOKIE_NAMES.USER_DATE_OF_BIRTH) || getCookie(getCookieName("DOB")) || 
+                   getCookie(getCookieName("dob")) || null,
       gender: getCookie(COOKIE_NAMES.USER_GENDER) || null,
     },
   };
@@ -332,6 +517,7 @@ export const getUserData = () => {
 export const isAuthenticated = () => {
   if (typeof window === "undefined") return false;
   
+  // Only read prefixed cookies - no fallback to unprefixed to ensure project isolation
   const userId = getCookie(COOKIE_NAMES.USER_ID);
   
   return !!userId;
@@ -343,6 +529,7 @@ export const isAuthenticated = () => {
  */
 export const getUserId = () => {
   if (typeof window === "undefined") return null;
+  // Only read prefixed cookies - no fallback to unprefixed to ensure project isolation
   return getCookie(COOKIE_NAMES.USER_ID) || null;
 };
 

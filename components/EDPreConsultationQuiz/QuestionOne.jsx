@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { QuestionLayout } from "../EdQuestionnaire/QuestionLayout";
 import { QuestionOption } from "../EdQuestionnaire/QuestionOption";
+import { getCookieName } from "@/utils/storagePrefix";
 
 const QuestionOne = ({ currentPage, answer, onAnswerChange }) => {
   // Move authentication check to a useEffect hook to ensure client-side only execution
@@ -9,7 +10,9 @@ const QuestionOne = ({ currentPage, answer, onAnswerChange }) => {
 
   useEffect(() => {
     // This code only runs on the client, after hydration
-    const hasAuthToken = document.cookie.includes("authToken=");
+    // Only check prefixed cookies - no fallback to unprefixed to ensure project isolation
+    const prefixedAuthToken = getCookieName("authToken");
+    const hasAuthToken = document.cookie.includes(`${prefixedAuthToken}=`);
     setIsAuthenticated(hasAuthToken);
   }, []);
 

@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { logger } from "@/utils/devLogger";
 import https from "https";
 import axios from "axios";
+import { getUserIdFromCookies, getAuthTokenFromCookies } from "@/services/userDataService";
 
 // Get base URL from environment variables
 const BASE_URL = process.env.BASE_URL;
@@ -11,8 +12,8 @@ const BASE_URL = process.env.BASE_URL;
 async function getUserAuthData() {
   try {
     const cookieStore = await cookies();
-    const userId = cookieStore.get("userId");
-    const authToken = cookieStore.get("authToken");
+    const userId = getUserIdFromCookies(cookieStore);
+    const authToken = getAuthTokenFromCookies(cookieStore);
 
     return {
       userId: userId?.value ? parseInt(userId.value) : null,

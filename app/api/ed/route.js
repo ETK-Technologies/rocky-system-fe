@@ -6,6 +6,15 @@ import https from "https";
 import axios from "axios";
 // Removed AWS import and S3 initialization and importing the utility function instead
 import { uploadToS3 } from "@/utils/s3";
+import {
+  getUserIdFromCookies,
+  getCookieValue,
+  getDisplayNameFromCookies,
+  getLastNameFromCookies,
+  getUserEmailFromCookies,
+  getPhoneFromCookies,
+  getProvinceFromCookies,
+} from "@/services/userDataService";
 
 const crmApi = axios.create({
   baseURL: "https://crm.myrocky.com/api",
@@ -33,7 +42,7 @@ async function getEntrykey() {
 async function getUserId() {
   try {
     const cookieStore = await cookies();
-    const userId = cookieStore.get("userId");
+    const userId = getUserIdFromCookies(cookieStore);
     return userId?.value ? parseInt(userId.value) : 887; // Fallback to 887 if no user ID in cookies
   } catch (error) {
     logger.warn("Error getting user ID from cookies:", error);
@@ -44,14 +53,14 @@ async function getUserId() {
 async function getUserDataFromCookies() {
   try {
     const cookieStore = await cookies();
-    const fName = cookieStore.get("displayName")?.value || "";
-    const lName = cookieStore.get("lastName")?.value || "";
-    const email = cookieStore.get("userEmail")?.value
-      ? decodeURIComponent(cookieStore.get("userEmail").value)
+    const fName = getDisplayNameFromCookies(cookieStore)?.value || "";
+    const lName = getLastNameFromCookies(cookieStore)?.value || "";
+    const email = getUserEmailFromCookies(cookieStore)?.value
+      ? decodeURIComponent(getUserEmailFromCookies(cookieStore).value)
       : "";
-    const phone = cookieStore.get("phone")?.value || "";
-    const dob = cookieStore.get("DOB")?.value || "";
-    const province = cookieStore.get("province")?.value || "";
+    const phone = getPhoneFromCookies(cookieStore)?.value || "";
+    const dob = getCookieValue(cookieStore, "DOB") || getCookieValue(cookieStore, "dob") || "";
+    const province = getProvinceFromCookies(cookieStore)?.value || "";
 
     return {
       fName,

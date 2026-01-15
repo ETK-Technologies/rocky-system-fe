@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import axios from "axios";
 import { logger } from "@/utils/devLogger";
 import { cookies } from "next/headers";
+import { getAuthTokenFromCookies, getCookieValue } from "@/services/userDataService";
 
 const BASE_URL = process.env.BASE_URL;
 
@@ -10,7 +11,7 @@ export async function POST(req) {
     const requestData = await req.json();
     const cookieStore = await cookies();
 
-    const encodedCredentials = cookieStore.get("authToken");
+    const encodedCredentials = getAuthTokenFromCookies(cookieStore);
 
     if (!encodedCredentials) {
       return NextResponse.json(
@@ -51,7 +52,8 @@ export async function POST(req) {
 
     // Update cart nonce if provided in response headers
     if (response.headers?.nonce) {
-      cookieStore.set("cart-nonce", response.headers.nonce);
+      const { setCookieValue } = await import("@/services/userDataService");
+      setCookieValue(cookieStore, "cart-nonce", response.headers.nonce);
     }
 
     return NextResponse.json(response.data);

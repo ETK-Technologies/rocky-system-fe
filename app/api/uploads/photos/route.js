@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { logger } from "@/utils/devLogger";
 import { getOrigin } from "@/lib/utils/getOrigin";
 import { cookies } from "next/headers";
+import { getAuthTokenFromCookies } from "@/services/userDataService";
 
 const BASE_URL = process.env.BASE_URL;
 
@@ -12,7 +13,7 @@ const BASE_URL = process.env.BASE_URL;
 export async function POST(request) {
   try {
     const cookieStore = await cookies();
-    const authToken = cookieStore.get("authToken");
+    const authToken = getAuthTokenFromCookies(cookieStore);
 
     logger.log("🚀 Received photo upload request", authToken);
 

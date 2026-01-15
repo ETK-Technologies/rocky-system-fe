@@ -3,6 +3,7 @@ import { useStepNavigation } from "../../hooks/useStepNavigation";
 import { useQuizData } from "../../hooks/useQuizData";
 import { quizConfig } from "../config/quizConfig";
 import { logger } from "@/utils/devLogger";
+import { getCookieName } from "@/utils/storagePrefix";
 
 export function useHyperpigmentationQuiz() {
   const storageKey = "quiz-form-data-skincare";
@@ -61,17 +62,22 @@ export function useHyperpigmentationQuiz() {
   const getCookieData = () => {
     if (typeof window === "undefined") return { dob: "", phone: "" };
     try {
-      // Check both uppercase and lowercase DOB cookie names
+      // Get prefixed cookie names - only read prefixed to ensure project isolation
+      const prefixedDOB = getCookieName("DOB");
+      const prefixedDob = getCookieName("dob");
+      const prefixedPn = getCookieName("pn");
+      
+      // Only read prefixed DOB cookie names (uppercase and lowercase)
       const dobUpper =
         document.cookie
           .split("; ")
-          .find((row) => row.startsWith("DOB="))
+          .find((row) => row.startsWith(`${prefixedDOB}=`))
           ?.split("=")[1] || "";
 
       const dobLower =
         document.cookie
           .split("; ")
-          .find((row) => row.startsWith("dob="))
+          .find((row) => row.startsWith(`${prefixedDob}=`))
           ?.split("=")[1] || "";
 
       const dobRaw = dobUpper || dobLower;
@@ -80,7 +86,7 @@ export function useHyperpigmentationQuiz() {
       const phoneRaw =
         document.cookie
           .split("; ")
-          .find((row) => row.startsWith("pn="))
+          .find((row) => row.startsWith(`${prefixedPn}=`))
           ?.split("=")[1] || "";
 
       const phone = phoneRaw ? decodeURIComponent(phoneRaw) : "";

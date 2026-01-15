@@ -6,6 +6,7 @@ import {
   transformPaymentError,
   logPaymentError,
 } from "@/utils/paymentErrorHandler";
+import { getAuthTokenFromCookies, getUserIdFromCookies } from "@/services/userDataService";
 
 const BASE_URL = process.env.BASE_URL;
 const API_SECRET_KEY =
@@ -15,8 +16,8 @@ const API_SECRET_KEY =
 export async function POST(req) {
   try {
     const cookieStore = await cookies();
-    const authToken = cookieStore.get("authToken");
-    const userId = cookieStore.get("userId");
+    const authToken = getAuthTokenFromCookies(cookieStore);
+    const userId = getUserIdFromCookies(cookieStore);
 
     // Check if user is authenticated
     if (!authToken || !userId) {
@@ -119,7 +120,7 @@ export async function POST(req) {
     try {
       // Re-get cookieStore and authToken to ensure they're available in this scope
       const currentCookieStore = await cookies();
-      const currentAuthToken = currentCookieStore.get("authToken");
+      const currentAuthToken = getAuthTokenFromCookies(currentCookieStore);
       if (!currentAuthToken) {
         logger.error("No authToken available for cart refresh");
         throw new Error("Authentication token not available");

@@ -3,6 +3,7 @@ import { logger } from "@/utils/devLogger";
 import { getOrigin } from "@/lib/utils/getOrigin";
 import { cookies } from "next/headers";
 import { getSessionId } from "@/services/sessionService";
+import { getAuthTokenFromCookies } from "@/services/userDataService";
 
 const BASE_URL = process.env.BASE_URL;
 
@@ -22,7 +23,7 @@ export async function POST(request, { params }) {
     }
 
     const cookieStore = await cookies();
-    const authToken = cookieStore.get("authToken");
+    const authToken = getAuthTokenFromCookies(cookieStore);
 
     // Get origin for Origin header (required for backend domain whitelist)
     const origin = getOrigin(request);

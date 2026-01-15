@@ -28,10 +28,13 @@ import {
   checkQuebecZonnicRestriction,
   getQuebecRestrictionMessage,
 } from "@/utils/zonnicQuebecValidation";
+import { getCookieName } from "@/utils/storagePrefix";
 import useCheckoutValidation from "@/lib/hooks/useCheckoutValidation";
 import { checkAgeRestriction } from "@/utils/ageValidation";
 import QuebecRestrictionPopup from "../Popups/QuebecRestrictionPopup";
 import AgeRestrictionPopup from "../Popups/AgeRestrictionPopup";
+import ProcessingPaymentPopup from "../Popups/ProcessingPaymentPopup";
+import PaymentFailedPopup from "../Popups/PaymentFailedPopup";
 import { getAwinFromUrlOrStorage } from "@/utils/awin";
 import StripeElementsPayment from "./StripeElementsPayment";
 import { Elements, useStripe } from "@stripe/react-stripe-js";
@@ -204,6 +207,9 @@ const CheckoutPageContent = () => {
   const [showAgePopup, setShowAgePopup] = useState(false);
   const [ageValidationFailed, setAgeValidationFailed] = useState(false);
   const [isUpdatingShipping, setIsUpdatingShipping] = useState(false);
+  const [showProcessingPopup, setShowProcessingPopup] = useState(false);
+  const [showPaymentFailedPopup, setShowPaymentFailedPopup] = useState(false);
+  const [paymentError, setPaymentError] = useState("");
 
   // Cache profile data to avoid redundant API calls
   const [cachedProfileData, setCachedProfileData] = useState(null);
@@ -725,9 +731,13 @@ const CheckoutPageContent = () => {
         return cookies;
       }, {});
 
-      // Decode cookie values to prevent URL encoding issues
-      const storedFirstName = decodeURIComponent(cookies.displayName || "");
-      const storedUserName = decodeURIComponent(cookies.userName || "");
+      // Get prefixed cookie names - only read prefixed to ensure project isolation
+      const prefixedDisplayName = getCookieName("displayName");
+      const prefixedUserName = getCookieName("userName");
+      
+      // Decode cookie values to prevent URL encoding issues - only read prefixed cookies
+      const storedFirstName = decodeURIComponent(cookies[prefixedDisplayName] || "");
+      const storedUserName = decodeURIComponent(cookies[prefixedUserName] || "");
 
       // Fetch fresh profile data - add timestamp to prevent any caching
       const timestamp = new Date().getTime();
@@ -1389,6 +1399,9 @@ const CheckoutPageContent = () => {
           const orderNumber = order.orderNumber;
           logger.log("✅ Order created:", { orderId, orderNumber });
 
+          // Show processing payment popup after order creation
+          setShowProcessingPopup(true);
+
           // Handle FREE orders (100% discount, total is $0)
           if (
             !payment ||
@@ -1396,6 +1409,9 @@ const CheckoutPageContent = () => {
             order.totalAmount === "0.00"
           ) {
             logger.log("✅ FREE ORDER detected (100% discount applied)");
+
+            // Hide processing popup
+            setShowProcessingPopup(false);
 
             logger.log("✅ Free order completed successfully");
             toast.success("Order placed successfully!");
@@ -1448,6 +1464,10 @@ const CheckoutPageContent = () => {
             logger.log(
               "Payment authorized successfully (awaiting manual capture)"
             );
+            
+            // Hide processing popup
+            setShowProcessingPopup(false);
+            
             toast.success("Payment authorized successfully!");
 
             // Empty cart
@@ -1467,6 +1487,10 @@ const CheckoutPageContent = () => {
           } else if (paymentIntent.status === "succeeded") {
             // Payment succeeded (if automatic capture was used)
             logger.log("Payment succeeded");
+            
+            // Hide processing popup
+            setShowProcessingPopup(false);
+            
             toast.success("Payment successful!");
 
             // Empty cart
@@ -1486,6 +1510,10 @@ const CheckoutPageContent = () => {
           } else if (paymentIntent.status === "processing") {
             // Payment is being processed
             logger.log("Payment is being processed");
+            
+            // Hide processing popup
+            setShowProcessingPopup(false);
+            
             toast.success("Payment is being processed!");
 
             // Empty cart
@@ -1505,15 +1533,26 @@ const CheckoutPageContent = () => {
           } else if (paymentIntent.status === "requires_action") {
             // 3D Secure required - Stripe will handle redirect
             logger.log("3D Secure authentication required");
+            // Keep processing popup open during 3D Secure
             return;
           } else {
+            // Hide processing popup before showing error
+            setShowProcessingPopup(false);
             throw new Error(
               `Unexpected payment status: ${paymentIntent.status}`
             );
           }
         } catch (error) {
           logger.error("❌ Stripe payment error:", error);
-          toast.error(error.message || "Payment failed. Please try again.");
+          
+          // Hide processing popup if it was shown, and show payment failed popup
+          if (showProcessingPopup) {
+            setShowProcessingPopup(false);
+          }
+          setPaymentError(
+            error.message || "Invalid payment request. Please check your details and try again."
+          );
+          setShowPaymentFailedPopup(true);
           setSubmitting(false);
           return;
         }
@@ -1608,6 +1647,25 @@ const CheckoutPageContent = () => {
           // Don't reset ageValidationFailed here - it should only reset when user enters valid age
         }}
         message="Sorry, you must be at least 19 years old to purchase this product."
+      />
+
+      {/* Processing Payment Popup */}
+      <ProcessingPaymentPopup isOpen={showProcessingPopup} />
+
+      {/* Payment Failed Popup */}
+      <PaymentFailedPopup
+        isOpen={showPaymentFailedPopup}
+        onClose={() => {
+          setShowPaymentFailedPopup(false);
+          setPaymentError("");
+        }}
+        onTryAgain={() => {
+          setShowPaymentFailedPopup(false);
+          setPaymentError("");
+          // Retry payment by calling handleSubmit again
+          handleSubmit();
+        }}
+        errorMessage={paymentError}
       />
     </>
   );

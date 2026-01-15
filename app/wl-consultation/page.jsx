@@ -1,16 +1,23 @@
 import WeightLossConsultationQuiz from "@/components/WeightQuestionnaire/WeightConsultationQuiz";
 import { cookies } from "next/headers";
+import {
+  getPhoneFromCookies,
+  getUserNameFromCookies,
+  getUserEmailFromCookies,
+  getProvinceFromCookies,
+  getCookieValue,
+} from "@/services/userDataService";
 
 // Force dynamic rendering for this page
 export const dynamic = "force-dynamic";
 
-export default function WeightConsultationPage() {
-  const cookieStore = cookies();
-  const pn = cookieStore.get("pn")?.value;
-  const userName = cookieStore.get("userName")?.value;
-  const userEmail = cookieStore.get("userEmail")?.value;
-  const province = cookieStore.get("province")?.value;
-  const dob = cookieStore.get("dob")?.value;
+export default async function WeightConsultationPage() {
+  const cookieStore = await cookies();
+  const pn = getPhoneFromCookies(cookieStore)?.value;
+  const userName = getUserNameFromCookies(cookieStore)?.value;
+  const userEmail = getUserEmailFromCookies(cookieStore)?.value;
+  const province = getProvinceFromCookies(cookieStore)?.value;
+  const dob = getCookieValue(cookieStore, "dob") || getCookieValue(cookieStore, "DOB");
 
   return (
     <main className="min-h-screen">

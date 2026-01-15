@@ -3,6 +3,7 @@ import axios from "axios";
 import { cookies } from "next/headers";
 import { logger } from "@/utils/devLogger";
 import { getOrigin } from "@/lib/utils/getOrigin";
+import { getAuthTokenFromCookies } from "@/services/userDataService";
 
 const BASE_URL = process.env.BASE_URL;
 
@@ -19,7 +20,7 @@ export async function PATCH(req, { params }) {
     const { id } = await params;
     const { quantity } = await req.json();
     const cookieStore = await cookies();
-    const authToken = cookieStore.get("authToken");
+    const authToken = getAuthTokenFromCookies(cookieStore);
 
     // Get sessionId from query parameters (for guest users)
     const { searchParams } = new URL(req.url);
@@ -191,7 +192,7 @@ export async function DELETE(req, { params }) {
   try {
     const { id } = await params;
     const cookieStore = await cookies();
-    const authToken = cookieStore.get("authToken");
+    const authToken = getAuthTokenFromCookies(cookieStore);
 
     // Get sessionId from query parameters (for guest users)
     const { searchParams } = new URL(req.url);

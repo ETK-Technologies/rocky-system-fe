@@ -3,6 +3,7 @@ import axios from "axios";
 import { cookies } from "next/headers";
 import { logger } from "@/utils/devLogger";
 import { getOrigin } from "@/lib/utils/getOrigin";
+import { getAuthTokenFromCookies, clearUserDataFromCookies } from "@/services/userDataService";
 
 const BASE_URL = process.env.BASE_URL;
 
@@ -13,7 +14,7 @@ const BASE_URL = process.env.BASE_URL;
 export async function POST(req) {
   try {
     const cookieStore = await cookies();
-    const authToken = cookieStore.get("authToken")?.value;
+    const authToken = getAuthTokenFromCookies(cookieStore)?.value;
 
     // Call the new logout API if we have an auth token
     if (authToken) {
@@ -90,12 +91,7 @@ export async function POST(req) {
     // Even if there's an error, try to clear cookies
     try {
       const cookieStore = await cookies();
-      cookieStore.delete("authToken");
-      cookieStore.delete("refreshToken");
-      cookieStore.delete("userId");
-      cookieStore.delete("userEmail");
-      cookieStore.delete("userName");
-      cookieStore.delete("displayName");
+      clearUserDataFromCookies(cookieStore);
     } catch (clearError) {
       logger.error("Error clearing cookies:", clearError);
     }

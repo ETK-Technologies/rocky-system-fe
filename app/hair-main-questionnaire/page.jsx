@@ -1,13 +1,20 @@
 import HairConsultation from "@/components/HairQuestionnaire/HairConsultationQuiz";
 import { cookies } from "next/headers";
+import {
+  getPhoneFromCookies,
+  getUserNameFromCookies,
+  getUserEmailFromCookies,
+  getProvinceFromCookies,
+  getCookieValue,
+} from "@/services/userDataService";
 
-export default function HairConsultationPage() {
-  const cookieStore = cookies();
-  const pn = cookieStore.get("pn")?.value;
-  const userName = cookieStore.get("userName")?.value;
-  const userEmail = cookieStore.get("userEmail")?.value;
-  const province = cookieStore.get("province")?.value;
-  const dob = cookieStore.get("dob")?.value;
+export default async function HairConsultationPage() {
+  const cookieStore = await cookies();
+  const pn = getPhoneFromCookies(cookieStore)?.value;
+  const userName = getUserNameFromCookies(cookieStore)?.value;
+  const userEmail = getUserEmailFromCookies(cookieStore)?.value;
+  const province = getProvinceFromCookies(cookieStore)?.value;
+  const dob = getCookieValue(cookieStore, "dob") || getCookieValue(cookieStore, "DOB");
 
   return (
     <main className="min-h-screen">

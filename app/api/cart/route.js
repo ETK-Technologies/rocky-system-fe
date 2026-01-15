@@ -3,11 +3,12 @@ import { cookies } from "next/headers";
 import { logger } from "@/utils/devLogger";
 import { fetchCartFromBackend } from "@/lib/api/cartApi";
 import { getOrigin } from "@/lib/utils/getOrigin";
+import { getAuthTokenFromCookies, getCookieValue } from "@/services/userDataService";
 
 export async function GET(request) {
   try {
     const cookieStore = await cookies();
-    const authToken = cookieStore.get("authToken");
+    const authToken = getAuthTokenFromCookies(cookieStore);
 
     // Get sessionId from query parameters (for guest users)
     const { searchParams } = new URL(request.url);
@@ -154,7 +155,7 @@ export async function PUT(req) {
     const { itemKey, quantity } = await req.json();
     const cookieStore = await cookies();
 
-    const encodedCredentials = cookieStore.get("authToken");
+    const encodedCredentials = getAuthTokenFromCookies(cookieStore);
 
     if (!encodedCredentials) {
       return NextResponse.json(
@@ -212,7 +213,7 @@ export async function DELETE(req) {
     const { itemKey } = await req.json();
     const cookieStore = await cookies();
 
-    const encodedCredentials = cookieStore.get("authToken");
+    const encodedCredentials = getAuthTokenFromCookies(cookieStore);
 
     if (!encodedCredentials) {
       return NextResponse.json(

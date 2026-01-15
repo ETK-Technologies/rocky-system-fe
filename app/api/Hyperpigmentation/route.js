@@ -4,6 +4,17 @@ import { logger } from "@/utils/devLogger";
 import { randomBytes } from "crypto";
 import https from "https";
 import axios from "axios";
+import {
+  getUserIdFromCookies,
+  getCookieValue,
+  getDisplayNameFromCookies,
+  getLastNameFromCookies,
+  getUserEmailFromCookies,
+  getUserNameFromCookies,
+  getPhoneFromCookies,
+  getProvinceFromCookies,
+  getAuthTokenFromCookies,
+} from "@/services/userDataService";
 
 const crmApi = axios.create({
     baseURL: "https://crm.myrocky.com/api",
@@ -30,7 +41,7 @@ async function getEntrykey() {
 async function getUserId() {
     try {
         const cookieStore = await cookies();
-        const userId = cookieStore.get("userId");
+        const userId = getUserIdFromCookies(cookieStore);
         return userId?.value ? parseInt(userId.value) : 887;
     } catch (error) {
         logger.warn("Error getting user ID from cookies:", error);
@@ -42,21 +53,20 @@ async function getUserDataFromCookies() {
     try {
         const cookieStore = await cookies();
 
-        // Get individual data from correct cookie keys
-        const fName = cookieStore.get("displayName")?.value || "";
-        const email = cookieStore.get("userEmail")?.value
-            ? decodeURIComponent(cookieStore.get("userEmail").value)
-            : "";
-        const phone = cookieStore.get("phone")?.value || "";
-        const dob = cookieStore.get("DOB")?.value || "";
-        const province = cookieStore.get("province")?.value || "";
+        // Get individual data using helper functions for prefixed cookies
+        const fName = getDisplayNameFromCookies(cookieStore)?.value || "";
+        const emailCookie = getUserEmailFromCookies(cookieStore)?.value;
+        const email = emailCookie ? decodeURIComponent(emailCookie) : "";
+        const phone = getPhoneFromCookies(cookieStore)?.value || "";
+        const dob = getCookieValue(cookieStore, "DOB")?.value || "";
+        const province = getProvinceFromCookies(cookieStore)?.value || "";
 
         // Get full name from userName cookie and extract last name
-        const userName = cookieStore.get("userName")?.value || "";
+        const userNameCookie = getUserNameFromCookies(cookieStore)?.value || "";
         let lName = "";
-        if (userName) {
+        if (userNameCookie) {
             // userName contains "FirstName LastName", extract last name
-            const nameParts = userName.split(" ");
+            const nameParts = userNameCookie.split(" ");
             if (nameParts.length > 1) {
                 lName = nameParts.slice(1).join(" "); // Join in case of multiple last names
             }
@@ -64,14 +74,14 @@ async function getUserDataFromCookies() {
 
         // Log what we got from cookies
         logger.log("Hyperpigmentation API - Cookie data retrieved:", {
-            fName, lName, email, phone, dob, province, userName
+            fName, lName, email, phone, dob, province, userName: userNameCookie
         });
 
         // Try to get gender from profile API
         let gender = "";
         try {
-            const authToken = cookieStore.get("authToken")?.value;
-            const userId = cookieStore.get("userId")?.value;
+            const authToken = getAuthTokenFromCookies(cookieStore)?.value;
+            const userId = getUserIdFromCookies(cookieStore)?.value;
 
             if (authToken && userId) {
                 const BASE_URL = process.env.BASE_URL;

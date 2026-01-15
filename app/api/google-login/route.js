@@ -2,6 +2,12 @@ import { NextResponse } from "next/server";
 import axios from "axios";
 import { cookies } from "next/headers";
 import { logger } from "@/utils/devLogger";
+import {
+  setCookieValue,
+  getCookieValue,
+  getAuthTokenFromCookies,
+  getUserIdFromCookies,
+} from "@/services/userDataService";
 
 const BASE_URL = process.env.BASE_URL;
 
@@ -79,19 +85,20 @@ export async function POST(req) {
       // This matches the regular login approach (username:password)
       // The session_token is validated by WordPress via the authenticate filter
       const encodedCredentials = btoa(`${userEmail}:${sessionToken}`);
-      cookieStore.set("authToken", `Basic ${encodedCredentials}`);
+      setCookieValue(cookieStore, "authToken", `Basic ${encodedCredentials}`);
 
-      cookieStore.set("userId", userId);
-      cookieStore.set("userName", fullName);
-      cookieStore.set("userEmail", userEmail);
-      cookieStore.set(
+      setCookieValue(cookieStore, "userId", userId);
+      setCookieValue(cookieStore, "userName", fullName);
+      setCookieValue(cookieStore, "userEmail", userEmail);
+      setCookieValue(
+        cookieStore,
         "displayName",
         firstName || userDisplayName.split(" ")[0]
       );
-      cookieStore.set("googleAuth", "true");
+      setCookieValue(cookieStore, "googleAuth", "true");
 
       // Verify the cookies were set correctly (same as regular login)
-      const storedUserId = cookieStore.get("userId");
+      const storedUserId = getUserIdFromCookies(cookieStore);
       if (!storedUserId || storedUserId.value !== userId) {
         logger.error("Failed to store userId in cookies");
         return NextResponse.json(
@@ -104,7 +111,7 @@ export async function POST(req) {
 
       // Fetch additional user profile data (phone, province, dob) - same as regular login
       try {
-        const authToken = cookieStore.get("authToken");
+        const authToken = getAuthTokenFromCookies(cookieStore);
         if (authToken) {
           const wpResponse = await axios.get(
             `${BASE_URL}/wp-json/custom/v1/user-profile`,
@@ -119,9 +126,9 @@ export async function POST(req) {
           const province = wpResponse.data.custom_meta?.province;
           const dob = wpResponse.data.custom_meta?.date_of_birth;
 
-          cookieStore.set("pn", phone || "");
-          cookieStore.set("province", province || "");
-          cookieStore.set("dob", dob || "");
+          setCookieValue(cookieStore, "pn", phone || "");
+          setCookieValue(cookieStore, "province", province || "");
+          setCookieValue(cookieStore, "dob", dob || "");
 
           logger.log("Google login: User profile data fetched successfully");
 
@@ -142,7 +149,7 @@ export async function POST(req) {
             );
 
             if (stripeCustomerMeta && stripeCustomerMeta.value) {
-              cookieStore.set("stripeCustomerId", stripeCustomerMeta.value);
+              setCookieValue(cookieStore, "stripeCustomerId", stripeCustomerMeta.value);
               logger.log(
                 "Stripe customer ID saved to cookies:",
                 stripeCustomerMeta.value
@@ -177,16 +184,16 @@ export async function POST(req) {
 
       // For Google login, create Basic auth credentials using email:session_token
       const encodedCredentials = btoa(`${userEmail}:${sessionToken}`);
-      cookieStore.set("authToken", `Basic ${encodedCredentials}`);
+      setCookieValue(cookieStore, "authToken", `Basic ${encodedCredentials}`);
 
-      cookieStore.set("userId", userId);
-      cookieStore.set("userEmail", userEmail);
-      cookieStore.set("displayName", userDisplayName);
-      cookieStore.set("googleAuth", "true");
+      setCookieValue(cookieStore, "userId", userId);
+      setCookieValue(cookieStore, "userEmail", userEmail);
+      setCookieValue(cookieStore, "displayName", userDisplayName);
+      setCookieValue(cookieStore, "googleAuth", "true");
 
       // Try to fetch additional user profile data even in fallback
       try {
-        const authToken = cookieStore.get("authToken");
+        const authToken = getAuthTokenFromCookies(cookieStore);
         if (authToken) {
           const wpResponse = await axios.get(
             `${BASE_URL}/wp-json/custom/v1/user-profile`,
@@ -201,9 +208,9 @@ export async function POST(req) {
           const province = wpResponse.data.custom_meta?.province;
           const dob = wpResponse.data.custom_meta?.date_of_birth;
 
-          cookieStore.set("pn", phone || "");
-          cookieStore.set("province", province || "");
-          cookieStore.set("dob", dob || "");
+          setCookieValue(cookieStore, "pn", phone || "");
+          setCookieValue(cookieStore, "province", province || "");
+          setCookieValue(cookieStore, "dob", dob || "");
 
           // Fetch Stripe customer ID from WooCommerce and save to cookies
           try {
@@ -222,7 +229,7 @@ export async function POST(req) {
             );
 
             if (stripeCustomerMeta && stripeCustomerMeta.value) {
-              cookieStore.set("stripeCustomerId", stripeCustomerMeta.value);
+              setCookieValue(cookieStore, "stripeCustomerId", stripeCustomerMeta.value);
               logger.log(
                 "Stripe customer ID saved to cookies (fallback):",
                 stripeCustomerMeta.value

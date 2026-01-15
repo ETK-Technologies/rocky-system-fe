@@ -6,6 +6,7 @@ import { FaArrowRightLong } from "react-icons/fa6";
 import { CiUser } from "react-icons/ci";
 import { useRouter } from "next/navigation";
 import { handleLogout } from "@/utils/logoutHandler";
+import { getCookieName } from "@/utils/storagePrefix";
 
 import Link from "next/link";
 import Image from "next/image";
@@ -39,13 +40,17 @@ const MobileMenu = ({ menuItems, displayName, token }) => {
     // Determine the display name with the same fallback logic as desktop
     let nameToShow = displayName;
     if (!nameToShow && typeof window !== "undefined") {
+      // Only read prefixed cookies - no fallback to unprefixed to ensure project isolation
+      const prefixedUserName = getCookieName("userName");
+      const prefixedUserEmail = getCookieName("userEmail");
+      
       const userName = document.cookie
         .split("; ")
-        .find((row) => row.startsWith("userName="))
+        .find((row) => row.startsWith(`${prefixedUserName}=`))
         ?.split("=")[1];
       const userEmail = document.cookie
         .split("; ")
-        .find((row) => row.startsWith("userEmail="))
+        .find((row) => row.startsWith(`${prefixedUserEmail}=`))
         ?.split("=")[1];
 
       if (userName) {

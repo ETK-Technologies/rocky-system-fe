@@ -6,6 +6,7 @@ import {
   ensureValidCartNonce,
   updateCartNonceFromResponse,
 } from "@/utils/nonceManager";
+import { getAuthTokenFromCookies } from "@/services/userDataService";
 
 const BASE_URL = process.env.BASE_URL;
 
@@ -24,7 +25,7 @@ export async function POST(req) {
     );
 
     const cookieStore = await cookies();
-    const encodedCredentials = cookieStore.get("authToken");
+    const encodedCredentials = getAuthTokenFromCookies(cookieStore);
 
     if (!encodedCredentials) {
       logger.log("Batch cart add failed: User not authenticated");

@@ -134,9 +134,11 @@ export async function POST_OLD(req) {
     logger.log("Order creation data validation passed");
 
     const cookieStore = await cookies();
-    const encodedCredentials = cookieStore.get("authToken");
-    const cartNonce = cookieStore.get("cart-nonce");
-    const userId = cookieStore.get("userId");
+    // Dynamic import since this file has old commented code above
+    const userDataService = await import("@/services/userDataService");
+    const encodedCredentials = userDataService.getAuthTokenFromCookies(cookieStore);
+    const cartNonce = userDataService.getCookieValue(cookieStore, "cart-nonce");
+    const userId = userDataService.getUserIdFromCookies(cookieStore);
 
     logger.log("Authentication check:", {
       hasAuthToken: !!encodedCredentials,

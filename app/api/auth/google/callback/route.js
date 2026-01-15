@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { logger } from "@/utils/devLogger";
+import { getCookieName } from "@/utils/storagePrefix";
 
 /**
  * GET /api/auth/google/callback
@@ -38,9 +39,10 @@ export async function GET(req) {
         const state = searchParams.get("state");
 
         // Check if tokens are already in cookies (backend might have set them via Set-Cookie header)
-        let authTokenCookie = cookieStore.get("authToken");
-        const refreshTokenCookie = cookieStore.get("refreshToken");
-        const userIdCookie = cookieStore.get("userId");
+        // Only read prefixed cookies - no fallback to unprefixed to ensure project isolation
+        let authTokenCookie = cookieStore.get(getCookieName("authToken"));
+        const refreshTokenCookie = cookieStore.get(getCookieName("refreshToken"));
+        const userIdCookie = cookieStore.get(getCookieName("userId"));
 
         // If we have a code but no tokens, backend should process it
         // Redirect to login page which will poll for tokens
@@ -74,9 +76,9 @@ export async function GET(req) {
         const accessToken = searchParams.get("access_token");
         const refreshToken = searchParams.get("refresh_token");
 
-        // If we have tokens in URL, set them as cookies
+        // If we have tokens in URL, set them as cookies (using project-specific prefixed names)
         if (accessToken) {
-            cookieStore.set("authToken", `Bearer ${accessToken}`, {
+            cookieStore.set(getCookieName("authToken"), `Bearer ${accessToken}`, {
                 httpOnly: true,
                 secure: process.env.NODE_ENV === "production",
                 sameSite: "lax",
@@ -84,11 +86,11 @@ export async function GET(req) {
             });
             logger.log("Access token set from URL parameter");
             // Update the cookie reference
-            authTokenCookie = cookieStore.get("authToken");
+            authTokenCookie = cookieStore.get(getCookieName("authToken"));
         }
 
         if (refreshToken) {
-            cookieStore.set("refreshToken", refreshToken, {
+            cookieStore.set(getCookieName("refreshToken"), refreshToken, {
                 httpOnly: true,
                 secure: process.env.NODE_ENV === "production",
                 sameSite: "lax",
@@ -109,21 +111,23 @@ export async function GET(req) {
             const firstName = searchParams.get("firstName") || searchParams.get("first_name");
             const lastName = searchParams.get("lastName") || searchParams.get("last_name");
 
-            // Set user information cookies if provided in URL
+            // Set user information cookies if provided in URL (using project-specific prefixed names)
             if (userId) {
-                cookieStore.set("userId", userId);
+                cookieStore.set(getCookieName("userId"), userId);
             }
             if (userEmail) {
-                cookieStore.set("userEmail", userEmail);
+                cookieStore.set(getCookieName("userEmail"), userEmail);
             }
             if (firstName) {
-                cookieStore.set("displayName", firstName);
+                cookieStore.set(getCookieName("displayName"), firstName);
+                cookieStore.set(getCookieName("userFirstName"), firstName);
             }
             if (lastName) {
-                cookieStore.set("lastName", lastName);
+                cookieStore.set(getCookieName("lastName"), lastName);
+                cookieStore.set(getCookieName("userLastName"), lastName);
             }
             if (firstName && lastName) {
-                cookieStore.set("userName", `${firstName} ${lastName}`);
+                cookieStore.set(getCookieName("userName"), `${firstName} ${lastName}`);
             }
 
             // Get redirect URL from query params

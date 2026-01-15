@@ -3,6 +3,7 @@ import Stripe from "stripe";
 import { logger } from "@/utils/devLogger";
 import { cookies } from "next/headers";
 import axios from "axios";
+import { getUserIdFromCookies, getAuthTokenFromCookies, getCookieValue } from "@/services/userDataService";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "");
 const BASE_URL = process.env.BASE_URL;
@@ -54,12 +55,12 @@ export async function POST(req) {
     let stripeCustomerId = null;
     try {
       const cookieStore = await cookies();
-      const userId = cookieStore.get("userId");
-      const authToken = cookieStore.get("authToken");
+      const userId = getUserIdFromCookies(cookieStore);
+      const authToken = getAuthTokenFromCookies(cookieStore);
 
       // Check if we have Stripe customer ID in cookies first (fastest path)
-      const cachedStripeCustomerId = cookieStore.get("stripeCustomerId");
-      if (cachedStripeCustomerId && cachedStripeCustomerId.value) {
+      const cachedStripeCustomerId = getCookieValue(cookieStore, "stripeCustomerId");
+      if (cachedStripeCustomerId) {
         stripeCustomerId = cachedStripeCustomerId.value;
         logger.log(
           "Using cached Stripe customer ID from cookies:",

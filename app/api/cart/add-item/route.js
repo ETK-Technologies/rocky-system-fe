@@ -3,6 +3,7 @@ import axios from "axios";
 import { cookies } from "next/headers";
 import { logger } from "@/utils/devLogger";
 import { getOrigin } from "@/lib/utils/getOrigin";
+import { getAuthTokenFromCookies } from "@/services/userDataService";
 
 const BASE_URL = process.env.BASE_URL;
 
@@ -105,7 +106,7 @@ export async function POST(req) {
 
     // If client didn't send Authorization, try to read from httpOnly cookie (server-side)
     const cookieStore = await cookies();
-    const authTokenCookie = cookieStore.get("authToken");
+    const authTokenCookie = getAuthTokenFromCookies(cookieStore);
 
     // Use client-sent token if available, otherwise use cookie
     const authToken = clientAuthHeader || authTokenCookie?.value;
