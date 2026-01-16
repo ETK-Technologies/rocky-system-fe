@@ -22,11 +22,17 @@ export default function QuizRenderer({
 }) {
   // Find last answered question index when resuming
   const getInitialStepIndex = () => {
+    const steps = quizData?.steps || [];
+    
     if (!existingAnswers || Object.keys(existingAnswers).length === 0) {
-      return 0; // Start from beginning if no existing answers
+      // Start from beginning - find first non-skippable step
+      let firstIndex = 0;
+      while (firstIndex < steps.length && steps[firstIndex].shouldSkip === true) {
+        firstIndex++;
+      }
+      return firstIndex < steps.length ? firstIndex : 0;
     }
 
-    const steps = quizData?.steps || [];
     let lastAnsweredIndex = 0;
 
     // Find the last question that has an answer
@@ -253,8 +259,19 @@ export default function QuizRenderer({
   // Navigate to previous step
   const handleBack = useCallback(() => {
     if (currentStepIndex > 0) {
-      const prevIndex =
+      let prevIndex =
         visitedSteps[visitedSteps.length - 2] || currentStepIndex - 1;
+      
+      // Skip steps marked with shouldSkip when going back
+      while (prevIndex >= 0 && steps[prevIndex].shouldSkip === true) {
+        prevIndex--;
+      }
+      
+      // Ensure we don't go below 0
+      if (prevIndex < 0) {
+        prevIndex = 0;
+      }
+      
       setCurrentStepIndex(prevIndex);
       setVisitedSteps(visitedSteps.slice(0, -1));
 
@@ -521,6 +538,13 @@ export default function QuizRenderer({
 
   const progress =
     currentStepIndex == 0 ? 0 : ((currentStepIndex + 1) / steps.length) * 100;
+  
+  // Calculate total non-skipped steps for accurate progress
+  const totalNonSkippedSteps = steps.filter(step => !step.shouldSkip).length;
+  const currentNonSkippedIndex = steps.slice(0, currentStepIndex + 1).filter(step => !step.shouldSkip).length;
+  const adjustedProgress = totalNonSkippedSteps > 0 
+    ? (currentNonSkippedIndex / totalNonSkippedSteps) * 100 
+    : 0;
 
   // Show error if no steps
   if (!steps || steps.length === 0) {
@@ -597,9 +621,9 @@ export default function QuizRenderer({
       <div className="max-w-2xl mx-auto md:px-0">
         {/* Progress Bar */}
         <QuizProgress
-          current={currentStepIndex + 1}
-          total={steps.length}
-          percentage={progress}
+          current={currentNonSkippedIndex}
+          total={totalNonSkippedSteps}
+          percentage={adjustedProgress}
         />
 
         {/* Current Step */}

@@ -268,11 +268,11 @@ const OrderReceivedContent = ({ userId }) => {
     
     // Build the base path based on flow type (legacy flows)
     let basePath = "";
-    if (mhFlow === "1") basePath = "/mh-quiz";
-    if (edFlow === "1") basePath = "/ed-consultation-quiz";
-    if (wlFlow === "1") basePath = "/wl-consultation";
-    if (hairFlow === "1") basePath = "/hair-main-questionnaire";
-    if (smokingFlow === "1") basePath = "/smoking-consultation/?checked-out=1";
+    if (mhFlow === "1") basePath = "/quiz/hair-main-questionnaire-v1";
+    if (edFlow === "1") basePath = "/quiz/ed-consultation-quiz";
+    if (wlFlow === "1") basePath = "/quiz/wl-consultation-v1";
+    if (hairFlow === "1") basePath = "/quiz/hair-main-questionnaire";
+    if (smokingFlow === "1") basePath = "/quiz/smoking-consultation/?checked-out=1";
 
     logger.log("[Debug] Base path:", basePath);
     logger.log("[Debug] Flow parameters:", {
@@ -423,20 +423,9 @@ const OrderReceivedContent = ({ userId }) => {
           }, 1000);
         }
 
-        // Check if we need to redirect to a questionnaire
-        // Check sessionStorage for mainQuiz redirect
-        const storedMainQuizId = sessionStorage.getItem("_rocky_main_quiz_redirect");
-        if (storedMainQuizId) {
-          logger.log("[MainQuiz Redirect] Setting up redirect to main consultation:", storedMainQuizId);
-          setIsQuestionnaireCompleted(false);
-          setQuestionnaireCheckComplete(true);
-          // Clear from sessionStorage after setting up redirect
-         // sessionStorage.removeItem("_rocky_main_quiz_redirect");
-          logger.log("[SessionStorage] Cleared mainQuizId after redirect setup");
-          // Countdown will start automatically
-        }
+        
         // Then check other flow redirects
-        else if (shouldRedirect) {
+        if (shouldRedirect) {
           // Only perform questionnaire completion check for ED and Hair flows
           if (edFlow === "1" || hairFlow === "1") {
             // Determine which questionnaire ID to check based on flow type

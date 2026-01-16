@@ -45,15 +45,30 @@ export function getBranchingLogic(quizData, currentStepIndex, currentAnswer, all
   // If matching flow rule found, navigate to target question
   if (matchingFlow && matchingFlow.to) {
     const targetQuestionId = matchingFlow.to.questionId;
-    const targetIndex = steps.findIndex((step) => step.id === targetQuestionId);
+    let targetIndex = steps.findIndex((step) => step.id === targetQuestionId);
     
     if (targetIndex !== -1) {
+      // Skip steps marked with shouldSkip
+      while (targetIndex < steps.length && steps[targetIndex].shouldSkip === true) {
+        targetIndex++;
+      }
+      
+      // Check if we've reached the end after skipping
+      if (targetIndex >= steps.length) {
+        return -1;
+      }
+      
       return targetIndex;
     }
   }
 
-  // Default: Go to next step sequentially
-  const nextIndex = currentStepIndex + 1;
+  // Default: Go to next step sequentially, skipping steps with shouldSkip = true
+  let nextIndex = currentStepIndex + 1;
+  
+  // Skip all steps marked with shouldSkip
+  while (nextIndex < steps.length && steps[nextIndex].shouldSkip === true) {
+    nextIndex++;
+  }
   
   // Check if we've reached the end
   if (nextIndex >= steps.length) {

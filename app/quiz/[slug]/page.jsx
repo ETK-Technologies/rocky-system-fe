@@ -60,7 +60,32 @@ export default function QuizPage({ params }) {
         logger.log("[SessionStorage] Cleared mainQuizId - starting main quiz");
       }
 
-      setQuizData(quiz);
+      // Process steps based on authentication and requiredLogin
+      const userAuthenticated = isAuthenticated();
+      const processedSteps = quiz.steps?.map(step => {
+        // If user is authenticated and step requires login, mark it as skippable
+        if (userAuthenticated && step.requiredLogin === true) {
+          return {
+            ...step,
+            shouldSkip: true
+          };
+        }
+        return {
+          ...step,
+          shouldSkip: false
+        };
+      });
+
+      // Update quiz data with processed steps
+      const processedQuiz = {
+        ...quiz,
+        steps: processedSteps,
+        isUserAuthenticated: userAuthenticated
+      };
+
+      logger.log("Processed steps with requiredLogin logic:", processedSteps?.filter(s => s.shouldSkip).length || 0, "steps marked to skip");
+      
+      setQuizData(processedQuiz);
 
       // Step 2: Check for sessionId in URL query parameters
       const urlParams = new URLSearchParams(window.location.search);
