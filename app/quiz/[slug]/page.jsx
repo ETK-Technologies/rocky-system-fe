@@ -11,38 +11,22 @@ export const dynamicParams = true;
 
 // Generate static paths at build time for known quizzes
 export async function generateStaticParams() {
-  try {
-    // Use absolute URL for build time
-    const baseUrl = process.env.NEXT_PUBLIC_API_URL || process.env.VERCEL_URL 
-      ? `https://${process.env.VERCEL_URL}` 
-      : "http://localhost:3000";
-    
-    // Fetch list of all quiz slugs from your API
-    const response = await fetch(
-      `${baseUrl}/api/quizzes/list`,
-      { 
-        cache: "no-store", // Don't cache during build
-      }
-    );
+  // Static list of known quiz slugs for build-time generation
+  const quizzes = [
+    { slug: "ed-pre-consultation" },
+    { slug: "hair-pre-consultation-quiz" },
+    { slug: "wl-pre-consultation" },
+    { slug: "wlprecons" },
+    { slug: "wl-consultation-v1" },
+    { slug: "ed-consultation" },
+    { slug: "hair-consultation" },
+  ];
 
-    if (!response.ok) {
-      console.warn("Failed to fetch quiz list for static generation, will use dynamic rendering");
-      return []; // Return empty array to allow dynamic rendering
-    }
-
-    const result = await response.json();
-    const quizzes = result.data || [];
-
-    console.log(`Generated static params for ${quizzes.length} quizzes`);
-    
-    return quizzes.map((quiz) => ({
-      slug: quiz.slug,
-    }));
-  } catch (error) {
-    console.warn("Error generating static params:", error.message);
-    // Return empty array to allow all routes to be generated on-demand
-    return [];
-  }
+  console.log(`Generating static params for ${quizzes.length} quizzes`);
+  
+  return quizzes.map((quiz) => ({
+    slug: quiz.slug,
+  }));
 }
 
 // Server Component - Fetches quiz data on server
@@ -52,9 +36,7 @@ export default async function QuizPage({ params }) {
 
   try {
     // Use absolute URL for server-side fetching
-    const baseUrl = process.env.NEXT_PUBLIC_API_URL || process.env.VERCEL_URL 
-      ? `https://${process.env.VERCEL_URL}` 
-      : "http://localhost:3000";
+    const baseUrl = "https://rocky-be-production.up.railway.app";
     
     // Fetch quiz runtime data on the server with ISR caching
     const quizResponse = await fetch(
