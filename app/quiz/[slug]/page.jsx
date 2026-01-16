@@ -36,9 +36,11 @@ export default async function QuizPage({ params }) {
 
   try {
     // Use absolute URL for server-side fetching
-    const baseUrl = process.env.NEXT_PUBLIC_API_URL || process.env.VERCEL_URL 
-      ? `https://${process.env.VERCEL_URL}` 
-      : "http://localhost:3000";
+    const baseUrl = process.env.NEXT_PUBLIC_API_URL 
+      || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null)
+      || "http://localhost:3000";
+    
+    console.log(`[QuizPage] Fetching quiz runtime data for slug: ${slug} from ${baseUrl}`);
     
     // Fetch quiz runtime data on the server with ISR caching
     const quizResponse = await fetch(
