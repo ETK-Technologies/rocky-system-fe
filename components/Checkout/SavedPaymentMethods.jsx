@@ -12,9 +12,15 @@ const SavedPaymentMethods = ({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [deletingId, setDeletingId] = useState(null);
+  const [hasFetched, setHasFetched] = useState(false);
 
   useEffect(() => {
-    fetchSavedPaymentMethods();
+    // Prevent double-fetching in React StrictMode
+    if (!hasFetched) {
+      setHasFetched(true);
+      fetchSavedPaymentMethods();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const fetchSavedPaymentMethods = async () => {
@@ -25,8 +31,66 @@ const SavedPaymentMethods = ({
       const data = await response.json();
 
       if (data.success) {
-        setPaymentMethods(data.paymentMethods || []);
-        logger.log("Saved payment methods fetched:", data.paymentMethods);
+        const methods = data.paymentMethods || [];
+        
+        logger.log("🔍 Raw payment methods from API:", methods.map(pm => ({
+          id: pm.id,
+          brand: pm.card?.brand,
+          last4: pm.card?.last4,
+          exp_month: pm.card?.exp_month,
+          exp_year: pm.card?.exp_year,
+        })));
+        
+        // Client-side deduplication (extra safety)
+        const seenIds = new Set();
+        const seenCards = new Set();
+        const duplicatesRemoved = [];
+        
+        const uniqueMethods = methods.filter((pm) => {
+          // Deduplicate by payment method ID
+          if (seenIds.has(pm.id)) {
+            logger.warn("⚠️ Duplicate payment method ID on client:", pm.id);
+            duplicatesRemoved.push({ type: "id", id: pm.id });
+            return false;
+          }
+          seenIds.add(pm.id);
+
+          // Deduplicate by card details (brand + last4 + expiry)
+          const cardKey = `${pm.card.brand}-${pm.card.last4}-${pm.card.exp_month}-${pm.card.exp_year}`;
+          logger.log("🔍 Checking card:", { id: pm.id, cardKey });
+          
+          if (seenCards.has(cardKey)) {
+            logger.warn("⚠️ Duplicate card on client - removing:", {
+              id: pm.id,
+              cardKey,
+              brand: pm.card.brand,
+              last4: pm.card.last4,
+              exp_month: pm.card.exp_month,
+              exp_year: pm.card.exp_year,
+            });
+            duplicatesRemoved.push({ type: "card", id: pm.id, cardKey });
+            return false;
+          }
+          seenCards.add(cardKey);
+          logger.log("✅ Keeping card:", { id: pm.id, cardKey });
+
+          return true;
+        });
+
+        setPaymentMethods(uniqueMethods);
+        logger.log("✅ Final unique payment methods:", uniqueMethods.map(pm => ({
+          id: pm.id,
+          brand: pm.card?.brand,
+          last4: pm.card?.last4,
+          exp_month: pm.card?.exp_month,
+          exp_year: pm.card?.exp_year,
+        })));
+        
+        if (methods.length !== uniqueMethods.length) {
+          logger.log(`🔧 Client-side deduplication: Removed ${methods.length - uniqueMethods.length} duplicate(s)`, duplicatesRemoved);
+        } else {
+          logger.log("✅ No duplicates found on client-side");
+        }
       } else {
         setError(data.message || "Failed to fetch saved payment methods");
         logger.error("Error fetching payment methods:", data.message);

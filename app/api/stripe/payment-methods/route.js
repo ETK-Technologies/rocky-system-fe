@@ -131,38 +131,110 @@ export async function GET(req) {
     // Fetch saved payment methods from Stripe
     logger.log("🔍 Fetching saved payment methods from Stripe for customer:", stripeCustomerId);
     try {
-      const paymentMethods = await stripe.paymentMethods.list({
-        customer: stripeCustomerId,
-        type: "card",
-      });
+      // Fetch all payment methods (handle pagination)
+      let allPaymentMethods = [];
+      let hasMore = true;
+      let startingAfter = null;
+
+      while (hasMore) {
+        const params = {
+          customer: stripeCustomerId,
+          type: "card",
+          limit: 100, // Stripe's max limit
+        };
+        
+        if (startingAfter) {
+          params.starting_after = startingAfter;
+        }
+
+        const response = await stripe.paymentMethods.list(params);
+        allPaymentMethods = allPaymentMethods.concat(response.data);
+        
+        hasMore = response.has_more;
+        if (hasMore && response.data.length > 0) {
+          startingAfter = response.data[response.data.length - 1].id;
+        } else {
+          hasMore = false;
+        }
+      }
+
+      const paymentMethods = { data: allPaymentMethods };
 
       logger.log(
         `✅ Found ${paymentMethods.data.length} saved payment method(s)`
       );
 
       if (paymentMethods.data.length > 0) {
-        logger.log("Payment methods:", paymentMethods.data.map(pm => ({
+        logger.log("Payment methods from Stripe:", paymentMethods.data.map(pm => ({
           id: pm.id,
           brand: pm.card?.brand,
           last4: pm.card?.last4,
         })));
       }
 
-      // Format payment methods for frontend
-      const formattedPaymentMethods = paymentMethods.data.map((pm) => ({
-        id: pm.id,
-        type: pm.type,
-        card: {
-          brand: pm.card?.brand || "unknown",
-          last4: pm.card?.last4 || "",
-          exp_month: pm.card?.exp_month || 0,
-          exp_year: pm.card?.exp_year || 0,
-        },
-      }));
+      // Format payment methods for frontend and deduplicate by payment method ID
+      const seenIds = new Set();
+      const formattedPaymentMethods = paymentMethods.data
+        .filter((pm) => {
+          // Deduplicate by payment method ID (each Stripe payment method should have unique ID)
+          if (seenIds.has(pm.id)) {
+            logger.warn("⚠️ Duplicate payment method ID found:", pm.id);
+            return false;
+          }
+          seenIds.add(pm.id);
+          return true;
+        })
+        .map((pm) => ({
+          id: pm.id,
+          type: pm.type,
+          card: {
+            brand: pm.card?.brand || "unknown",
+            last4: pm.card?.last4 || "",
+            exp_month: pm.card?.exp_month || 0,
+            exp_year: pm.card?.exp_year || 0,
+          },
+        }));
+
+      // Additional deduplication by card details (last4 + brand + expiry) 
+      // in case the same card was added multiple times with different payment method IDs
+      const seenCards = new Set();
+      const duplicateCards = [];
+      const uniquePaymentMethods = formattedPaymentMethods.filter((pm) => {
+        const cardKey = `${pm.card.brand}-${pm.card.last4}-${pm.card.exp_month}-${pm.card.exp_year}`;
+        if (seenCards.has(cardKey)) {
+          duplicateCards.push({ id: pm.id, cardKey });
+          logger.warn("⚠️ Duplicate card found (same brand, last4, and expiry):", {
+            paymentMethodId: pm.id,
+            cardKey,
+            brand: pm.card.brand,
+            last4: pm.card.last4,
+            expiry: `${pm.card.exp_month}/${pm.card.exp_year}`
+          });
+          return false;
+        }
+        seenCards.add(cardKey);
+        return true;
+      });
+
+      if (formattedPaymentMethods.length !== uniquePaymentMethods.length) {
+        logger.log(
+          `🔧 Server-side deduplication: Removed ${formattedPaymentMethods.length - uniquePaymentMethods.length} duplicate payment method(s)`,
+          { duplicates: duplicateCards }
+        );
+      }
+
+      logger.log(
+        `✅ Returning ${uniquePaymentMethods.length} unique payment method(s)`,
+        uniquePaymentMethods.map(pm => ({
+          id: pm.id,
+          brand: pm.card.brand,
+          last4: pm.card.last4,
+        }))
+      );
 
       return NextResponse.json({
         success: true,
-        paymentMethods: formattedPaymentMethods,
+        paymentMethods: uniquePaymentMethods,
         customerId: stripeCustomerId,
       });
     } catch (stripeError) {
