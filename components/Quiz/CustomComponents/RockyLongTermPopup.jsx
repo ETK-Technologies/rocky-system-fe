@@ -39,7 +39,7 @@ export default function RockyLongTermPopup({ step, answer, onAnswerChange }) {
       </p>
 
       {/* Image */}
-      <div className="mx-auto mb-4">
+      <div className="mx-auto relative mb-4">
         <Image
           width={1000}
           height={1000}
