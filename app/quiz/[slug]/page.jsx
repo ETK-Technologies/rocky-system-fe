@@ -35,34 +35,43 @@ export default async function QuizPage({ params }) {
   const { slug } = await params;
 
   try {
-    // Use absolute URL for server-side fetching
-    const baseUrl = process.env.NEXT_PUBLIC_API_URL 
-      || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null)
-      || "http://localhost:3000";
+    // Fetch directly from backend on server-side
+    const apiUrl = process.env.BASE_URL || "https://rocky-be-production.up.railway.app";
+    const backendUrl = `${apiUrl}/api/v1/runtime/quizzes/${slug}`;
     
-    console.log(`[QuizPage] Fetching quiz runtime data for slug: ${slug} from ${baseUrl}`);
+    // Get the origin for the request - use the correct whitelisted domain
+    const origin = process.env.NEXT_PUBLIC_SITE_URL 
+      || process.env.SITE_URL 
+      || process.env.NEXT_PUBLIC_APP_URL
+      || (process.env.NODE_ENV === "development" ? "http://localhost:3000" : "https://www.myrocky.com");
+    
+    console.log(`[QuizPage] Fetching quiz runtime data for slug: ${slug} from ${backendUrl} with origin: ${origin}`);
     
     // Fetch quiz runtime data on the server with ISR caching
-    const quizResponse = await fetch(
-      `${baseUrl}/api/quizzes/runtime/${slug}`,
-      {
-        next: { revalidate: 60 }, // Revalidate every 60 seconds
-      }
-    );
+    const quizResponse = await fetch(backendUrl, {
+      method: "GET",
+      headers: {
+        "accept": "application/json",
+        "Content-Type": "application/json",
+        "X-App-Key": process.env.NEXT_PUBLIC_APP_KEY,
+        "X-App-Secret": process.env.NEXT_PUBLIC_APP_SECRET,
+        "Origin": origin,
+      },
+      next: { revalidate: 60 }, // Revalidate every 60 seconds
+    });
 
     if (!quizResponse.ok) {
-      console.error(`Failed to fetch quiz: ${slug} (${quizResponse.status})`);
+      const errorText = await quizResponse.text();
+      console.error(`Failed to fetch quiz: ${slug} (${quizResponse.status}) - ${errorText}`);
       notFound();
     }
 
-    const quizResult = await quizResponse.json();
+    const quizData = await quizResponse.json();
 
-    if (!quizResult.success || !quizResult.data) {
+    if (!quizData) {
       console.error("Invalid quiz data received");
       notFound();
     }
-
-    const quizData = quizResult.data;
 
     // Pass pre-fetched quiz data to client component
     return (
