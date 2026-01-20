@@ -206,11 +206,29 @@ export default function QuizRenderer({
       return;
     }
 
-    // Update answers state
+    // Update answers state with cleanup for changed answers
     const updatedAnswers = {
       ...answers,
       [questionId]: { value: currentAnswer },
     };
+    
+    // Check if answer changed to clear subsequent answers
+    // This handles the case where a user resumes, changes an answer, and we need to invalidate old path data
+    const previousAnswer = answers[questionId]?.value;
+    const hasChanged = JSON.stringify(previousAnswer) !== JSON.stringify(currentAnswer);
+    
+    if (hasChanged) {
+      logger.log(`Answer changed at step ${currentStepIndex}. Clearing downstream answers.`);
+      for (let i = currentStepIndex + 1; i < steps.length; i++) {
+        const stepId = String(steps[i].id);
+        if (updatedAnswers[stepId]) {
+          delete updatedAnswers[stepId];
+        }
+      }
+    }
+
+    logger.log("Updated answers after saving:", previousAnswer, "->", currentAnswer, updatedAnswers);
+    
     setAnswers(updatedAnswers);
     logger.log("All answers collected:", updatedAnswers);
 
@@ -262,8 +280,15 @@ export default function QuizRenderer({
       let prevIndex =
         visitedSteps[visitedSteps.length - 2] || currentStepIndex - 1;
       
+      logger.log(" stepsss ->: " ,steps);
+      logger.log("Handling back navigation. Current index:", currentStepIndex, "Previous index:", prevIndex);
       // Skip steps marked with shouldSkip when going back
+      logger.log("Checking for skippable steps when going back...");
       while (prevIndex >= 0 && steps[prevIndex].shouldSkip === true) {
+        prevIndex--;
+      }
+
+      if(steps[prevIndex] && steps[prevIndex].stepType === "component"){
         prevIndex--;
       }
       
