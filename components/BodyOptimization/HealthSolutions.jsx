@@ -92,7 +92,7 @@ const HealthSolutions = ({ btnColor = null }) => {
       {/* Button */}
       <div>
         <Link
-          href="/wl-pre-consultation/"
+          href="/quiz/wlprecons/"
           className={` ${
             btnColor || "bg-black"
           }  h-11 md:px-[24px] py-3 md:py-[11.5px] rounded-[64px] flex items-center space-x-2 transition justify-center w-full md:w-fit  text-white hover:bg-gray-800`}

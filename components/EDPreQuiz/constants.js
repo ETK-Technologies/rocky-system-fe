@@ -23,7 +23,7 @@ export const ED_PRE_QUIZ_DATA = {
     buttons: [
         {
             text: "Get Started",
-            href: "/ed-pre-consultation-quiz/",
+            href: "/quiz/ed-pre-consultation/",
             primary: true,
             ariaLabel: "Opt1",
             width: "170px",

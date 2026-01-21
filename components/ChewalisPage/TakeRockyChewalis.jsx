@@ -33,7 +33,7 @@ const TakeRockyChewalis = () => {
       {/* CTA Button */}
       <div className="flex flex-col md:flex-row gap-4 md:gap-0 md:space-x-4 mb-6">
         <Link
-          href="/ed-pre-consultation-quiz/"
+          href="/quiz/ed-pre-consultation/"
           className="bg-black text-white px-6 py-3 rounded-full flex items-center justify-center md:justify-start space-x-3 hover:bg-gray-800 transition"
         >
           <span className="text-center md:text-start">Learn More</span>

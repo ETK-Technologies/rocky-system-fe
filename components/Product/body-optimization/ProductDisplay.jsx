@@ -84,7 +84,7 @@ const ProductDisplay = ({ product, productSlug }) => {
               )}
               <div className="mt-6 md:mt-8">
                 <Link
-                  href="/wl-pre-consultation"
+                  href="/quiz/wlprecons"
                   className="w-full md:w-auto bg-black text-white py-4 px-8 rounded-full font-medium flex items-center justify-center text-center hover:bg-gray-800 transition-colors"
                 >
                   Get Started

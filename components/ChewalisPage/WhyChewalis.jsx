@@ -85,7 +85,7 @@ const WhyChewalis = () => {
       {/* Button - Mobile Only */}
       <div className="flex flex-col md:hidden gap-4 mb-6">
         <Link
-          href="/ed-pre-consultation-quiz/"
+          href="/quiz/ed-pre-consultation/"
           className="bg-black text-white px-6 py-3 rounded-full flex items-center justify-center space-x-3 hover:bg-gray-800 transition"
         >
           <span>Start Your Quiz</span>

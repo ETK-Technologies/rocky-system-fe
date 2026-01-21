@@ -169,7 +169,7 @@ const EdProducts = ({ showonly, initialProducts = null }) => {
       {/* Find What's Best for Me Button */}
       <div className="flex justify-center mt-8 mb-8">
         <Link
-          href="/ed-pre-consultation-quiz/"
+          href="/quiz/ed-pre-consultation/"
           className="bg-white border-2 border-black text-black px-8 py-3 rounded-full flex items-center justify-center space-x-3 hover:bg-gray-50 transition font-medium"
         >
           <span>Find What's Best For Me</span>

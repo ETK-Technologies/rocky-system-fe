@@ -4,7 +4,7 @@ export const assistanceCenterCards = [
         category: "Erectile Dysfunction",
         title: "Get Confidence Back in Bed",
         img: "https://myrocky.b-cdn.net/WP%20Images/Homepage/ed-leading.webp",
-        to: "/ed-pre-consultation-quiz/",
+        to: "/quiz/ed-pre-consultation/",
         btn: "Get Started"
     },
     {
@@ -12,7 +12,7 @@ export const assistanceCenterCards = [
         category: "Weight Loss",
         title: "Lose Weight With Science",
         img: "https://myrocky.b-cdn.net/WP%20Images/Homepage/wl-section.webp",
-        to: "/wl-pre-consultation",
+        to: "/quiz/wlprecons",
         btn: "Am I Eligible?"
     },
     {

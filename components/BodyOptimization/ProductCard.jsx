@@ -33,7 +33,7 @@ const ProductCard = ({ product, btnColor = null }) => {
       </div>
       <div className="flex gap-2 w-full justify-center items-center absolute bottom-5">
         <Link
-          href="/wl-pre-consultation"
+          href="/quiz/wlprecons"
           prefetch={true}
           className={`${
             btnColor || "bg-black"
