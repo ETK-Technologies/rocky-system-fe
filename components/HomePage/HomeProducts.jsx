@@ -52,27 +52,27 @@ const wlProductCard = [
       {
         title: "Ozempic®",
         description: "(semaglutide) injection",
-        link: "/wl-pre-consultation",
+        link: "/quiz/wlprecons",
         image:
           "https://myrocky.b-cdn.net/WP%20Images/Homepage/ozempic-cropped.webp",
       },
       {
         title: "Mounjaro®",
         description: "(tirzepatide)",
-        link: "/wl-pre-consultation",
+        link: "/quiz/wlprecons",
         image: "/products/monjaro.png",
       },
       {
         title: "Wegovy®",
         description: "(semaglutide) injection",
-        link: "/wl-pre-consultation",
+        link: "/quiz/wlprecons",
         image: "https://myrocky.b-cdn.net/WP%20Images/Homepage/wegovy.webp",
       },
       ,
       {
         title: "Rybelsus®",
         description: "(semaglutide) injection",
-        link: "/wl-pre-consultation",
+        link: "/quiz/wlprecons",
         image: "/products/rybelsus.png",
       },
     ],

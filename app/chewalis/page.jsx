@@ -40,7 +40,7 @@ const chewalisButtons = [
       "h-11 md:px-[24px] py-3 md:py-[11.5px] rounded-[64px] flex items-center space-x-2 transition justify-center bg-black text-white hover:bg-gray-800",
   },
   {
-    href: "/ed-pre-consultation-quiz/",
+    href: "/quiz/ed-pre-consultation/",
     text: "See if treatment is right for me",
     className:
       "h-11 md:px-[24px] py-3 md:py-[11.5px] rounded-[64px] flex items-center space-x-2 transition justify-center bg-white border border-black text-black hover:bg-gray-100",

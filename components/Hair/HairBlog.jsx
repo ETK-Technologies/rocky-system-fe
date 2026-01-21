@@ -7,7 +7,7 @@ const hairBlog = [
       "https://myrocky.b-cdn.net/WP%20Images/Hair%20Loss/hair-video.mp4",
     title: "Simple. Discreet. Affordable.",
     buttonText: "Get Started →",
-    buttonLink: "/hair-pre-consultation-quiz/",
+    buttonLink: "/quiz/hair-pre-consultation-quiz/",
   },
 ];
 

@@ -89,7 +89,7 @@ const ResultSection = () => {
       {/* Button */}
       <div>
         <Link
-          href="/wl-pre-consultation/"
+          href="/quiz/wlprecons/"
           className="mx-auto my-[32px] md:my-[56px] h-[52px] md:px-[24px] py-[21px] rounded-[64px] flex items-center space-x-2 transition justify-center w-full md:w-[320px] bg-black text-white hover:bg-gray-800"
         >
           <span className="text-[14px] leading-[19.6px] md:leading-[21px] font-[500] md:font-[400]">

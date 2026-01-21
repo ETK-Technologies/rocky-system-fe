@@ -14,7 +14,7 @@ export default function edPrelander4() {
         title="Have her bragging to her friends tomorrow"
         subTitle="Digital Healthcare for men without the wait time or stigma. Trusted by 350K+ Canadians."
         btnText="Get Started →"
-        quizHref="/ed-pre-consultation-quiz"
+        quizHref="/quiz/ed-pre-consultation"
       />
       <Section bg={"bg-[#FFFFFF]"}>
         <HowRockyWorks />
