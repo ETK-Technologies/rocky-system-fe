@@ -23,6 +23,7 @@ export default function EDNoAppointmentAcknowledgement({
 
   const handleRequestCallInstead = () => {
     if (onNext) {
+      onAnswerChange({ answerType: "acknowledgement", answer: true });
       onNext();
     } else {
       onBack();

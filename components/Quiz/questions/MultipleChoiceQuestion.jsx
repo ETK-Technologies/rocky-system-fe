@@ -72,7 +72,28 @@ export default function MultipleChoiceQuestion({
     x: 0,
     y: 0,
   });
-  const [textareaValues, setTextareaValues] = useState({});
+  
+  // Initialize textareaValues from answer if it exists
+  const getInitialTextareaValues = () => {
+    if (!answer) return {};
+    
+    let textareaData = null;
+    
+    if (typeof answer === 'object' && !Array.isArray(answer)) {
+      // Extract from nested structures
+      if (answer.value?.value?.textareaValues) {
+        textareaData = answer.value.value.textareaValues;
+      } else if (answer.value?.textareaValues) {
+        textareaData = answer.value.textareaValues;
+      } else if (answer.textareaValues) {
+        textareaData = answer.textareaValues;
+      }
+    }
+    
+    return textareaData && typeof textareaData === 'object' ? textareaData : {};
+  };
+  
+  const [textareaValues, setTextareaValues] = useState(getInitialTextareaValues());
 
   const { title, description, options } = step;
 
@@ -115,7 +136,18 @@ export default function MultipleChoiceQuestion({
     }
 
     setSelectedOptions(newSelection);
-    onAnswerChange({ answerType: "text", answer: newSelection });
+    
+    // Include textarea values if they exist
+    const answerData = {
+      answerType: "text",
+      answer: newSelection
+    };
+    
+    if (Object.keys(textareaValues).length > 0) {
+      answerData.textareaValues = textareaValues;
+    }
+    
+    onAnswerChange(answerData);
   };
 
   const handleTextareaChange = (optionText, value) => {
@@ -124,8 +156,17 @@ export default function MultipleChoiceQuestion({
       [optionText]: value,
     }));
 
-    // Don't update answer, just update local textarea state
-    // The textarea data will be included in form submission
+    // Update answer to include textarea values
+    const textareaData = {
+      ...textareaValues,
+      [optionText]: value
+    };
+    
+    onAnswerChange({
+      answerType: "text",
+      answer: selectedOptions,
+      textareaValues: textareaData
+    });
   };
 
   return (

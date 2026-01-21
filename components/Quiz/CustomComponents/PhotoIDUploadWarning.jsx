@@ -109,9 +109,10 @@ export default function PhotoIDUploadWarning({
           <button
             onClick={() => {
               if (isChecked) {
-                onAnswerChange({ answerType: "text", answer: "acknowledged" });
+                const answerData = { answerType: "text", answer: "acknowledged" };
+                onAnswerChange(answerData);
                 if (onNext) {
-                  onNext();
+                  onNext(answerData);
                 }
               }
             }}

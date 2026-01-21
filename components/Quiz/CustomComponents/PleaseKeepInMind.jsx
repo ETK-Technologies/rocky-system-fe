@@ -15,7 +15,9 @@ export default function PleaseKeepInMind({
   const handleContinue = () => {
     if (!isChecked) return;
     if (onNext) {
-      onNext();
+      const answerData = { answerType: "acknowledgement", answer: true };
+      onAnswerChange(answerData);
+      onNext(answerData);
     }
   };
 

@@ -138,8 +138,11 @@ const EDProductCard = ({
 
   // Update selected pills when frequency changes
   useEffect(() => {
+    logger.log("Frequency changed to:", pillOptions[0]);
     if (pillOptions[selectedFrequency] && pillOptions[selectedFrequency][0]) {
       setSelectedPills(pillOptions[selectedFrequency][0]);
+    } else {
+      setSelectedPills(pillOptions[0]);
     }
   }, [selectedFrequency, pillOptions]);
 

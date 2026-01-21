@@ -184,11 +184,14 @@ export default function QuizRenderer({
   }, []);
 
   // Navigate to next step
-  const handleNext = useCallback(async () => {
-    if (!currentAnswer) {
-      toast.warning("Please provide an answer before continuing");
-      return;
-    }
+  const handleNext = useCallback(async (answerOverride = null) => {
+    // Use provided answer or current answer
+    const answerToUse = answerOverride || currentAnswer;
+    
+    // if (!answerToUse) {
+    //   toast.warning("Please provide an answer before continuing");
+    //   return;
+    // }
 
     setIsSubmitting(true);
 
@@ -197,20 +200,38 @@ export default function QuizRenderer({
     logger.log("=== Saving Answer ===");
     logger.log("Question:", currentStep.title || currentStep.text);
     logger.log("Question ID:", currentStep.id);
-    logger.log("Answer:", currentAnswer);
+    logger.log("Answer:", answerToUse);
 
-    const saved = await saveAnswer(questionId, { value: currentAnswer });
+    const saved = await saveAnswer(questionId, { value: answerToUse });
 
     if (!saved) {
       setIsSubmitting(false);
       return;
     }
 
-    // Update answers state
+    // Update answers state with cleanup for changed answers
     const updatedAnswers = {
       ...answers,
-      [questionId]: { value: currentAnswer },
+      [questionId]: { value: answerToUse },
     };
+    
+    // Check if answer changed to clear subsequent answers
+    // This handles the case where a user resumes, changes an answer, and we need to invalidate old path data
+    const previousAnswer = answers[questionId]?.value;
+    const hasChanged = JSON.stringify(previousAnswer) !== JSON.stringify(answerToUse);
+    
+    if (hasChanged) {
+      logger.log(`Answer changed at step ${currentStepIndex}. Clearing downstream answers.`);
+      for (let i = currentStepIndex + 1; i < steps.length; i++) {
+        const stepId = String(steps[i].id);
+        if (updatedAnswers[stepId]) {
+          delete updatedAnswers[stepId];
+        }
+      }
+    }
+
+    logger.log("Updated answers after saving:", previousAnswer, "->", answerToUse, updatedAnswers);
+    
     setAnswers(updatedAnswers);
     logger.log("All answers collected:", updatedAnswers);
 
@@ -222,9 +243,9 @@ export default function QuizRenderer({
 
     // Extract actual answer value for branching logic
     const answerValue =
-      currentAnswer?.answer !== undefined
-        ? currentAnswer.answer
-        : currentAnswer;
+      answerToUse?.answer !== undefined
+        ? answerToUse.answer
+        : answerToUse;
     logger.log("Answer value for branching:", answerValue);
 
     // Determine next step using branching logic
@@ -262,8 +283,15 @@ export default function QuizRenderer({
       let prevIndex =
         visitedSteps[visitedSteps.length - 2] || currentStepIndex - 1;
       
+      logger.log(" stepsss ->: " ,steps);
+      logger.log("Handling back navigation. Current index:", currentStepIndex, "Previous index:", prevIndex);
       // Skip steps marked with shouldSkip when going back
+      logger.log("Checking for skippable steps when going back...");
       while (prevIndex >= 0 && steps[prevIndex].shouldSkip === true) {
+        prevIndex--;
+      }
+
+      if(steps[prevIndex] && steps[prevIndex].stepType === "component"){
         prevIndex--;
       }
       
@@ -627,7 +655,7 @@ export default function QuizRenderer({
         />
 
         {/* Current Step */}
-        <div className="mb-6">
+        <div className="mb-12">
           {currentStep ? (
             <>
               <StepRenderer
@@ -636,8 +664,7 @@ export default function QuizRenderer({
                 allAnswers={answers && Object.keys(answers).length > 0 ? answers : existingAnswers}
                 onAnswerChange={handleAnswerChange}
                 onBack={handleBack}
-                onNext={handleNext}
-              />
+                onNext={handleNext}                isSubmitting={isSubmitting}              />
 
               {!Authenticated && (
                 <SignInLink quizSlug={quizData.quizDetails?.slug} />
@@ -652,26 +679,60 @@ export default function QuizRenderer({
       </div>
 
       {/* Navigation - Sticky at Bottom */}
-      <QuizNavigation
-        canGoBack={currentStepIndex > 0}
-        canGoNext={
-          currentStep?.stepType === "form"
-            ? currentAnswer &&
-              typeof currentAnswer === "object" &&
-              currentAnswer.answer &&
-              currentStep.formInputs.every(
-                (input) =>
-                  currentAnswer.answer[input.id] &&
-                  currentAnswer.answer[input.id].toString().trim() !== ""
-              )
-            : !!currentAnswer
+      {/* Hide navigation for single-choice and true-false questions unless selected option has textarea or came from navigation (back button) */}
+      {(() => {
+        const shouldHideNav = 
+          currentStep?.stepType === "question" &&
+          (currentStep?.questionType === "single-choice" || currentStep?.questionType === "true-false");
+        
+        if (!shouldHideNav) {
+          // Always show for other question types
+          return true;
         }
-        isLastStep={currentStepIndex === steps.length - 1}
-        isSubmitting={isSubmitting}
-        onBack={handleBack}
-        onNext={handleNext}
-       
-      />
+        
+        // For single-choice/true-false, check various conditions
+        if (currentAnswer) {
+          const answerValue = typeof currentAnswer === 'object' 
+            ? (currentAnswer.answer || currentAnswer.value?.answer) 
+            : currentAnswer;
+          
+          const selectedOption = currentStep.options?.find(opt => opt.text === answerValue);
+          
+          // Show navigation if selected option has textarea
+          if (selectedOption?.hasTextarea) {
+            return true;
+          }
+          
+          // Show navigation if user navigated back (visited steps > 1) or there's an existing answer
+          if (visitedSteps.length > 1 || existingAnswers?.[String(currentStep.id)]) {
+            return true;
+          }
+        }
+        
+        // Hide navigation for single-choice/true-false without textarea (first time answering)
+        return false;
+      })() && (
+        <QuizNavigation
+          canGoBack={currentStepIndex > 0}
+          canGoNext={
+            currentStep?.stepType === "form"
+              ? currentAnswer &&
+                typeof currentAnswer === "object" &&
+                currentAnswer.answer &&
+                currentStep.formInputs.every(
+                  (input) =>
+                    currentAnswer.answer[input.id] &&
+                    currentAnswer.answer[input.id].toString().trim() !== ""
+                )
+              : !!currentAnswer
+          }
+          isLastStep={currentStepIndex === steps.length - 1}
+          isSubmitting={isSubmitting}
+          onBack={handleBack}
+          onNext={handleNext}
+         
+        />
+      )}
     </div>
   );
 }
