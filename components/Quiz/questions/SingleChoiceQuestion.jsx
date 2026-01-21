@@ -1,28 +1,85 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import QuestionTitle from "./Shared/QuestionTitle";
 
-export default function SingleChoiceQuestion({ step, answer, onAnswerChange }) {
+export default function SingleChoiceQuestion({ step, answer, onAnswerChange, onNext, isSubmitting }) {
   const { title, description, options } = step;
   const [showTooltip, setShowTooltip] = useState(null);
   const [zoomState, setZoomState] = useState({ show: false, image: null, x: 0, y: 0 });
+  const [isAutoAdvancing, setIsAutoAdvancing] = useState(false);
+  
+  // Reset auto-advancing state when component updates or isSubmitting changes
+  useEffect(() => {
+    if (isAutoAdvancing && !isSubmitting) {
+      setIsAutoAdvancing(false);
+    }
+  }, [isSubmitting, isAutoAdvancing]);
+  
   const [textareaValues, setTextareaValues] = useState({});
+
+  // Update textareaValues when answer changes (for resuming or going back)
+  useEffect(() => {
+    if (!answer) return;
+    
+    let textareaValue = null;
+    let answerText = null;
+    
+    if (typeof answer === 'object' && !Array.isArray(answer)) {
+      // Extract from nested structures
+      if (answer.value?.value?.textareaValue) {
+        textareaValue = answer.value.value.textareaValue;
+        answerText = answer.value.value.answer || answer.value.answer;
+      } else if (answer.value?.textareaValue) {
+        textareaValue = answer.value.textareaValue;
+        answerText = answer.value.answer;
+      } else if (answer.textareaValue) {
+        textareaValue = answer.textareaValue;
+        answerText = answer.answer;
+      }
+    }
+    
+    if (textareaValue && answerText) {
+      setTextareaValues({ [answerText]: textareaValue });
+    }
+  }, [answer]);
 
   const handleOptionSelect = (option) => {
     const optionText = option.text;
     
+    // Preserve textarea value if it exists
+    const textareaValue = textareaValues[optionText];
+    const answerData = {
+      answerType: "text",
+      answer: optionText
+    };
+    
+    // Include textarea value if it exists
+    if (textareaValue) {
+      answerData.textareaValue = textareaValue;
+    }
+    
     // Handle unselectOther logic
     if (option.unselectOther) {
       // If this option unselects others, just select this one
-      onAnswerChange({ answerType: "text", answer: optionText });
+      onAnswerChange(answerData);
     } else {
       // Check if any other option has unselectOther and is currently selected
       const unselectOtherOption = options.find(opt => opt.unselectOther);
       if (unselectOtherOption && answer === unselectOtherOption.text) {
         // If an unselectOther option is selected, replace it with this one
-        onAnswerChange({ answerType: "text", answer: optionText });
+        onAnswerChange(answerData);
       } else {
-        onAnswerChange({ answerType: "text", answer: optionText });
+        onAnswerChange(answerData);
       }
+    }
+    
+    // Auto-advance if no textarea and onNext is provided
+    if (!option.hasTextarea && onNext && !isSubmitting) {
+      // Show loading state
+      setIsAutoAdvancing(true);
+      // Call onNext with the answer data to ensure proper state update
+      setTimeout(() => {
+        onNext(answerData);
+      }, 300);
     }
   };
 
@@ -32,8 +89,12 @@ export default function SingleChoiceQuestion({ step, answer, onAnswerChange }) {
       [optionText]: value
     }));
     
-    // Don't update answer, just update local textarea state
-    // The textarea data will be included in form submission
+    // Update answer to include textarea value
+    onAnswerChange({
+      answerType: "text",
+      answer: optionText,
+      textareaValue: value
+    });
   };
 
   // Extract answer text if answer is an object
@@ -163,6 +224,19 @@ export default function SingleChoiceQuestion({ step, answer, onAnswerChange }) {
           );
         })}
       </div>
+
+      {/* Loading indicator for auto-advance */}
+      {isAutoAdvancing && (
+        <div className="mt-6 flex items-center justify-center">
+          <div className="flex items-center gap-2 text-[#A7885A]">
+            <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+            </svg>
+            <span className="text-sm">Loading...</span>
+          </div>
+        </div>
+      )}
 
       {/* Zoomed Image on Hover */}
       {zoomState.show && zoomState.image && (

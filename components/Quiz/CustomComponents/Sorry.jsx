@@ -110,7 +110,9 @@ export default function Sorry({ step, answer, onAnswerChange, onBack, onNext }) 
           <button
             onClick={() => {
               if (isChecked && onNext) {
-                onNext();
+                const answerData = { answerType: "acknowledgement", answer: true };
+                onAnswerChange(answerData);
+                onNext(answerData);
               }
             }}
             disabled={!isChecked}

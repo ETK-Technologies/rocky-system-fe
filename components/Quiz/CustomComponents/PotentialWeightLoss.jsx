@@ -107,12 +107,13 @@ export default function PotentialWeightLoss({
     // if (goNext === 0) return;
 
     // Submit answer to continue
-    onAnswerChange({
+    const answerData = {
       answerType: "text",
       answer: userData
-    });
+    };
+    onAnswerChange(answerData);
 
-    onNext();
+    onNext(answerData);
   };
 
   //
